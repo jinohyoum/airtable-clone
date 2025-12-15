@@ -121,12 +121,56 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
-exports.Prisma.PostScalarFieldEnum = {
+exports.Prisma.BaseScalarFieldEnum = {
   id: 'id',
   name: 'name',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  createdById: 'createdById'
+  userId: 'userId'
+};
+
+exports.Prisma.TableScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  baseId: 'baseId'
+};
+
+exports.Prisma.ColumnScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  type: 'type',
+  order: 'order',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  tableId: 'tableId'
+};
+
+exports.Prisma.RowScalarFieldEnum = {
+  id: 'id',
+  order: 'order',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  tableId: 'tableId'
+};
+
+exports.Prisma.CellScalarFieldEnum = {
+  id: 'id',
+  value: 'value',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  rowId: 'rowId',
+  columnId: 'columnId'
+};
+
+exports.Prisma.ViewScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  config: 'config',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  tableId: 'tableId'
 };
 
 exports.Prisma.AccountScalarFieldEnum = {
@@ -183,7 +227,12 @@ exports.Prisma.NullsOrder = {
 
 
 exports.Prisma.ModelName = {
-  Post: 'Post',
+  Base: 'Base',
+  Table: 'Table',
+  Column: 'Column',
+  Row: 'Row',
+  Cell: 'Cell',
+  View: 'View',
   Account: 'Account',
   Session: 'Session',
   User: 'User',
