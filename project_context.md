@@ -24,98 +24,127 @@ Please send daily updates to the Slack channel and timestamp it with day 1, day 
 Disclaimer: Lyra will not be using your take home project for any commercial purposes.
 7-day plan (ship something usable every day)
 
-Day 1 — Scaffold + Auth + Deploy + Core routes
+7-day plan (ship something usable every day)
 
-Scaffold with npm create t3-app@latest (Next.js + TS + Tailwind + tRPC + Prisma + NextAuth). 
-GitHub
-+1
+Goal: An Airtable-style base/table editor focused on the main grid page (tables, columns, cells) with Google login, dynamic columns (Text/Number), spreadsheet UX, and DB-level search/filter/sort that stays fast at 100k now and 1m later via tRPC + virtualization + infinite paging.
 
-Google OAuth (NextAuth) + protected routes; verify callback URLs. 
-Create T3 App
-+1
+Daily ritual (every day):
 
-Postgres + Prisma schema (Base/Table/Column/Row/Cell/View).
+Ship a working increment to prod (Vercel).
 
-Routes live:
+Record a 1–2 min Loom walking through exactly what changed.
 
-/ list Bases
+Slack message format: “Day X (YYYY-MM-DD HH:MM AEDT)” + 2–4 bullets + Loom link.
 
-/base/[baseId] list Tables
+Goal: Airtable-style base/table grid with Google login, bases/tables, dynamic Text/Number columns, spreadsheet editing + keyboard nav, virtualized infinite scroll for 100k, DB-level search/filter/sort, saved views, hide/show columns, and loading states, with a path to 1m rows.
 
-/base/[baseId]/table/[tableId] grid page shell
+Day 1 — Scaffold + Auth + Deploy + Core routes + grid page shell
+Build:
 
-Deliverable: Vercel deploy works; login → create base → create table → land on empty grid page.
+T3 scaffold (Next.js + TS + Tailwind + tRPC + Prisma + NextAuth)
 
-Slack update: “Day 1 (YYYY-MM-DD HH:MM AEDT)” + Loom link.
+Postgres (Neon) + Prisma schema (Base/Table/Column/Row/Cell/View)
 
-Day 2 — Data model wired + Create table defaults (faker) + Basic grid render
+Google OAuth + protected routes
 
-tRPC routers: base/table CRUD, column add, row/page fetch, cell upsert.
+Routes:
+• / list Bases
+• /base/[baseId] list Tables
+• /base/[baseId]/table/[tableId] grid page shell
+
+Deliverable:
+
+Deployed and protected, login works, you can navigate to a grid shell page.
+
+Day 2 — Airtable 1:1 UI (time-boxed) + create table defaults + basic grid render
+UI:
+
+Replicate Airtable layout/styling on the grid page (top bar, tabs, view bar, grid styling, active cell highlight, hover states).
+Data:
 
 “Create table” generates default columns + default rows using faker.
 
-Render a basic TanStack Table grid (no virtualization yet) with editable cell UI.
+Render TanStack Table with this data (no virtualization yet).
 
-Deliverable: Create table → see rows/columns filled with faker data; editing a cell persists.
+Deliverable:
 
-Day 3 — Spreadsheet UX (editing + keyboard navigation)
+Create table → immediately see a grid that looks like Airtable with real-looking data.
 
-Single-cell editing behavior (enter to edit, esc cancel, blur commit).
+Day 3 — Real CRUD + editable cells + loading states everywhere
+Build:
 
-Arrow keys + Tab/Shift+Tab move active cell; keep selection visible (scrollIntoView).
+tRPC + Prisma CRUD for bases/tables/columns/rows page fetch/cell upsert
 
-Optimistic update for cell edits + loading state for saves.
+Editable cells (click edit, blur/enter commit, esc cancel)
 
-Deliverable: Grid feels spreadsheet-like (fast navigation + edits).
+Loading states: initial load, creating table, saving cell, paging placeholder (even if paging comes later)
 
-Day 4 — Virtualized infinite scroll + “+100k rows” button
+Deliverable:
 
-Implement useInfiniteQuery on tRPC for row paging. 
-trpc.io
-+1
+Edit a cell → persists after refresh, with clear saving/loading feedback.
 
-Row virtualization with TanStack Virtual (useVirtualizer). 
-TanStack
-+1
+Day 4 — Spreadsheet UX (keyboard navigation + selection)
+Build:
 
-Add “+100k rows” button (server-side chunked inserts) + progress/loading UI.
+Arrow keys + Tab/Shift+Tab moves active cell
 
-Deliverable: 100k rows scroll smoothly; fetching pages is seamless; loading skeleton shows.
+Keep active cell visible while navigating
 
-Day 5 — DB-level global search (filters rows)
+Optimistic updates for edits
 
-Search box filters rows at the DB level (not client filtering).
+Deliverable:
 
-Implement a scalable approach (recommended: Row.searchText denormalized + indexed) so 100k→1m stays viable.
+Grid feels spreadsheet-fast for navigation + editing.
 
-Deliverable: Search instantly narrows rows while keeping virtualization + infinite query.
+Day 5 — Virtualized infinite scroll + “+100k rows” button
+Build:
 
-Day 6 — Views (save config) + DB-level filter/sort + hide/show columns
+tRPC useInfiniteQuery for rows paging
 
-View CRUD + config JSON persisted.
+TanStack Virtual row virtualization
 
-Column hide/show per view.
+“+100k rows” server-side chunked inserts + progress/loading UI
 
-DB-level filters:
+Deliverable:
 
-Text: is empty / not empty / contains / not contains / equals
+100k rows scroll smoothly without lag, paging is seamless, +100k doesn’t freeze UI.
 
-Number: > / < / equals
+Day 6 — DB-level global search + DB-level sorting
+Build:
+
+Global search across all cells at DB level (recommended: denormalized Row.searchText + indexes)
 
 DB-level sorting:
+• Text A→Z / Z→A
+• Number ↑ / ↓
 
-Text A→Z / Z→A
+Ensure search + sort work with infinite query + virtualization
 
-Number ↑ / ↓
+Deliverable:
 
-Deliverable: Switch views and see saved search/filter/sort/hidden columns applied.
+Search filters rows instantly and stays smooth, sort works without client filtering.
 
-Day 7 — Airtable 1:1 polish + performance hardening
+Day 7 — Views + DB-level filters + hide/show columns + 1m-readiness hardening
+Build:
 
-UI polish to match Airtable layout (top bar, tabs, view selector, search placement, grid styling).
+View CRUD + config JSON persisted
 
-Add/verify indexes; stress test to “1m rows” workflow (paging + search + filter + sort).
+Hide/show columns per view
 
-Improve loading states, empty states, error toasts.
+DB-level filters:
+• Text: is empty / not empty / contains / not contains / equals
+• Number: > / < / equals
 
-Deliverable: “Demo day” Loom: create base/table → +100k → scroll → edit → search → view configs.
+Hardening for 1m path:
+• confirm indexes for paging/search/filter/sort
+• stress test query patterns (EXPLAIN on worst-case)
+• tighten loading/error/empty states + toasts
+
+Deliverable:
+
+Demo Loom: login → create base/table → +100k → scroll → edit → search → sort → filter → switch views → hide/show columns.
+
+Scope fences (do not add):
+• No attachments, formulas, collaborators, multi-select, comments, permissions, row reordering, or fancy Airtable automations.
+• Only Text + Number columns.
+• Search/filter/sort must be DB-level (never client filtering).
