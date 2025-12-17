@@ -50,7 +50,7 @@ export default function SignInPage() {
         {/* Continue Button */}
         <button
           onClick={(e) => e.preventDefault()}
-          className="mb-5 h-[40px] w-full rounded-lg bg-[#2d7ff9] text-[14px] font-medium text-white transition-colors hover:bg-[#2668d4]"
+          className="mb-5 h-[40px] w-full cursor-pointer rounded-lg bg-[#2d7ff9] text-[14px] font-medium text-white transition-colors hover:bg-[#2668d4]"
         >
           Continue
         </button>
@@ -63,7 +63,7 @@ export default function SignInPage() {
         {/* SSO Button */}
         <button
           onClick={(e) => e.preventDefault()}
-          className="mb-3 flex h-[40px] w-full items-center justify-center rounded-lg border border-[#d0d0d0] bg-white text-[14px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5]"
+          className="mb-3 flex h-[40px] w-full cursor-pointer items-center justify-center rounded-lg border border-[#d0d0d0] bg-white text-[14px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5]"
         >
           Sign in with <span className="ml-1 font-semibold">Single Sign On</span>
         </button>
@@ -71,7 +71,7 @@ export default function SignInPage() {
         {/* Google Button - FUNCTIONAL */}
         <button
           onClick={handleGoogleSignIn}
-          className="mb-3 flex h-[40px] w-full items-center justify-center rounded-lg border border-[#d0d0d0] bg-white text-[14px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5]"
+          className="mb-3 flex h-[40px] w-full cursor-pointer items-center justify-center rounded-lg border border-[#d0d0d0] bg-white text-[14px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5]"
         >
           <svg
             width="18"
@@ -105,7 +105,7 @@ export default function SignInPage() {
         {/* Apple Button */}
         <button
           onClick={(e) => e.preventDefault()}
-          className="mb-8 flex h-[40px] w-full items-center justify-center rounded-lg border border-[#d0d0d0] bg-white text-[14px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5]"
+          className="mb-8 flex h-[40px] w-full cursor-pointer items-center justify-center rounded-lg border border-[#d0d0d0] bg-white text-[14px] font-medium text-[#1a1a1a] transition-colors hover:bg-[#f5f5f5]"
         >
           <svg
             width="18"
@@ -127,7 +127,7 @@ export default function SignInPage() {
           New to Airtable?{" "}
           <button
             onClick={(e) => e.preventDefault()}
-            className="text-[#2d7ff9] underline"
+            className="cursor-pointer text-[#2d7ff9] underline"
           >
             Create an account
           </button>{" "}
@@ -137,7 +137,7 @@ export default function SignInPage() {
 
       {/* Help Button - Bottom Left */}
       <button
-        className="fixed bottom-6 left-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#2d7ff9] text-white shadow-lg transition-all hover:bg-[#2668d4]"
+        className="fixed bottom-6 left-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#2d7ff9] text-white shadow-lg transition-all hover:bg-[#2668d4]"
         aria-label="Help"
       >
         <svg
