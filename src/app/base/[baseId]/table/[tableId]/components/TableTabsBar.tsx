@@ -3,7 +3,9 @@
 import { ChevronDown, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
 import TableCreationDropdown from './TableCreationDropdown';
+import { api } from '~/trpc/react';
 
 type MenuEntry =
   | { kind: 'heading'; label: string }
@@ -19,6 +21,9 @@ type MenuEntry =
     };
 
 export default function TableTabsBar() {
+  const params = useParams();
+  const baseId = params.baseId as string;
+  
   const popoverId = useId();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -33,11 +38,13 @@ export default function TableTabsBar() {
   const [tableCreationPos, setTableCreationPos] = useState<{ x: number; y: number } | null>(null);
   const [tables, setTables] = useState([
     { id: 1, name: 'Table 1', isActive: true },
-    { id: 2, name: 'Table 2', isActive: false },
   ]);
   const [creatingTableId, setCreatingTableId] = useState<number | null>(null);
-  const nextTableIdRef = useRef(3); // Start from 3 since we have Table 1 and 2
+  const nextTableIdRef = useRef(2); // Start from 2 since we have Table 1
   const tableButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  
+  // tRPC mutation for creating tables
+  const createTableMutation = api.table.create.useMutation();
 
   const entries: MenuEntry[] = useMemo(
     () => [
@@ -53,12 +60,13 @@ export default function TableTabsBar() {
           const newTable = {
             id: newTableId,
             name: `Table ${tableNumber}`,
-            isActive: false,
+            isActive: true, // Set new table as active
           };
           
           nextTableIdRef.current += 1; // Increment for next table's unique ID
           
-          setTables((prev) => [...prev, newTable]);
+          // Add new table and deactivate all existing tables
+          setTables((prev) => [...prev.map((t) => ({ ...t, isActive: false })), newTable]);
           setCreatingTableId(newTableId);
           
           // Wait for the new tab to render, then position the dropdown below it
@@ -403,6 +411,12 @@ export default function TableTabsBar() {
               tableButtonRefs.current.delete(table.id);
             }
           }}
+          onClick={() => {
+            // Set this table as active and deactivate all others
+            setTables((prevTables) =>
+              prevTables.map((t) => ({ ...t, isActive: t.id === table.id }))
+            );
+          }}
           className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
             table.isActive
               ? 'bg-white border border-gray-300 font-medium'
@@ -535,15 +549,28 @@ export default function TableTabsBar() {
         <TableCreationDropdown
           tableName={tables.find((t) => t.id === creatingTableId)?.name ?? ''}
           position={tableCreationPos}
-          onSave={(tableName, recordTerm) => {
-            console.log('Creating table:', tableName, 'with record term:', recordTerm);
-            // Update the table name
-            setTables((prevTables) =>
-              prevTables.map((t) => (t.id === creatingTableId ? { ...t, name: tableName } : t)),
-            );
-            setShowTableCreation(false);
-            setCreatingTableId(null);
-            // TODO: Create table in database
+          onSave={async (tableName, recordTerm) => {
+            try {
+              // Create table in database with default columns
+              const newTable = await createTableMutation.mutateAsync({
+                baseId,
+                name: tableName,
+                recordTerm,
+              });
+              
+              console.log('Table created:', newTable);
+              
+              // Update the local table name
+              setTables((prevTables) =>
+                prevTables.map((t) => (t.id === creatingTableId ? { ...t, name: tableName } : t)),
+              );
+              setShowTableCreation(false);
+              setCreatingTableId(null);
+            } catch (error) {
+              console.error('Failed to create table:', error);
+              // Optionally show error to user
+              alert('Failed to create table. Please try again.');
+            }
           }}
           onCancel={() => {
             // Remove the table if cancelled
@@ -551,11 +578,25 @@ export default function TableTabsBar() {
             setShowTableCreation(false);
             setCreatingTableId(null);
           }}
-          onClickOutside={() => {
-            // Just close the dropdown, keep the table with its current name
+          onClickOutside={async () => {
+            // Create table with default name
+            const currentTable = tables.find((t) => t.id === creatingTableId);
+            if (currentTable) {
+              try {
+                const newTable = await createTableMutation.mutateAsync({
+                  baseId,
+                  name: currentTable.name,
+                  recordTerm: 'Record',
+                });
+                
+                console.log('Table created with default name:', newTable);
+              } catch (error) {
+                console.error('Failed to create table:', error);
+              }
+            }
+            
             setShowTableCreation(false);
             setCreatingTableId(null);
-            // TODO: Create table in database with default name
           }}
         />
       )}

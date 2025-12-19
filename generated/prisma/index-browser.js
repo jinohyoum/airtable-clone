@@ -142,6 +142,7 @@ exports.Prisma.ColumnScalarFieldEnum = {
   name: 'name',
   type: 'type',
   order: 'order',
+  options: 'options',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   tableId: 'tableId'

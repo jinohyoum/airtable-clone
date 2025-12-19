@@ -1,154 +1,136 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-    provider = "prisma-client-js"
-    output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url      = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-// Airtable clone models
 model Base {
-    id        String   @id @default(cuid())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tables    Table[]
 
-    userId String
-    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-    tables Table[]
-
-    @@index([userId])
+  @@index([userId])
 }
 
 model Table {
-    id        String   @id @default(cuid())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  baseId    String
+  columns   Column[]
+  rows      Row[]
+  base      Base     @relation(fields: [baseId], references: [id], onDelete: Cascade)
+  views     View[]
 
-    baseId String
-    base   Base   @relation(fields: [baseId], references: [id], onDelete: Cascade)
-
-    columns Column[]
-    rows    Row[]
-    views   View[]
-
-    @@index([baseId])
+  @@index([baseId])
 }
 
 model Column {
-    id        String   @id @default(cuid())
-    name      String
-    type      String   // "text" or "number"
-    order     Int
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tableId   String
+  options   String?
+  cells     Cell[]
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
-    tableId String
-    table   Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
-
-    cells Cell[]
-
-    @@index([tableId])
+  @@index([tableId])
 }
 
 model Row {
-    id        String   @id @default(cuid())
-    order     Int
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tableId   String
+  cells     Cell[]
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
-    tableId String
-    table   Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
-
-    cells Cell[]
-
-    @@index([tableId])
+  @@index([tableId])
 }
 
 model Cell {
-    id        String   @id @default(cuid())
-    value     String?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  value     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rowId     String
+  columnId  String
+  column    Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  row       Row      @relation(fields: [rowId], references: [id], onDelete: Cascade)
 
-    rowId    String
-    row      Row    @relation(fields: [rowId], references: [id], onDelete: Cascade)
-    columnId String
-    column   Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
-
-    @@unique([rowId, columnId])
-    @@index([rowId])
-    @@index([columnId])
+  @@unique([rowId, columnId])
+  @@index([rowId])
+  @@index([columnId])
 }
 
 model View {
-    id        String   @id @default(cuid())
-    name      String
-    config    String?  @db.Text // JSON string for filters, sort, hidden columns, search
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  config    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
-    tableId String
-    table   Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
-
-    @@index([tableId])
+  @@index([tableId])
 }
 
-// Necessary for Next auth
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String
-    type                     String
-    provider                 String
-    providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? // @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String?
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  refresh_token_expires_in Int?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    bases         Base[]
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  bases         Base[]
+  sessions      Session[]
 }
 
 model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
 }

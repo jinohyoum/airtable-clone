@@ -4127,6 +4127,7 @@ export namespace Prisma {
     name: string | null
     type: string | null
     order: number | null
+    options: string | null
     createdAt: Date | null
     updatedAt: Date | null
     tableId: string | null
@@ -4137,6 +4138,7 @@ export namespace Prisma {
     name: string | null
     type: string | null
     order: number | null
+    options: string | null
     createdAt: Date | null
     updatedAt: Date | null
     tableId: string | null
@@ -4147,6 +4149,7 @@ export namespace Prisma {
     name: number
     type: number
     order: number
+    options: number
     createdAt: number
     updatedAt: number
     tableId: number
@@ -4167,6 +4170,7 @@ export namespace Prisma {
     name?: true
     type?: true
     order?: true
+    options?: true
     createdAt?: true
     updatedAt?: true
     tableId?: true
@@ -4177,6 +4181,7 @@ export namespace Prisma {
     name?: true
     type?: true
     order?: true
+    options?: true
     createdAt?: true
     updatedAt?: true
     tableId?: true
@@ -4187,6 +4192,7 @@ export namespace Prisma {
     name?: true
     type?: true
     order?: true
+    options?: true
     createdAt?: true
     updatedAt?: true
     tableId?: true
@@ -4284,6 +4290,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options: string | null
     createdAt: Date
     updatedAt: Date
     tableId: string
@@ -4313,6 +4320,7 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
+    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
@@ -4326,6 +4334,7 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
+    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
@@ -4337,6 +4346,7 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
+    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
@@ -4348,12 +4358,13 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
+    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
   }
 
-  export type ColumnOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "type" | "order" | "createdAt" | "updatedAt" | "tableId", ExtArgs["result"]["column"]>
+  export type ColumnOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "type" | "order" | "options" | "createdAt" | "updatedAt" | "tableId", ExtArgs["result"]["column"]>
   export type ColumnInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     table?: boolean | TableDefaultArgs<ExtArgs>
     cells?: boolean | Column$cellsArgs<ExtArgs>
@@ -4377,6 +4388,7 @@ export namespace Prisma {
       name: string
       type: string
       order: number
+      options: string | null
       createdAt: Date
       updatedAt: Date
       tableId: string
@@ -4809,6 +4821,7 @@ export namespace Prisma {
     readonly name: FieldRef<"Column", 'String'>
     readonly type: FieldRef<"Column", 'String'>
     readonly order: FieldRef<"Column", 'Int'>
+    readonly options: FieldRef<"Column", 'String'>
     readonly createdAt: FieldRef<"Column", 'DateTime'>
     readonly updatedAt: FieldRef<"Column", 'DateTime'>
     readonly tableId: FieldRef<"Column", 'String'>
@@ -12903,6 +12916,7 @@ export namespace Prisma {
     name: 'name',
     type: 'type',
     order: 'order',
+    options: 'options',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     tableId: 'tableId'
@@ -13213,6 +13227,7 @@ export namespace Prisma {
     name?: StringFilter<"Column"> | string
     type?: StringFilter<"Column"> | string
     order?: IntFilter<"Column"> | number
+    options?: StringNullableFilter<"Column"> | string | null
     createdAt?: DateTimeFilter<"Column"> | Date | string
     updatedAt?: DateTimeFilter<"Column"> | Date | string
     tableId?: StringFilter<"Column"> | string
@@ -13225,6 +13240,7 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
+    options?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
@@ -13240,6 +13256,7 @@ export namespace Prisma {
     name?: StringFilter<"Column"> | string
     type?: StringFilter<"Column"> | string
     order?: IntFilter<"Column"> | number
+    options?: StringNullableFilter<"Column"> | string | null
     createdAt?: DateTimeFilter<"Column"> | Date | string
     updatedAt?: DateTimeFilter<"Column"> | Date | string
     tableId?: StringFilter<"Column"> | string
@@ -13252,6 +13269,7 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
+    options?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
@@ -13270,6 +13288,7 @@ export namespace Prisma {
     name?: StringWithAggregatesFilter<"Column"> | string
     type?: StringWithAggregatesFilter<"Column"> | string
     order?: IntWithAggregatesFilter<"Column"> | number
+    options?: StringNullableWithAggregatesFilter<"Column"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Column"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Column"> | Date | string
     tableId?: StringWithAggregatesFilter<"Column"> | string
@@ -13842,6 +13861,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     table: TableCreateNestedOneWithoutColumnsInput
@@ -13853,6 +13873,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     tableId: string
@@ -13864,6 +13885,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     table?: TableUpdateOneRequiredWithoutColumnsNestedInput
@@ -13875,6 +13897,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
@@ -13886,6 +13909,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     tableId: string
@@ -13896,6 +13920,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -13905,6 +13930,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
@@ -14528,6 +14554,21 @@ export namespace Prisma {
     not?: NestedIntFilter<$PrismaModel> | number
   }
 
+  export type StringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
   export type TableScalarRelationFilter = {
     is?: TableWhereInput
     isNot?: TableWhereInput
@@ -14539,6 +14580,11 @@ export namespace Prisma {
     none?: CellWhereInput
   }
 
+  export type SortOrderInput = {
+    sort: SortOrder
+    nulls?: NullsOrder
+  }
+
   export type CellOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -14548,6 +14594,7 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
+    options?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
@@ -14562,6 +14609,7 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
+    options?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
@@ -14572,6 +14620,7 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
+    options?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
@@ -14595,6 +14644,24 @@ export namespace Prisma {
     _sum?: NestedIntFilter<$PrismaModel>
     _min?: NestedIntFilter<$PrismaModel>
     _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedStringNullableFilter<$PrismaModel>
+    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type RowCountOrderByAggregateInput = {
@@ -14629,21 +14696,6 @@ export namespace Prisma {
     order?: SortOrder
   }
 
-  export type StringNullableFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
-  }
-
   export type RowScalarRelationFilter = {
     is?: RowWhereInput
     isNot?: RowWhereInput
@@ -14652,11 +14704,6 @@ export namespace Prisma {
   export type ColumnScalarRelationFilter = {
     is?: ColumnWhereInput
     isNot?: ColumnWhereInput
-  }
-
-  export type SortOrderInput = {
-    sort: SortOrder
-    nulls?: NullsOrder
   }
 
   export type CellRowIdColumnIdCompoundUniqueInput = {
@@ -14689,24 +14736,6 @@ export namespace Prisma {
     updatedAt?: SortOrder
     rowId?: SortOrder
     columnId?: SortOrder
-  }
-
-  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedStringNullableFilter<$PrismaModel>
-    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type ViewCountOrderByAggregateInput = {
@@ -15181,6 +15210,10 @@ export namespace Prisma {
     divide?: number
   }
 
+  export type NullableStringFieldUpdateOperationsInput = {
+    set?: string | null
+  }
+
   export type TableUpdateOneRequiredWithoutColumnsNestedInput = {
     create?: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
     connectOrCreate?: TableCreateOrConnectWithoutColumnsInput
@@ -15283,10 +15316,6 @@ export namespace Prisma {
     create?: XOR<ColumnCreateWithoutCellsInput, ColumnUncheckedCreateWithoutCellsInput>
     connectOrCreate?: ColumnCreateOrConnectWithoutCellsInput
     connect?: ColumnWhereUniqueInput
-  }
-
-  export type NullableStringFieldUpdateOperationsInput = {
-    set?: string | null
   }
 
   export type RowUpdateOneRequiredWithoutCellsNestedInput = {
@@ -15552,6 +15581,20 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
+  export type NestedStringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -15577,20 +15620,6 @@ export namespace Prisma {
     gt?: number | FloatFieldRefInput<$PrismaModel>
     gte?: number | FloatFieldRefInput<$PrismaModel>
     not?: NestedFloatFilter<$PrismaModel> | number
-  }
-
-  export type NestedStringNullableFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -15812,6 +15841,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     cells?: CellCreateNestedManyWithoutColumnInput
@@ -15822,6 +15852,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     cells?: CellUncheckedCreateNestedManyWithoutColumnInput
@@ -15940,6 +15971,7 @@ export namespace Prisma {
     name?: StringFilter<"Column"> | string
     type?: StringFilter<"Column"> | string
     order?: IntFilter<"Column"> | number
+    options?: StringNullableFilter<"Column"> | string | null
     createdAt?: DateTimeFilter<"Column"> | Date | string
     updatedAt?: DateTimeFilter<"Column"> | Date | string
     tableId?: StringFilter<"Column"> | string
@@ -16234,6 +16266,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     table: TableCreateNestedOneWithoutColumnsInput
@@ -16244,6 +16277,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     tableId: string
@@ -16297,6 +16331,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     table?: TableUpdateOneRequiredWithoutColumnsNestedInput
@@ -16307,6 +16342,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
@@ -16695,6 +16731,7 @@ export namespace Prisma {
     name: string
     type: string
     order: number
+    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -16719,6 +16756,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     cells?: CellUpdateManyWithoutColumnNestedInput
@@ -16729,6 +16767,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     cells?: CellUncheckedUpdateManyWithoutColumnNestedInput
@@ -16739,6 +16778,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
