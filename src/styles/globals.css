@@ -83,3 +83,291 @@
   background: rgba(2, 132, 199, 0.12); /* sky-600-ish */
   color: rgb(3, 105, 161); /* sky-700-ish */
 }
+
+/* -------------------------------------------------------------------------- */
+/* Table Creation Dropdown Styles                                             */
+/* -------------------------------------------------------------------------- */
+
+.table-creation-dropdown {
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+}
+
+.colors-background-default {
+  background-color: rgb(255, 255, 255);
+}
+
+.stroked1 {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.p2 {
+  padding: 12px;
+}
+
+.rounded {
+  border-radius: 8px;
+}
+
+.max-width-1 {
+  max-width: 100%;
+}
+
+.baymax {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.flex {
+  display: flex;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.flex-auto {
+  flex: 1 1 auto;
+}
+
+.border-thick {
+  border-width: 2px;
+}
+
+.border-blue {
+  border-color: rgb(22, 110, 225);
+}
+
+.big {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rounded-big {
+  border-radius: 6px;
+}
+
+.colors-background-subtle.rounded-big {
+  border-radius: 6px;
+}
+
+.mb2 {
+  margin-bottom: 12px;
+}
+
+.p1 {
+  padding: 8px;
+}
+
+.mb1 {
+  margin-bottom: 8px;
+}
+
+.quiet {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+}
+
+.link-unquiet {
+  text-decoration: none;
+}
+
+.pointer {
+  cursor: pointer;
+}
+
+.focus-visible:focus-visible {
+  outline: 2px solid rgb(22, 110, 225);
+  outline-offset: 2px;
+}
+
+.colors-foreground-subtle {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.rounded-huge {
+  border-radius: 12px;
+}
+
+.icon {
+  display: block;
+}
+
+.colors-background-subtle {
+  background-color: rgb(242, 244, 248);
+  color: rgb(29, 31, 37);
+  overflow: hidden;
+  transition: none !important;
+}
+
+.colors-background-subtle:hover {
+  background-color: rgb(232, 234, 238);
+  transition: none !important;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ml-half {
+  margin-left: 4px;
+}
+
+.hide-print {
+  /* Hide in print view */
+}
+
+.small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.thin {
+  font-weight: 400;
+}
+
+.col-2 {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 60px;
+}
+
+.col-10 {
+  flex: 1 1 auto;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.mr1-and-half {
+  margin-right: 12px;
+}
+
+.ml1 {
+  margin-left: 8px;
+}
+
+.mr-half {
+  margin-right: 4px;
+}
+
+.mt1-and-half {
+  margin-top: 12px;
+}
+
+.border-box {
+  box-sizing: border-box;
+}
+
+.text-decoration-none {
+  text-decoration: none;
+}
+
+.print-color-exact {
+  /* Print color exact */
+}
+
+.ignore-baymax-defaults {
+  /* Ignore baymax defaults */
+}
+
+.border-none {
+  border: none;
+}
+
+.colors-foreground-default {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.background-transparent {
+  background-color: transparent;
+}
+
+.colors-background-selected-hover:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.button-size-small {
+  height: 32px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.mr1 {
+  margin-right: 8px;
+}
+
+.hover:hover {
+  /* Hover state */
+}
+
+.text-white {
+  color: white;
+}
+
+.font-weight-strong {
+  font-weight: 600;
+}
+
+.colors-background-primary-control {
+  background-color: rgb(22, 110, 225);
+}
+
+.colors-background-primary-control:hover {
+  background-color: rgb(20, 100, 205);
+}
+
+.shadow-elevation-low {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.shadow-elevation-low-hover:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+}
+
+.noevents {
+  pointer-events: none;
+}
+
+.button-text-label {
+  display: inline-block;
+}
+
+.no-user-select {
+  user-select: none;
+}
+
+h5.quiet {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.table-creation-dropdown input[type="text"] {
+  outline: none;
+  border-style: solid;
+}
+
+.table-creation-dropdown input[type="text"]:focus {
+  outline: 2px solid rgb(22, 110, 225);
+  outline-offset: -2px;
+}
+
+.table-creation-dropdown * {
+  transition: none !important;
+}

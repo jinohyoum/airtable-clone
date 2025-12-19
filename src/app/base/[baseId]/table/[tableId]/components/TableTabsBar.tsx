@@ -3,6 +3,7 @@
 import { ChevronDown, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import TableCreationDropdown from './TableCreationDropdown';
 
 type MenuEntry =
   | { kind: 'heading'; label: string }
@@ -28,6 +29,15 @@ export default function TableTabsBar() {
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number; maxH: number } | null>(
     null,
   );
+  const [showTableCreation, setShowTableCreation] = useState(false);
+  const [tableCreationPos, setTableCreationPos] = useState<{ x: number; y: number } | null>(null);
+  const [tables, setTables] = useState([
+    { id: 1, name: 'Table 1', isActive: true },
+    { id: 2, name: 'Table 2', isActive: false },
+  ]);
+  const [creatingTableId, setCreatingTableId] = useState<number | null>(null);
+  const nextTableIdRef = useRef(3); // Start from 3 since we have Table 1 and 2
+  const tableButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   const entries: MenuEntry[] = useMemo(
     () => [
@@ -37,7 +47,34 @@ export default function TableTabsBar() {
         label: 'Start from scratch',
         ariaLabel: 'Start from scratch',
         onSelect: () => {
-          // TODO: wire to create table flow
+          // Create a new table tab with unique ID
+          const newTableId = nextTableIdRef.current;
+          const tableNumber = tables.length + 1; // Based on how many tables exist
+          const newTable = {
+            id: newTableId,
+            name: `Table ${tableNumber}`,
+            isActive: false,
+          };
+          
+          nextTableIdRef.current += 1; // Increment for next table's unique ID
+          
+          setTables((prev) => [...prev, newTable]);
+          setCreatingTableId(newTableId);
+          
+          // Wait for the new tab to render, then position the dropdown below it
+          setTimeout(() => {
+            const newTableBtn = tableButtonRefs.current.get(newTableId);
+            if (!newTableBtn) return;
+            
+            const rect = newTableBtn.getBoundingClientRect();
+            // Center the dropdown (299px wide) with the right edge of the table tab
+            const dropdownWidth = 299;
+            setTableCreationPos({
+              x: Math.round(rect.right - dropdownWidth / 2),
+              y: Math.round(rect.bottom + 8),
+            });
+            setShowTableCreation(true);
+          }, 10);
         },
       },
       { kind: 'divider' },
@@ -354,20 +391,30 @@ export default function TableTabsBar() {
   };
 
   return (
-    <div className="relative h-12 bg-[#FDF6F0] border-b border-gray-200 flex items-center px-4 gap-2">
-      {/* Table 1 tab */}
-      <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
-        <span>Table 1</span>
-        <ChevronDown className="w-4 h-4 text-gray-500" />
-      </button>
+    <div className="relative flex items-center px-4 gap-2 border-b border-gray-200" style={{ backgroundColor: 'rgb(255, 236, 227)', height: '32px' }}>
+      {/* Dynamic table tabs */}
+      {tables.map((table) => (
+        <button
+          key={table.id}
+          ref={(el) => {
+            if (el) {
+              tableButtonRefs.current.set(table.id, el);
+            } else {
+              tableButtonRefs.current.delete(table.id);
+            }
+          }}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+            table.isActive
+              ? 'bg-white border border-gray-300 font-medium'
+              : 'hover:bg-white/50 text-gray-700'
+          }`}
+        >
+          <span>{table.name}</span>
+          <ChevronDown className="w-4 h-4 text-gray-500" />
+        </button>
+      ))}
 
-      {/* Table 2 tab */}
-      <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/50 rounded text-sm text-gray-700">
-        <span>Table 2</span>
-        <ChevronDown className="w-4 h-4 text-gray-500" />
-      </button>
-
-      {/* Add or import button */}
+      {/* Add button */}
       <button
         ref={buttonRef}
         type="button"
@@ -381,10 +428,9 @@ export default function TableTabsBar() {
             return next;
           });
         }}
-        className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/50 rounded text-sm text-gray-700"
+        className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/50 rounded text-sm text-gray-700"
       >
         <Plus className="w-4 h-4" />
-        <span>Add or import</span>
       </button>
 
       <div className="flex-1" />
@@ -482,6 +528,36 @@ export default function TableTabsBar() {
             })}
           </ul>
         </div>
+      )}
+
+      {/* Table Creation Dropdown */}
+      {showTableCreation && tableCreationPos && creatingTableId !== null && (
+        <TableCreationDropdown
+          tableName={tables.find((t) => t.id === creatingTableId)?.name ?? ''}
+          position={tableCreationPos}
+          onSave={(tableName, recordTerm) => {
+            console.log('Creating table:', tableName, 'with record term:', recordTerm);
+            // Update the table name
+            setTables((prevTables) =>
+              prevTables.map((t) => (t.id === creatingTableId ? { ...t, name: tableName } : t)),
+            );
+            setShowTableCreation(false);
+            setCreatingTableId(null);
+            // TODO: Create table in database
+          }}
+          onCancel={() => {
+            // Remove the table if cancelled
+            setTables((prevTables) => prevTables.filter((t) => t.id !== creatingTableId));
+            setShowTableCreation(false);
+            setCreatingTableId(null);
+          }}
+          onClickOutside={() => {
+            // Just close the dropdown, keep the table with its current name
+            setShowTableCreation(false);
+            setCreatingTableId(null);
+            // TODO: Create table in database with default name
+          }}
+        />
       )}
     </div>
   );
