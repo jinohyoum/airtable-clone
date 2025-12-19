@@ -160,9 +160,6 @@ export default function MainContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isDataHovered = hoveredRow === 'data';
-  const isAddHovered = hoveredRow === 'add';
-
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }}>
       {/* Spreadsheet grid
@@ -219,7 +216,7 @@ export default function MainContent() {
                         <input
                           type="text"
                           className="w-full h-8 px-2 bg-transparent outline-none focus:bg-blue-50 table-cell-input"
-                          defaultValue={firstCell ? String(firstCell.getValue() ?? '') : ''}
+                          defaultValue={firstCell ? (firstCell.getValue() as string ?? '') : ''}
                         />
                       </td>
                     </tr>
@@ -303,7 +300,7 @@ export default function MainContent() {
                           <input
                             type="text"
                             className="w-full h-8 pl-3 pr-2 bg-transparent outline-none focus:bg-blue-50 table-cell-input"
-                            defaultValue={String(cell.getValue() ?? '')}
+                            defaultValue={(cell.getValue() as string ?? '')}
                           />
                         </td>
                       ))}

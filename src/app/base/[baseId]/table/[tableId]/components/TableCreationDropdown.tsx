@@ -99,7 +99,7 @@ export default function TableCreationDropdown({
                 viewBox="0 0 16 16"
                 className="flex-none icon"
                 aria-hidden="true"
-                style={{ shapeRendering: 'geometricprecision' }}
+                style={{ shapeRendering: 'geometricPrecision' }}
               >
                 <path
                   fill="currentColor"
@@ -137,10 +137,9 @@ export default function TableCreationDropdown({
                 height="16"
                 viewBox="0 0 16 16"
                 className="flex-none icon"
-                style={{ shapeRendering: 'geometricprecision' }}
+                style={{ shapeRendering: 'geometricPrecision' }}
               >
                 <path
-                  fill="currentColor"
                   d="M4.5 6L8 9.5L11.5 6"
                   stroke="currentColor"
                   strokeWidth="1.5"
@@ -163,10 +162,9 @@ export default function TableCreationDropdown({
                 height="16"
                 viewBox="0 0 16 16"
                 className="flex-none ml1 mr-half"
-                style={{ shapeRendering: 'geometricprecision' }}
+                style={{ shapeRendering: 'geometricPrecision' }}
               >
                 <path
-                  fill="currentColor"
                   d="M8 3.5v9m-4.5-4.5h9"
                   stroke="currentColor"
                   strokeWidth="1.5"
@@ -182,7 +180,7 @@ export default function TableCreationDropdown({
                 height="16"
                 viewBox="0 0 16 16"
                 className="flex-none ml1 mr-half"
-                style={{ shapeRendering: 'geometricprecision' }}
+                style={{ shapeRendering: 'geometricPrecision' }}
               >
                 <path
                   fill="currentColor"

@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import Link from 'next/link';
 import { Loader, HelpCircle, Bell } from 'lucide-react';
 
 export default function LeftSidebarNarrow() {
@@ -10,13 +10,12 @@ export default function LeftSidebarNarrow() {
       <div className="flex flex-col items-center gap-2">
         {/* Home icon (Airtable logo) */}
         <div className="flex items-center">
-          <a 
+          <Link 
             id="appTopBarHomeButton" 
             aria-label="Back to home" 
             className="flex flex-none relative pointer circle focus-visible-white colors-border-emphasis" 
             href="/" 
-            style={{ width: '24px', height: '24px' }} 
-            aria-description="Tooltip: Back to home"
+            style={{ width: '24px', height: '24px' }}
           >
             <div className="animate flex flex-auto items-center justify-center" style={{ transform: 'scale(1)' }}>
               <div style={{ position: 'relative', top: '2px' }}>
@@ -25,7 +24,7 @@ export default function LeftSidebarNarrow() {
                   height="20.4" 
                   viewBox="0 0 200 170" 
                   xmlns="http://www.w3.org/2000/svg" 
-                  style={{ shapeRendering: 'geometricprecision' }}
+                  style={{ shapeRendering: 'geometricPrecision' }}
                 >
                   <g>
                     <path 
@@ -44,7 +43,7 @@ export default function LeftSidebarNarrow() {
                 </svg>
               </div>
             </div>
-          </a>
+          </Link>
         </div>
 
         {/* Spinner/Loading icon */}

@@ -19,7 +19,7 @@ export default function TopNav() {
               height="20.4" 
               viewBox="0 0 200 170" 
               xmlns="http://www.w3.org/2000/svg" 
-              style={{ shapeRendering: 'geometricprecision' }}
+              style={{ shapeRendering: 'geometricPrecision' }}
             >
               <g>
                 <path 

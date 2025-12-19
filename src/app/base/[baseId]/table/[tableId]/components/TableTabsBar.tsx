@@ -26,7 +26,7 @@ export default function TableTabsBar() {
   const currentTableId = params.tableId as string;
   
   const popoverId = useId();
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const buttonRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLUListElement | null>(null);
 
