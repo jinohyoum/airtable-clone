@@ -6,6 +6,7 @@ import Image from "next/image";
 export default function SignInPage() {
   const handleGoogleSignIn = async () => {
     try {
+      // Redirect to home page which will handle the table redirect
       await signIn("google", { callbackUrl: "/", redirect: true });
     } catch (error) {
       console.error("Sign in error:", error);
