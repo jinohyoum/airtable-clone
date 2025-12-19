@@ -1823,14 +1823,14 @@ export namespace Prisma {
 
   export type UserCountOutputType = {
     accounts: number
-    sessions: number
     bases: number
+    sessions: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | UserCountOutputTypeCountAccountsArgs
-    sessions?: boolean | UserCountOutputTypeCountSessionsArgs
     bases?: boolean | UserCountOutputTypeCountBasesArgs
+    sessions?: boolean | UserCountOutputTypeCountSessionsArgs
   }
 
   // Custom InputTypes
@@ -1854,15 +1854,15 @@ export namespace Prisma {
   /**
    * UserCountOutputType without action
    */
-  export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    where?: SessionWhereInput
+  export type UserCountOutputTypeCountBasesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BaseWhereInput
   }
 
   /**
    * UserCountOutputType without action
    */
-  export type UserCountOutputTypeCountBasesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    where?: BaseWhereInput
+  export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionWhereInput
   }
 
 
@@ -3122,9 +3122,9 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     baseId?: boolean
-    base?: boolean | BaseDefaultArgs<ExtArgs>
     columns?: boolean | Table$columnsArgs<ExtArgs>
     rows?: boolean | Table$rowsArgs<ExtArgs>
+    base?: boolean | BaseDefaultArgs<ExtArgs>
     views?: boolean | Table$viewsArgs<ExtArgs>
     _count?: boolean | TableCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["table"]>
@@ -3157,9 +3157,9 @@ export namespace Prisma {
 
   export type TableOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "createdAt" | "updatedAt" | "baseId", ExtArgs["result"]["table"]>
   export type TableInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    base?: boolean | BaseDefaultArgs<ExtArgs>
     columns?: boolean | Table$columnsArgs<ExtArgs>
     rows?: boolean | Table$rowsArgs<ExtArgs>
+    base?: boolean | BaseDefaultArgs<ExtArgs>
     views?: boolean | Table$viewsArgs<ExtArgs>
     _count?: boolean | TableCountOutputTypeDefaultArgs<ExtArgs>
   }
@@ -3173,9 +3173,9 @@ export namespace Prisma {
   export type $TablePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Table"
     objects: {
-      base: Prisma.$BasePayload<ExtArgs>
       columns: Prisma.$ColumnPayload<ExtArgs>[]
       rows: Prisma.$RowPayload<ExtArgs>[]
+      base: Prisma.$BasePayload<ExtArgs>
       views: Prisma.$ViewPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -3578,9 +3578,9 @@ export namespace Prisma {
    */
   export interface Prisma__TableClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-    base<T extends BaseDefaultArgs<ExtArgs> = {}>(args?: Subset<T, BaseDefaultArgs<ExtArgs>>): Prisma__BaseClient<$Result.GetResult<Prisma.$BasePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     columns<T extends Table$columnsArgs<ExtArgs> = {}>(args?: Subset<T, Table$columnsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ColumnPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     rows<T extends Table$rowsArgs<ExtArgs> = {}>(args?: Subset<T, Table$rowsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RowPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    base<T extends BaseDefaultArgs<ExtArgs> = {}>(args?: Subset<T, BaseDefaultArgs<ExtArgs>>): Prisma__BaseClient<$Result.GetResult<Prisma.$BasePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     views<T extends Table$viewsArgs<ExtArgs> = {}>(args?: Subset<T, Table$viewsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ViewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -4127,10 +4127,10 @@ export namespace Prisma {
     name: string | null
     type: string | null
     order: number | null
-    options: string | null
     createdAt: Date | null
     updatedAt: Date | null
     tableId: string | null
+    options: string | null
   }
 
   export type ColumnMaxAggregateOutputType = {
@@ -4138,10 +4138,10 @@ export namespace Prisma {
     name: string | null
     type: string | null
     order: number | null
-    options: string | null
     createdAt: Date | null
     updatedAt: Date | null
     tableId: string | null
+    options: string | null
   }
 
   export type ColumnCountAggregateOutputType = {
@@ -4149,10 +4149,10 @@ export namespace Prisma {
     name: number
     type: number
     order: number
-    options: number
     createdAt: number
     updatedAt: number
     tableId: number
+    options: number
     _all: number
   }
 
@@ -4170,10 +4170,10 @@ export namespace Prisma {
     name?: true
     type?: true
     order?: true
-    options?: true
     createdAt?: true
     updatedAt?: true
     tableId?: true
+    options?: true
   }
 
   export type ColumnMaxAggregateInputType = {
@@ -4181,10 +4181,10 @@ export namespace Prisma {
     name?: true
     type?: true
     order?: true
-    options?: true
     createdAt?: true
     updatedAt?: true
     tableId?: true
+    options?: true
   }
 
   export type ColumnCountAggregateInputType = {
@@ -4192,10 +4192,10 @@ export namespace Prisma {
     name?: true
     type?: true
     order?: true
-    options?: true
     createdAt?: true
     updatedAt?: true
     tableId?: true
+    options?: true
     _all?: true
   }
 
@@ -4290,10 +4290,10 @@ export namespace Prisma {
     name: string
     type: string
     order: number
-    options: string | null
     createdAt: Date
     updatedAt: Date
     tableId: string
+    options: string | null
     _count: ColumnCountAggregateOutputType | null
     _avg: ColumnAvgAggregateOutputType | null
     _sum: ColumnSumAggregateOutputType | null
@@ -4320,12 +4320,12 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
-    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
-    table?: boolean | TableDefaultArgs<ExtArgs>
+    options?: boolean
     cells?: boolean | Column$cellsArgs<ExtArgs>
+    table?: boolean | TableDefaultArgs<ExtArgs>
     _count?: boolean | ColumnCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["column"]>
 
@@ -4334,10 +4334,10 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
-    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
+    options?: boolean
     table?: boolean | TableDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["column"]>
 
@@ -4346,10 +4346,10 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
-    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
+    options?: boolean
     table?: boolean | TableDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["column"]>
 
@@ -4358,16 +4358,16 @@ export namespace Prisma {
     name?: boolean
     type?: boolean
     order?: boolean
-    options?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
+    options?: boolean
   }
 
-  export type ColumnOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "type" | "order" | "options" | "createdAt" | "updatedAt" | "tableId", ExtArgs["result"]["column"]>
+  export type ColumnOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "type" | "order" | "createdAt" | "updatedAt" | "tableId" | "options", ExtArgs["result"]["column"]>
   export type ColumnInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    table?: boolean | TableDefaultArgs<ExtArgs>
     cells?: boolean | Column$cellsArgs<ExtArgs>
+    table?: boolean | TableDefaultArgs<ExtArgs>
     _count?: boolean | ColumnCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ColumnIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4380,18 +4380,18 @@ export namespace Prisma {
   export type $ColumnPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Column"
     objects: {
-      table: Prisma.$TablePayload<ExtArgs>
       cells: Prisma.$CellPayload<ExtArgs>[]
+      table: Prisma.$TablePayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       name: string
       type: string
       order: number
-      options: string | null
       createdAt: Date
       updatedAt: Date
       tableId: string
+      options: string | null
     }, ExtArgs["result"]["column"]>
     composites: {}
   }
@@ -4786,8 +4786,8 @@ export namespace Prisma {
    */
   export interface Prisma__ColumnClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-    table<T extends TableDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TableDefaultArgs<ExtArgs>>): Prisma__TableClient<$Result.GetResult<Prisma.$TablePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     cells<T extends Column$cellsArgs<ExtArgs> = {}>(args?: Subset<T, Column$cellsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CellPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    table<T extends TableDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TableDefaultArgs<ExtArgs>>): Prisma__TableClient<$Result.GetResult<Prisma.$TablePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4821,10 +4821,10 @@ export namespace Prisma {
     readonly name: FieldRef<"Column", 'String'>
     readonly type: FieldRef<"Column", 'String'>
     readonly order: FieldRef<"Column", 'Int'>
-    readonly options: FieldRef<"Column", 'String'>
     readonly createdAt: FieldRef<"Column", 'DateTime'>
     readonly updatedAt: FieldRef<"Column", 'DateTime'>
     readonly tableId: FieldRef<"Column", 'String'>
+    readonly options: FieldRef<"Column", 'String'>
   }
     
 
@@ -5461,8 +5461,8 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     tableId?: boolean
-    table?: boolean | TableDefaultArgs<ExtArgs>
     cells?: boolean | Row$cellsArgs<ExtArgs>
+    table?: boolean | TableDefaultArgs<ExtArgs>
     _count?: boolean | RowCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["row"]>
 
@@ -5494,8 +5494,8 @@ export namespace Prisma {
 
   export type RowOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "order" | "createdAt" | "updatedAt" | "tableId", ExtArgs["result"]["row"]>
   export type RowInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    table?: boolean | TableDefaultArgs<ExtArgs>
     cells?: boolean | Row$cellsArgs<ExtArgs>
+    table?: boolean | TableDefaultArgs<ExtArgs>
     _count?: boolean | RowCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type RowIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -5508,8 +5508,8 @@ export namespace Prisma {
   export type $RowPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Row"
     objects: {
-      table: Prisma.$TablePayload<ExtArgs>
       cells: Prisma.$CellPayload<ExtArgs>[]
+      table: Prisma.$TablePayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -5911,8 +5911,8 @@ export namespace Prisma {
    */
   export interface Prisma__RowClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-    table<T extends TableDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TableDefaultArgs<ExtArgs>>): Prisma__TableClient<$Result.GetResult<Prisma.$TablePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     cells<T extends Row$cellsArgs<ExtArgs> = {}>(args?: Subset<T, Row$cellsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CellPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    table<T extends TableDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TableDefaultArgs<ExtArgs>>): Prisma__TableClient<$Result.GetResult<Prisma.$TablePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -6557,8 +6557,8 @@ export namespace Prisma {
     updatedAt?: boolean
     rowId?: boolean
     columnId?: boolean
-    row?: boolean | RowDefaultArgs<ExtArgs>
     column?: boolean | ColumnDefaultArgs<ExtArgs>
+    row?: boolean | RowDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["cell"]>
 
   export type CellSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -6568,8 +6568,8 @@ export namespace Prisma {
     updatedAt?: boolean
     rowId?: boolean
     columnId?: boolean
-    row?: boolean | RowDefaultArgs<ExtArgs>
     column?: boolean | ColumnDefaultArgs<ExtArgs>
+    row?: boolean | RowDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["cell"]>
 
   export type CellSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -6579,8 +6579,8 @@ export namespace Prisma {
     updatedAt?: boolean
     rowId?: boolean
     columnId?: boolean
-    row?: boolean | RowDefaultArgs<ExtArgs>
     column?: boolean | ColumnDefaultArgs<ExtArgs>
+    row?: boolean | RowDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["cell"]>
 
   export type CellSelectScalar = {
@@ -6594,23 +6594,23 @@ export namespace Prisma {
 
   export type CellOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "value" | "createdAt" | "updatedAt" | "rowId" | "columnId", ExtArgs["result"]["cell"]>
   export type CellInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    row?: boolean | RowDefaultArgs<ExtArgs>
     column?: boolean | ColumnDefaultArgs<ExtArgs>
+    row?: boolean | RowDefaultArgs<ExtArgs>
   }
   export type CellIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    row?: boolean | RowDefaultArgs<ExtArgs>
     column?: boolean | ColumnDefaultArgs<ExtArgs>
+    row?: boolean | RowDefaultArgs<ExtArgs>
   }
   export type CellIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    row?: boolean | RowDefaultArgs<ExtArgs>
     column?: boolean | ColumnDefaultArgs<ExtArgs>
+    row?: boolean | RowDefaultArgs<ExtArgs>
   }
 
   export type $CellPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Cell"
     objects: {
-      row: Prisma.$RowPayload<ExtArgs>
       column: Prisma.$ColumnPayload<ExtArgs>
+      row: Prisma.$RowPayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -7013,8 +7013,8 @@ export namespace Prisma {
    */
   export interface Prisma__CellClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-    row<T extends RowDefaultArgs<ExtArgs> = {}>(args?: Subset<T, RowDefaultArgs<ExtArgs>>): Prisma__RowClient<$Result.GetResult<Prisma.$RowPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     column<T extends ColumnDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ColumnDefaultArgs<ExtArgs>>): Prisma__ColumnClient<$Result.GetResult<Prisma.$ColumnPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    row<T extends RowDefaultArgs<ExtArgs> = {}>(args?: Subset<T, RowDefaultArgs<ExtArgs>>): Prisma__RowClient<$Result.GetResult<Prisma.$RowPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -10945,8 +10945,8 @@ export namespace Prisma {
     emailVerified?: boolean
     image?: boolean
     accounts?: boolean | User$accountsArgs<ExtArgs>
-    sessions?: boolean | User$sessionsArgs<ExtArgs>
     bases?: boolean | User$basesArgs<ExtArgs>
+    sessions?: boolean | User$sessionsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -10977,8 +10977,8 @@ export namespace Prisma {
   export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "email" | "emailVerified" | "image", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | User$accountsArgs<ExtArgs>
-    sessions?: boolean | User$sessionsArgs<ExtArgs>
     bases?: boolean | User$basesArgs<ExtArgs>
+    sessions?: boolean | User$sessionsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -10988,8 +10988,8 @@ export namespace Prisma {
     name: "User"
     objects: {
       accounts: Prisma.$AccountPayload<ExtArgs>[]
-      sessions: Prisma.$SessionPayload<ExtArgs>[]
       bases: Prisma.$BasePayload<ExtArgs>[]
+      sessions: Prisma.$SessionPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -11392,8 +11392,8 @@ export namespace Prisma {
   export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     accounts<T extends User$accountsArgs<ExtArgs> = {}>(args?: Subset<T, User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     bases<T extends User$basesArgs<ExtArgs> = {}>(args?: Subset<T, User$basesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BasePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -11840,30 +11840,6 @@ export namespace Prisma {
   }
 
   /**
-   * User.sessions
-   */
-  export type User$sessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the Session
-     */
-    select?: SessionSelect<ExtArgs> | null
-    /**
-     * Omit specific fields from the Session
-     */
-    omit?: SessionOmit<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well
-     */
-    include?: SessionInclude<ExtArgs> | null
-    where?: SessionWhereInput
-    orderBy?: SessionOrderByWithRelationInput | SessionOrderByWithRelationInput[]
-    cursor?: SessionWhereUniqueInput
-    take?: number
-    skip?: number
-    distinct?: SessionScalarFieldEnum | SessionScalarFieldEnum[]
-  }
-
-  /**
    * User.bases
    */
   export type User$basesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -11885,6 +11861,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: BaseScalarFieldEnum | BaseScalarFieldEnum[]
+  }
+
+  /**
+   * User.sessions
+   */
+  export type User$sessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Session
+     */
+    select?: SessionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Session
+     */
+    omit?: SessionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionInclude<ExtArgs> | null
+    where?: SessionWhereInput
+    orderBy?: SessionOrderByWithRelationInput | SessionOrderByWithRelationInput[]
+    cursor?: SessionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SessionScalarFieldEnum | SessionScalarFieldEnum[]
   }
 
   /**
@@ -12916,10 +12916,10 @@ export namespace Prisma {
     name: 'name',
     type: 'type',
     order: 'order',
-    options: 'options',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
-    tableId: 'tableId'
+    tableId: 'tableId',
+    options: 'options'
   };
 
   export type ColumnScalarFieldEnum = (typeof ColumnScalarFieldEnum)[keyof typeof ColumnScalarFieldEnum]
@@ -13164,9 +13164,9 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Table"> | Date | string
     updatedAt?: DateTimeFilter<"Table"> | Date | string
     baseId?: StringFilter<"Table"> | string
-    base?: XOR<BaseScalarRelationFilter, BaseWhereInput>
     columns?: ColumnListRelationFilter
     rows?: RowListRelationFilter
+    base?: XOR<BaseScalarRelationFilter, BaseWhereInput>
     views?: ViewListRelationFilter
   }
 
@@ -13176,9 +13176,9 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     baseId?: SortOrder
-    base?: BaseOrderByWithRelationInput
     columns?: ColumnOrderByRelationAggregateInput
     rows?: RowOrderByRelationAggregateInput
+    base?: BaseOrderByWithRelationInput
     views?: ViewOrderByRelationAggregateInput
   }
 
@@ -13191,9 +13191,9 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Table"> | Date | string
     updatedAt?: DateTimeFilter<"Table"> | Date | string
     baseId?: StringFilter<"Table"> | string
-    base?: XOR<BaseScalarRelationFilter, BaseWhereInput>
     columns?: ColumnListRelationFilter
     rows?: RowListRelationFilter
+    base?: XOR<BaseScalarRelationFilter, BaseWhereInput>
     views?: ViewListRelationFilter
   }, "id">
 
@@ -13227,12 +13227,12 @@ export namespace Prisma {
     name?: StringFilter<"Column"> | string
     type?: StringFilter<"Column"> | string
     order?: IntFilter<"Column"> | number
-    options?: StringNullableFilter<"Column"> | string | null
     createdAt?: DateTimeFilter<"Column"> | Date | string
     updatedAt?: DateTimeFilter<"Column"> | Date | string
     tableId?: StringFilter<"Column"> | string
-    table?: XOR<TableScalarRelationFilter, TableWhereInput>
+    options?: StringNullableFilter<"Column"> | string | null
     cells?: CellListRelationFilter
+    table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }
 
   export type ColumnOrderByWithRelationInput = {
@@ -13240,12 +13240,12 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
-    options?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
-    table?: TableOrderByWithRelationInput
+    options?: SortOrderInput | SortOrder
     cells?: CellOrderByRelationAggregateInput
+    table?: TableOrderByWithRelationInput
   }
 
   export type ColumnWhereUniqueInput = Prisma.AtLeast<{
@@ -13256,12 +13256,12 @@ export namespace Prisma {
     name?: StringFilter<"Column"> | string
     type?: StringFilter<"Column"> | string
     order?: IntFilter<"Column"> | number
-    options?: StringNullableFilter<"Column"> | string | null
     createdAt?: DateTimeFilter<"Column"> | Date | string
     updatedAt?: DateTimeFilter<"Column"> | Date | string
     tableId?: StringFilter<"Column"> | string
-    table?: XOR<TableScalarRelationFilter, TableWhereInput>
+    options?: StringNullableFilter<"Column"> | string | null
     cells?: CellListRelationFilter
+    table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }, "id">
 
   export type ColumnOrderByWithAggregationInput = {
@@ -13269,10 +13269,10 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
-    options?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
+    options?: SortOrderInput | SortOrder
     _count?: ColumnCountOrderByAggregateInput
     _avg?: ColumnAvgOrderByAggregateInput
     _max?: ColumnMaxOrderByAggregateInput
@@ -13288,10 +13288,10 @@ export namespace Prisma {
     name?: StringWithAggregatesFilter<"Column"> | string
     type?: StringWithAggregatesFilter<"Column"> | string
     order?: IntWithAggregatesFilter<"Column"> | number
-    options?: StringNullableWithAggregatesFilter<"Column"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Column"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Column"> | Date | string
     tableId?: StringWithAggregatesFilter<"Column"> | string
+    options?: StringNullableWithAggregatesFilter<"Column"> | string | null
   }
 
   export type RowWhereInput = {
@@ -13303,8 +13303,8 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Row"> | Date | string
     updatedAt?: DateTimeFilter<"Row"> | Date | string
     tableId?: StringFilter<"Row"> | string
-    table?: XOR<TableScalarRelationFilter, TableWhereInput>
     cells?: CellListRelationFilter
+    table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }
 
   export type RowOrderByWithRelationInput = {
@@ -13313,8 +13313,8 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
-    table?: TableOrderByWithRelationInput
     cells?: CellOrderByRelationAggregateInput
+    table?: TableOrderByWithRelationInput
   }
 
   export type RowWhereUniqueInput = Prisma.AtLeast<{
@@ -13326,8 +13326,8 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Row"> | Date | string
     updatedAt?: DateTimeFilter<"Row"> | Date | string
     tableId?: StringFilter<"Row"> | string
-    table?: XOR<TableScalarRelationFilter, TableWhereInput>
     cells?: CellListRelationFilter
+    table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }, "id">
 
   export type RowOrderByWithAggregationInput = {
@@ -13364,8 +13364,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Cell"> | Date | string
     rowId?: StringFilter<"Cell"> | string
     columnId?: StringFilter<"Cell"> | string
-    row?: XOR<RowScalarRelationFilter, RowWhereInput>
     column?: XOR<ColumnScalarRelationFilter, ColumnWhereInput>
+    row?: XOR<RowScalarRelationFilter, RowWhereInput>
   }
 
   export type CellOrderByWithRelationInput = {
@@ -13375,8 +13375,8 @@ export namespace Prisma {
     updatedAt?: SortOrder
     rowId?: SortOrder
     columnId?: SortOrder
-    row?: RowOrderByWithRelationInput
     column?: ColumnOrderByWithRelationInput
+    row?: RowOrderByWithRelationInput
   }
 
   export type CellWhereUniqueInput = Prisma.AtLeast<{
@@ -13390,8 +13390,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Cell"> | Date | string
     rowId?: StringFilter<"Cell"> | string
     columnId?: StringFilter<"Cell"> | string
-    row?: XOR<RowScalarRelationFilter, RowWhereInput>
     column?: XOR<ColumnScalarRelationFilter, ColumnWhereInput>
+    row?: XOR<RowScalarRelationFilter, RowWhereInput>
   }, "id" | "rowId_columnId">
 
   export type CellOrderByWithAggregationInput = {
@@ -13636,8 +13636,8 @@ export namespace Prisma {
     emailVerified?: DateTimeNullableFilter<"User"> | Date | string | null
     image?: StringNullableFilter<"User"> | string | null
     accounts?: AccountListRelationFilter
-    sessions?: SessionListRelationFilter
     bases?: BaseListRelationFilter
+    sessions?: SessionListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -13647,8 +13647,8 @@ export namespace Prisma {
     emailVerified?: SortOrderInput | SortOrder
     image?: SortOrderInput | SortOrder
     accounts?: AccountOrderByRelationAggregateInput
-    sessions?: SessionOrderByRelationAggregateInput
     bases?: BaseOrderByRelationAggregateInput
+    sessions?: SessionOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -13661,8 +13661,8 @@ export namespace Prisma {
     emailVerified?: DateTimeNullableFilter<"User"> | Date | string | null
     image?: StringNullableFilter<"User"> | string | null
     accounts?: AccountListRelationFilter
-    sessions?: SessionListRelationFilter
     bases?: BaseListRelationFilter
+    sessions?: SessionListRelationFilter
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -13794,9 +13794,9 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
-    base: BaseCreateNestedOneWithoutTablesInput
     columns?: ColumnCreateNestedManyWithoutTableInput
     rows?: RowCreateNestedManyWithoutTableInput
+    base: BaseCreateNestedOneWithoutTablesInput
     views?: ViewCreateNestedManyWithoutTableInput
   }
 
@@ -13816,9 +13816,9 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
     columns?: ColumnUpdateManyWithoutTableNestedInput
     rows?: RowUpdateManyWithoutTableNestedInput
+    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
     views?: ViewUpdateManyWithoutTableNestedInput
   }
 
@@ -13861,11 +13861,11 @@ export namespace Prisma {
     name: string
     type: string
     order: number
-    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    table: TableCreateNestedOneWithoutColumnsInput
+    options?: string | null
     cells?: CellCreateNestedManyWithoutColumnInput
+    table: TableCreateNestedOneWithoutColumnsInput
   }
 
   export type ColumnUncheckedCreateInput = {
@@ -13873,10 +13873,10 @@ export namespace Prisma {
     name: string
     type: string
     order: number
-    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     tableId: string
+    options?: string | null
     cells?: CellUncheckedCreateNestedManyWithoutColumnInput
   }
 
@@ -13885,11 +13885,11 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    table?: TableUpdateOneRequiredWithoutColumnsNestedInput
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUpdateManyWithoutColumnNestedInput
+    table?: TableUpdateOneRequiredWithoutColumnsNestedInput
   }
 
   export type ColumnUncheckedUpdateInput = {
@@ -13897,10 +13897,10 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUncheckedUpdateManyWithoutColumnNestedInput
   }
 
@@ -13909,10 +13909,10 @@ export namespace Prisma {
     name: string
     type: string
     order: number
-    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     tableId: string
+    options?: string | null
   }
 
   export type ColumnUpdateManyMutationInput = {
@@ -13920,9 +13920,9 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ColumnUncheckedUpdateManyInput = {
@@ -13930,10 +13930,10 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RowCreateInput = {
@@ -13941,8 +13941,8 @@ export namespace Prisma {
     order: number
     createdAt?: Date | string
     updatedAt?: Date | string
-    table: TableCreateNestedOneWithoutRowsInput
     cells?: CellCreateNestedManyWithoutRowInput
+    table: TableCreateNestedOneWithoutRowsInput
   }
 
   export type RowUncheckedCreateInput = {
@@ -13959,8 +13959,8 @@ export namespace Prisma {
     order?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    table?: TableUpdateOneRequiredWithoutRowsNestedInput
     cells?: CellUpdateManyWithoutRowNestedInput
+    table?: TableUpdateOneRequiredWithoutRowsNestedInput
   }
 
   export type RowUncheckedUpdateInput = {
@@ -14000,8 +14000,8 @@ export namespace Prisma {
     value?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    row: RowCreateNestedOneWithoutCellsInput
     column: ColumnCreateNestedOneWithoutCellsInput
+    row: RowCreateNestedOneWithoutCellsInput
   }
 
   export type CellUncheckedCreateInput = {
@@ -14018,8 +14018,8 @@ export namespace Prisma {
     value?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    row?: RowUpdateOneRequiredWithoutCellsNestedInput
     column?: ColumnUpdateOneRequiredWithoutCellsNestedInput
+    row?: RowUpdateOneRequiredWithoutCellsNestedInput
   }
 
   export type CellUncheckedUpdateInput = {
@@ -14284,8 +14284,8 @@ export namespace Prisma {
     emailVerified?: Date | string | null
     image?: string | null
     accounts?: AccountCreateNestedManyWithoutUserInput
-    sessions?: SessionCreateNestedManyWithoutUserInput
     bases?: BaseCreateNestedManyWithoutUserInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -14295,8 +14295,8 @@ export namespace Prisma {
     emailVerified?: Date | string | null
     image?: string | null
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     bases?: BaseUncheckedCreateNestedManyWithoutUserInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -14306,8 +14306,8 @@ export namespace Prisma {
     emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     image?: NullableStringFieldUpdateOperationsInput | string | null
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    sessions?: SessionUpdateManyWithoutUserNestedInput
     bases?: BaseUpdateManyWithoutUserNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -14317,8 +14317,8 @@ export namespace Prisma {
     emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     image?: NullableStringFieldUpdateOperationsInput | string | null
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     bases?: BaseUncheckedUpdateManyWithoutUserNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -14484,11 +14484,6 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
-  export type BaseScalarRelationFilter = {
-    is?: BaseWhereInput
-    isNot?: BaseWhereInput
-  }
-
   export type ColumnListRelationFilter = {
     every?: ColumnWhereInput
     some?: ColumnWhereInput
@@ -14499,6 +14494,11 @@ export namespace Prisma {
     every?: RowWhereInput
     some?: RowWhereInput
     none?: RowWhereInput
+  }
+
+  export type BaseScalarRelationFilter = {
+    is?: BaseWhereInput
+    isNot?: BaseWhereInput
   }
 
   export type ViewListRelationFilter = {
@@ -14569,15 +14569,15 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
-  export type TableScalarRelationFilter = {
-    is?: TableWhereInput
-    isNot?: TableWhereInput
-  }
-
   export type CellListRelationFilter = {
     every?: CellWhereInput
     some?: CellWhereInput
     none?: CellWhereInput
+  }
+
+  export type TableScalarRelationFilter = {
+    is?: TableWhereInput
+    isNot?: TableWhereInput
   }
 
   export type SortOrderInput = {
@@ -14594,10 +14594,10 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
-    options?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
+    options?: SortOrder
   }
 
   export type ColumnAvgOrderByAggregateInput = {
@@ -14609,10 +14609,10 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
-    options?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
+    options?: SortOrder
   }
 
   export type ColumnMinOrderByAggregateInput = {
@@ -14620,10 +14620,10 @@ export namespace Prisma {
     name?: SortOrder
     type?: SortOrder
     order?: SortOrder
-    options?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     tableId?: SortOrder
+    options?: SortOrder
   }
 
   export type ColumnSumOrderByAggregateInput = {
@@ -14696,14 +14696,14 @@ export namespace Prisma {
     order?: SortOrder
   }
 
-  export type RowScalarRelationFilter = {
-    is?: RowWhereInput
-    isNot?: RowWhereInput
-  }
-
   export type ColumnScalarRelationFilter = {
     is?: ColumnWhereInput
     isNot?: ColumnWhereInput
+  }
+
+  export type RowScalarRelationFilter = {
+    is?: RowWhereInput
+    isNot?: RowWhereInput
   }
 
   export type CellRowIdColumnIdCompoundUniqueInput = {
@@ -14893,27 +14893,27 @@ export namespace Prisma {
     none?: AccountWhereInput
   }
 
-  export type SessionListRelationFilter = {
-    every?: SessionWhereInput
-    some?: SessionWhereInput
-    none?: SessionWhereInput
-  }
-
   export type BaseListRelationFilter = {
     every?: BaseWhereInput
     some?: BaseWhereInput
     none?: BaseWhereInput
   }
 
+  export type SessionListRelationFilter = {
+    every?: SessionWhereInput
+    some?: SessionWhereInput
+    none?: SessionWhereInput
+  }
+
   export type AccountOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
-  export type SessionOrderByRelationAggregateInput = {
+  export type BaseOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
-  export type BaseOrderByRelationAggregateInput = {
+  export type SessionOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -15042,12 +15042,6 @@ export namespace Prisma {
     deleteMany?: TableScalarWhereInput | TableScalarWhereInput[]
   }
 
-  export type BaseCreateNestedOneWithoutTablesInput = {
-    create?: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
-    connectOrCreate?: BaseCreateOrConnectWithoutTablesInput
-    connect?: BaseWhereUniqueInput
-  }
-
   export type ColumnCreateNestedManyWithoutTableInput = {
     create?: XOR<ColumnCreateWithoutTableInput, ColumnUncheckedCreateWithoutTableInput> | ColumnCreateWithoutTableInput[] | ColumnUncheckedCreateWithoutTableInput[]
     connectOrCreate?: ColumnCreateOrConnectWithoutTableInput | ColumnCreateOrConnectWithoutTableInput[]
@@ -15060,6 +15054,12 @@ export namespace Prisma {
     connectOrCreate?: RowCreateOrConnectWithoutTableInput | RowCreateOrConnectWithoutTableInput[]
     createMany?: RowCreateManyTableInputEnvelope
     connect?: RowWhereUniqueInput | RowWhereUniqueInput[]
+  }
+
+  export type BaseCreateNestedOneWithoutTablesInput = {
+    create?: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
+    connectOrCreate?: BaseCreateOrConnectWithoutTablesInput
+    connect?: BaseWhereUniqueInput
   }
 
   export type ViewCreateNestedManyWithoutTableInput = {
@@ -15090,14 +15090,6 @@ export namespace Prisma {
     connect?: ViewWhereUniqueInput | ViewWhereUniqueInput[]
   }
 
-  export type BaseUpdateOneRequiredWithoutTablesNestedInput = {
-    create?: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
-    connectOrCreate?: BaseCreateOrConnectWithoutTablesInput
-    upsert?: BaseUpsertWithoutTablesInput
-    connect?: BaseWhereUniqueInput
-    update?: XOR<XOR<BaseUpdateToOneWithWhereWithoutTablesInput, BaseUpdateWithoutTablesInput>, BaseUncheckedUpdateWithoutTablesInput>
-  }
-
   export type ColumnUpdateManyWithoutTableNestedInput = {
     create?: XOR<ColumnCreateWithoutTableInput, ColumnUncheckedCreateWithoutTableInput> | ColumnCreateWithoutTableInput[] | ColumnUncheckedCreateWithoutTableInput[]
     connectOrCreate?: ColumnCreateOrConnectWithoutTableInput | ColumnCreateOrConnectWithoutTableInput[]
@@ -15124,6 +15116,14 @@ export namespace Prisma {
     update?: RowUpdateWithWhereUniqueWithoutTableInput | RowUpdateWithWhereUniqueWithoutTableInput[]
     updateMany?: RowUpdateManyWithWhereWithoutTableInput | RowUpdateManyWithWhereWithoutTableInput[]
     deleteMany?: RowScalarWhereInput | RowScalarWhereInput[]
+  }
+
+  export type BaseUpdateOneRequiredWithoutTablesNestedInput = {
+    create?: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
+    connectOrCreate?: BaseCreateOrConnectWithoutTablesInput
+    upsert?: BaseUpsertWithoutTablesInput
+    connect?: BaseWhereUniqueInput
+    update?: XOR<XOR<BaseUpdateToOneWithWhereWithoutTablesInput, BaseUpdateWithoutTablesInput>, BaseUncheckedUpdateWithoutTablesInput>
   }
 
   export type ViewUpdateManyWithoutTableNestedInput = {
@@ -15182,17 +15182,17 @@ export namespace Prisma {
     deleteMany?: ViewScalarWhereInput | ViewScalarWhereInput[]
   }
 
-  export type TableCreateNestedOneWithoutColumnsInput = {
-    create?: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
-    connectOrCreate?: TableCreateOrConnectWithoutColumnsInput
-    connect?: TableWhereUniqueInput
-  }
-
   export type CellCreateNestedManyWithoutColumnInput = {
     create?: XOR<CellCreateWithoutColumnInput, CellUncheckedCreateWithoutColumnInput> | CellCreateWithoutColumnInput[] | CellUncheckedCreateWithoutColumnInput[]
     connectOrCreate?: CellCreateOrConnectWithoutColumnInput | CellCreateOrConnectWithoutColumnInput[]
     createMany?: CellCreateManyColumnInputEnvelope
     connect?: CellWhereUniqueInput | CellWhereUniqueInput[]
+  }
+
+  export type TableCreateNestedOneWithoutColumnsInput = {
+    create?: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
+    connectOrCreate?: TableCreateOrConnectWithoutColumnsInput
+    connect?: TableWhereUniqueInput
   }
 
   export type CellUncheckedCreateNestedManyWithoutColumnInput = {
@@ -15214,14 +15214,6 @@ export namespace Prisma {
     set?: string | null
   }
 
-  export type TableUpdateOneRequiredWithoutColumnsNestedInput = {
-    create?: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
-    connectOrCreate?: TableCreateOrConnectWithoutColumnsInput
-    upsert?: TableUpsertWithoutColumnsInput
-    connect?: TableWhereUniqueInput
-    update?: XOR<XOR<TableUpdateToOneWithWhereWithoutColumnsInput, TableUpdateWithoutColumnsInput>, TableUncheckedUpdateWithoutColumnsInput>
-  }
-
   export type CellUpdateManyWithoutColumnNestedInput = {
     create?: XOR<CellCreateWithoutColumnInput, CellUncheckedCreateWithoutColumnInput> | CellCreateWithoutColumnInput[] | CellUncheckedCreateWithoutColumnInput[]
     connectOrCreate?: CellCreateOrConnectWithoutColumnInput | CellCreateOrConnectWithoutColumnInput[]
@@ -15234,6 +15226,14 @@ export namespace Prisma {
     update?: CellUpdateWithWhereUniqueWithoutColumnInput | CellUpdateWithWhereUniqueWithoutColumnInput[]
     updateMany?: CellUpdateManyWithWhereWithoutColumnInput | CellUpdateManyWithWhereWithoutColumnInput[]
     deleteMany?: CellScalarWhereInput | CellScalarWhereInput[]
+  }
+
+  export type TableUpdateOneRequiredWithoutColumnsNestedInput = {
+    create?: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
+    connectOrCreate?: TableCreateOrConnectWithoutColumnsInput
+    upsert?: TableUpsertWithoutColumnsInput
+    connect?: TableWhereUniqueInput
+    update?: XOR<XOR<TableUpdateToOneWithWhereWithoutColumnsInput, TableUpdateWithoutColumnsInput>, TableUncheckedUpdateWithoutColumnsInput>
   }
 
   export type CellUncheckedUpdateManyWithoutColumnNestedInput = {
@@ -15250,12 +15250,6 @@ export namespace Prisma {
     deleteMany?: CellScalarWhereInput | CellScalarWhereInput[]
   }
 
-  export type TableCreateNestedOneWithoutRowsInput = {
-    create?: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
-    connectOrCreate?: TableCreateOrConnectWithoutRowsInput
-    connect?: TableWhereUniqueInput
-  }
-
   export type CellCreateNestedManyWithoutRowInput = {
     create?: XOR<CellCreateWithoutRowInput, CellUncheckedCreateWithoutRowInput> | CellCreateWithoutRowInput[] | CellUncheckedCreateWithoutRowInput[]
     connectOrCreate?: CellCreateOrConnectWithoutRowInput | CellCreateOrConnectWithoutRowInput[]
@@ -15263,19 +15257,17 @@ export namespace Prisma {
     connect?: CellWhereUniqueInput | CellWhereUniqueInput[]
   }
 
+  export type TableCreateNestedOneWithoutRowsInput = {
+    create?: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
+    connectOrCreate?: TableCreateOrConnectWithoutRowsInput
+    connect?: TableWhereUniqueInput
+  }
+
   export type CellUncheckedCreateNestedManyWithoutRowInput = {
     create?: XOR<CellCreateWithoutRowInput, CellUncheckedCreateWithoutRowInput> | CellCreateWithoutRowInput[] | CellUncheckedCreateWithoutRowInput[]
     connectOrCreate?: CellCreateOrConnectWithoutRowInput | CellCreateOrConnectWithoutRowInput[]
     createMany?: CellCreateManyRowInputEnvelope
     connect?: CellWhereUniqueInput | CellWhereUniqueInput[]
-  }
-
-  export type TableUpdateOneRequiredWithoutRowsNestedInput = {
-    create?: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
-    connectOrCreate?: TableCreateOrConnectWithoutRowsInput
-    upsert?: TableUpsertWithoutRowsInput
-    connect?: TableWhereUniqueInput
-    update?: XOR<XOR<TableUpdateToOneWithWhereWithoutRowsInput, TableUpdateWithoutRowsInput>, TableUncheckedUpdateWithoutRowsInput>
   }
 
   export type CellUpdateManyWithoutRowNestedInput = {
@@ -15292,6 +15284,14 @@ export namespace Prisma {
     deleteMany?: CellScalarWhereInput | CellScalarWhereInput[]
   }
 
+  export type TableUpdateOneRequiredWithoutRowsNestedInput = {
+    create?: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
+    connectOrCreate?: TableCreateOrConnectWithoutRowsInput
+    upsert?: TableUpsertWithoutRowsInput
+    connect?: TableWhereUniqueInput
+    update?: XOR<XOR<TableUpdateToOneWithWhereWithoutRowsInput, TableUpdateWithoutRowsInput>, TableUncheckedUpdateWithoutRowsInput>
+  }
+
   export type CellUncheckedUpdateManyWithoutRowNestedInput = {
     create?: XOR<CellCreateWithoutRowInput, CellUncheckedCreateWithoutRowInput> | CellCreateWithoutRowInput[] | CellUncheckedCreateWithoutRowInput[]
     connectOrCreate?: CellCreateOrConnectWithoutRowInput | CellCreateOrConnectWithoutRowInput[]
@@ -15306,24 +15306,16 @@ export namespace Prisma {
     deleteMany?: CellScalarWhereInput | CellScalarWhereInput[]
   }
 
-  export type RowCreateNestedOneWithoutCellsInput = {
-    create?: XOR<RowCreateWithoutCellsInput, RowUncheckedCreateWithoutCellsInput>
-    connectOrCreate?: RowCreateOrConnectWithoutCellsInput
-    connect?: RowWhereUniqueInput
-  }
-
   export type ColumnCreateNestedOneWithoutCellsInput = {
     create?: XOR<ColumnCreateWithoutCellsInput, ColumnUncheckedCreateWithoutCellsInput>
     connectOrCreate?: ColumnCreateOrConnectWithoutCellsInput
     connect?: ColumnWhereUniqueInput
   }
 
-  export type RowUpdateOneRequiredWithoutCellsNestedInput = {
+  export type RowCreateNestedOneWithoutCellsInput = {
     create?: XOR<RowCreateWithoutCellsInput, RowUncheckedCreateWithoutCellsInput>
     connectOrCreate?: RowCreateOrConnectWithoutCellsInput
-    upsert?: RowUpsertWithoutCellsInput
     connect?: RowWhereUniqueInput
-    update?: XOR<XOR<RowUpdateToOneWithWhereWithoutCellsInput, RowUpdateWithoutCellsInput>, RowUncheckedUpdateWithoutCellsInput>
   }
 
   export type ColumnUpdateOneRequiredWithoutCellsNestedInput = {
@@ -15332,6 +15324,14 @@ export namespace Prisma {
     upsert?: ColumnUpsertWithoutCellsInput
     connect?: ColumnWhereUniqueInput
     update?: XOR<XOR<ColumnUpdateToOneWithWhereWithoutCellsInput, ColumnUpdateWithoutCellsInput>, ColumnUncheckedUpdateWithoutCellsInput>
+  }
+
+  export type RowUpdateOneRequiredWithoutCellsNestedInput = {
+    create?: XOR<RowCreateWithoutCellsInput, RowUncheckedCreateWithoutCellsInput>
+    connectOrCreate?: RowCreateOrConnectWithoutCellsInput
+    upsert?: RowUpsertWithoutCellsInput
+    connect?: RowWhereUniqueInput
+    update?: XOR<XOR<RowUpdateToOneWithWhereWithoutCellsInput, RowUpdateWithoutCellsInput>, RowUncheckedUpdateWithoutCellsInput>
   }
 
   export type TableCreateNestedOneWithoutViewsInput = {
@@ -15391,18 +15391,18 @@ export namespace Prisma {
     connect?: AccountWhereUniqueInput | AccountWhereUniqueInput[]
   }
 
-  export type SessionCreateNestedManyWithoutUserInput = {
-    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
-    createMany?: SessionCreateManyUserInputEnvelope
-    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-  }
-
   export type BaseCreateNestedManyWithoutUserInput = {
     create?: XOR<BaseCreateWithoutUserInput, BaseUncheckedCreateWithoutUserInput> | BaseCreateWithoutUserInput[] | BaseUncheckedCreateWithoutUserInput[]
     connectOrCreate?: BaseCreateOrConnectWithoutUserInput | BaseCreateOrConnectWithoutUserInput[]
     createMany?: BaseCreateManyUserInputEnvelope
     connect?: BaseWhereUniqueInput | BaseWhereUniqueInput[]
+  }
+
+  export type SessionCreateNestedManyWithoutUserInput = {
+    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
+    createMany?: SessionCreateManyUserInputEnvelope
+    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
   }
 
   export type AccountUncheckedCreateNestedManyWithoutUserInput = {
@@ -15412,18 +15412,18 @@ export namespace Prisma {
     connect?: AccountWhereUniqueInput | AccountWhereUniqueInput[]
   }
 
-  export type SessionUncheckedCreateNestedManyWithoutUserInput = {
-    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
-    createMany?: SessionCreateManyUserInputEnvelope
-    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-  }
-
   export type BaseUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<BaseCreateWithoutUserInput, BaseUncheckedCreateWithoutUserInput> | BaseCreateWithoutUserInput[] | BaseUncheckedCreateWithoutUserInput[]
     connectOrCreate?: BaseCreateOrConnectWithoutUserInput | BaseCreateOrConnectWithoutUserInput[]
     createMany?: BaseCreateManyUserInputEnvelope
     connect?: BaseWhereUniqueInput | BaseWhereUniqueInput[]
+  }
+
+  export type SessionUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
+    createMany?: SessionCreateManyUserInputEnvelope
+    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
   }
 
   export type NullableDateTimeFieldUpdateOperationsInput = {
@@ -15444,20 +15444,6 @@ export namespace Prisma {
     deleteMany?: AccountScalarWhereInput | AccountScalarWhereInput[]
   }
 
-  export type SessionUpdateManyWithoutUserNestedInput = {
-    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
-    upsert?: SessionUpsertWithWhereUniqueWithoutUserInput | SessionUpsertWithWhereUniqueWithoutUserInput[]
-    createMany?: SessionCreateManyUserInputEnvelope
-    set?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    disconnect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    delete?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    update?: SessionUpdateWithWhereUniqueWithoutUserInput | SessionUpdateWithWhereUniqueWithoutUserInput[]
-    updateMany?: SessionUpdateManyWithWhereWithoutUserInput | SessionUpdateManyWithWhereWithoutUserInput[]
-    deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
-  }
-
   export type BaseUpdateManyWithoutUserNestedInput = {
     create?: XOR<BaseCreateWithoutUserInput, BaseUncheckedCreateWithoutUserInput> | BaseCreateWithoutUserInput[] | BaseUncheckedCreateWithoutUserInput[]
     connectOrCreate?: BaseCreateOrConnectWithoutUserInput | BaseCreateOrConnectWithoutUserInput[]
@@ -15470,6 +15456,20 @@ export namespace Prisma {
     update?: BaseUpdateWithWhereUniqueWithoutUserInput | BaseUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: BaseUpdateManyWithWhereWithoutUserInput | BaseUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: BaseScalarWhereInput | BaseScalarWhereInput[]
+  }
+
+  export type SessionUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
+    upsert?: SessionUpsertWithWhereUniqueWithoutUserInput | SessionUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SessionCreateManyUserInputEnvelope
+    set?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    disconnect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    delete?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    update?: SessionUpdateWithWhereUniqueWithoutUserInput | SessionUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SessionUpdateManyWithWhereWithoutUserInput | SessionUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
   }
 
   export type AccountUncheckedUpdateManyWithoutUserNestedInput = {
@@ -15486,20 +15486,6 @@ export namespace Prisma {
     deleteMany?: AccountScalarWhereInput | AccountScalarWhereInput[]
   }
 
-  export type SessionUncheckedUpdateManyWithoutUserNestedInput = {
-    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
-    upsert?: SessionUpsertWithWhereUniqueWithoutUserInput | SessionUpsertWithWhereUniqueWithoutUserInput[]
-    createMany?: SessionCreateManyUserInputEnvelope
-    set?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    disconnect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    delete?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
-    update?: SessionUpdateWithWhereUniqueWithoutUserInput | SessionUpdateWithWhereUniqueWithoutUserInput[]
-    updateMany?: SessionUpdateManyWithWhereWithoutUserInput | SessionUpdateManyWithWhereWithoutUserInput[]
-    deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
-  }
-
   export type BaseUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<BaseCreateWithoutUserInput, BaseUncheckedCreateWithoutUserInput> | BaseCreateWithoutUserInput[] | BaseUncheckedCreateWithoutUserInput[]
     connectOrCreate?: BaseCreateOrConnectWithoutUserInput | BaseCreateOrConnectWithoutUserInput[]
@@ -15512,6 +15498,20 @@ export namespace Prisma {
     update?: BaseUpdateWithWhereUniqueWithoutUserInput | BaseUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: BaseUpdateManyWithWhereWithoutUserInput | BaseUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: BaseScalarWhereInput | BaseScalarWhereInput[]
+  }
+
+  export type SessionUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
+    upsert?: SessionUpsertWithWhereUniqueWithoutUserInput | SessionUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SessionCreateManyUserInputEnvelope
+    set?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    disconnect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    delete?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+    update?: SessionUpdateWithWhereUniqueWithoutUserInput | SessionUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SessionUpdateManyWithWhereWithoutUserInput | SessionUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -15815,35 +15815,14 @@ export namespace Prisma {
     baseId?: StringFilter<"Table"> | string
   }
 
-  export type BaseCreateWithoutTablesInput = {
-    id?: string
-    name: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    user: UserCreateNestedOneWithoutBasesInput
-  }
-
-  export type BaseUncheckedCreateWithoutTablesInput = {
-    id?: string
-    name: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    userId: string
-  }
-
-  export type BaseCreateOrConnectWithoutTablesInput = {
-    where: BaseWhereUniqueInput
-    create: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
-  }
-
   export type ColumnCreateWithoutTableInput = {
     id?: string
     name: string
     type: string
     order: number
-    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    options?: string | null
     cells?: CellCreateNestedManyWithoutColumnInput
   }
 
@@ -15852,9 +15831,9 @@ export namespace Prisma {
     name: string
     type: string
     order: number
-    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    options?: string | null
     cells?: CellUncheckedCreateNestedManyWithoutColumnInput
   }
 
@@ -15894,6 +15873,27 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type BaseCreateWithoutTablesInput = {
+    id?: string
+    name: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutBasesInput
+  }
+
+  export type BaseUncheckedCreateWithoutTablesInput = {
+    id?: string
+    name: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    userId: string
+  }
+
+  export type BaseCreateOrConnectWithoutTablesInput = {
+    where: BaseWhereUniqueInput
+    create: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
+  }
+
   export type ViewCreateWithoutTableInput = {
     id?: string
     name: string
@@ -15920,33 +15920,6 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type BaseUpsertWithoutTablesInput = {
-    update: XOR<BaseUpdateWithoutTablesInput, BaseUncheckedUpdateWithoutTablesInput>
-    create: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
-    where?: BaseWhereInput
-  }
-
-  export type BaseUpdateToOneWithWhereWithoutTablesInput = {
-    where?: BaseWhereInput
-    data: XOR<BaseUpdateWithoutTablesInput, BaseUncheckedUpdateWithoutTablesInput>
-  }
-
-  export type BaseUpdateWithoutTablesInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutBasesNestedInput
-  }
-
-  export type BaseUncheckedUpdateWithoutTablesInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    userId?: StringFieldUpdateOperationsInput | string
-  }
-
   export type ColumnUpsertWithWhereUniqueWithoutTableInput = {
     where: ColumnWhereUniqueInput
     update: XOR<ColumnUpdateWithoutTableInput, ColumnUncheckedUpdateWithoutTableInput>
@@ -15971,10 +15944,10 @@ export namespace Prisma {
     name?: StringFilter<"Column"> | string
     type?: StringFilter<"Column"> | string
     order?: IntFilter<"Column"> | number
-    options?: StringNullableFilter<"Column"> | string | null
     createdAt?: DateTimeFilter<"Column"> | Date | string
     updatedAt?: DateTimeFilter<"Column"> | Date | string
     tableId?: StringFilter<"Column"> | string
+    options?: StringNullableFilter<"Column"> | string | null
   }
 
   export type RowUpsertWithWhereUniqueWithoutTableInput = {
@@ -16002,6 +15975,33 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Row"> | Date | string
     updatedAt?: DateTimeFilter<"Row"> | Date | string
     tableId?: StringFilter<"Row"> | string
+  }
+
+  export type BaseUpsertWithoutTablesInput = {
+    update: XOR<BaseUpdateWithoutTablesInput, BaseUncheckedUpdateWithoutTablesInput>
+    create: XOR<BaseCreateWithoutTablesInput, BaseUncheckedCreateWithoutTablesInput>
+    where?: BaseWhereInput
+  }
+
+  export type BaseUpdateToOneWithWhereWithoutTablesInput = {
+    where?: BaseWhereInput
+    data: XOR<BaseUpdateWithoutTablesInput, BaseUncheckedUpdateWithoutTablesInput>
+  }
+
+  export type BaseUpdateWithoutTablesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutBasesNestedInput
+  }
+
+  export type BaseUncheckedUpdateWithoutTablesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    userId?: StringFieldUpdateOperationsInput | string
   }
 
   export type ViewUpsertWithWhereUniqueWithoutTableInput = {
@@ -16032,31 +16032,6 @@ export namespace Prisma {
     tableId?: StringFilter<"View"> | string
   }
 
-  export type TableCreateWithoutColumnsInput = {
-    id?: string
-    name: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    base: BaseCreateNestedOneWithoutTablesInput
-    rows?: RowCreateNestedManyWithoutTableInput
-    views?: ViewCreateNestedManyWithoutTableInput
-  }
-
-  export type TableUncheckedCreateWithoutColumnsInput = {
-    id?: string
-    name: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    baseId: string
-    rows?: RowUncheckedCreateNestedManyWithoutTableInput
-    views?: ViewUncheckedCreateNestedManyWithoutTableInput
-  }
-
-  export type TableCreateOrConnectWithoutColumnsInput = {
-    where: TableWhereUniqueInput
-    create: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
-  }
-
   export type CellCreateWithoutColumnInput = {
     id?: string
     value?: string | null
@@ -16083,35 +16058,29 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type TableUpsertWithoutColumnsInput = {
-    update: XOR<TableUpdateWithoutColumnsInput, TableUncheckedUpdateWithoutColumnsInput>
+  export type TableCreateWithoutColumnsInput = {
+    id?: string
+    name: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    rows?: RowCreateNestedManyWithoutTableInput
+    base: BaseCreateNestedOneWithoutTablesInput
+    views?: ViewCreateNestedManyWithoutTableInput
+  }
+
+  export type TableUncheckedCreateWithoutColumnsInput = {
+    id?: string
+    name: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    baseId: string
+    rows?: RowUncheckedCreateNestedManyWithoutTableInput
+    views?: ViewUncheckedCreateNestedManyWithoutTableInput
+  }
+
+  export type TableCreateOrConnectWithoutColumnsInput = {
+    where: TableWhereUniqueInput
     create: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
-    where?: TableWhereInput
-  }
-
-  export type TableUpdateToOneWithWhereWithoutColumnsInput = {
-    where?: TableWhereInput
-    data: XOR<TableUpdateWithoutColumnsInput, TableUncheckedUpdateWithoutColumnsInput>
-  }
-
-  export type TableUpdateWithoutColumnsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
-    rows?: RowUpdateManyWithoutTableNestedInput
-    views?: ViewUpdateManyWithoutTableNestedInput
-  }
-
-  export type TableUncheckedUpdateWithoutColumnsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    baseId?: StringFieldUpdateOperationsInput | string
-    rows?: RowUncheckedUpdateManyWithoutTableNestedInput
-    views?: ViewUncheckedUpdateManyWithoutTableNestedInput
   }
 
   export type CellUpsertWithWhereUniqueWithoutColumnInput = {
@@ -16142,29 +16111,35 @@ export namespace Prisma {
     columnId?: StringFilter<"Cell"> | string
   }
 
-  export type TableCreateWithoutRowsInput = {
-    id?: string
-    name: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    base: BaseCreateNestedOneWithoutTablesInput
-    columns?: ColumnCreateNestedManyWithoutTableInput
-    views?: ViewCreateNestedManyWithoutTableInput
+  export type TableUpsertWithoutColumnsInput = {
+    update: XOR<TableUpdateWithoutColumnsInput, TableUncheckedUpdateWithoutColumnsInput>
+    create: XOR<TableCreateWithoutColumnsInput, TableUncheckedCreateWithoutColumnsInput>
+    where?: TableWhereInput
   }
 
-  export type TableUncheckedCreateWithoutRowsInput = {
-    id?: string
-    name: string
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    baseId: string
-    columns?: ColumnUncheckedCreateNestedManyWithoutTableInput
-    views?: ViewUncheckedCreateNestedManyWithoutTableInput
+  export type TableUpdateToOneWithWhereWithoutColumnsInput = {
+    where?: TableWhereInput
+    data: XOR<TableUpdateWithoutColumnsInput, TableUncheckedUpdateWithoutColumnsInput>
   }
 
-  export type TableCreateOrConnectWithoutRowsInput = {
-    where: TableWhereUniqueInput
-    create: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
+  export type TableUpdateWithoutColumnsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    rows?: RowUpdateManyWithoutTableNestedInput
+    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
+    views?: ViewUpdateManyWithoutTableNestedInput
+  }
+
+  export type TableUncheckedUpdateWithoutColumnsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    baseId?: StringFieldUpdateOperationsInput | string
+    rows?: RowUncheckedUpdateManyWithoutTableNestedInput
+    views?: ViewUncheckedUpdateManyWithoutTableNestedInput
   }
 
   export type CellCreateWithoutRowInput = {
@@ -16193,35 +16168,29 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type TableUpsertWithoutRowsInput = {
-    update: XOR<TableUpdateWithoutRowsInput, TableUncheckedUpdateWithoutRowsInput>
+  export type TableCreateWithoutRowsInput = {
+    id?: string
+    name: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    columns?: ColumnCreateNestedManyWithoutTableInput
+    base: BaseCreateNestedOneWithoutTablesInput
+    views?: ViewCreateNestedManyWithoutTableInput
+  }
+
+  export type TableUncheckedCreateWithoutRowsInput = {
+    id?: string
+    name: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    baseId: string
+    columns?: ColumnUncheckedCreateNestedManyWithoutTableInput
+    views?: ViewUncheckedCreateNestedManyWithoutTableInput
+  }
+
+  export type TableCreateOrConnectWithoutRowsInput = {
+    where: TableWhereUniqueInput
     create: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
-    where?: TableWhereInput
-  }
-
-  export type TableUpdateToOneWithWhereWithoutRowsInput = {
-    where?: TableWhereInput
-    data: XOR<TableUpdateWithoutRowsInput, TableUncheckedUpdateWithoutRowsInput>
-  }
-
-  export type TableUpdateWithoutRowsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
-    columns?: ColumnUpdateManyWithoutTableNestedInput
-    views?: ViewUpdateManyWithoutTableNestedInput
-  }
-
-  export type TableUncheckedUpdateWithoutRowsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    baseId?: StringFieldUpdateOperationsInput | string
-    columns?: ColumnUncheckedUpdateManyWithoutTableNestedInput
-    views?: ViewUncheckedUpdateManyWithoutTableNestedInput
   }
 
   export type CellUpsertWithWhereUniqueWithoutRowInput = {
@@ -16238,6 +16207,64 @@ export namespace Prisma {
   export type CellUpdateManyWithWhereWithoutRowInput = {
     where: CellScalarWhereInput
     data: XOR<CellUpdateManyMutationInput, CellUncheckedUpdateManyWithoutRowInput>
+  }
+
+  export type TableUpsertWithoutRowsInput = {
+    update: XOR<TableUpdateWithoutRowsInput, TableUncheckedUpdateWithoutRowsInput>
+    create: XOR<TableCreateWithoutRowsInput, TableUncheckedCreateWithoutRowsInput>
+    where?: TableWhereInput
+  }
+
+  export type TableUpdateToOneWithWhereWithoutRowsInput = {
+    where?: TableWhereInput
+    data: XOR<TableUpdateWithoutRowsInput, TableUncheckedUpdateWithoutRowsInput>
+  }
+
+  export type TableUpdateWithoutRowsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    columns?: ColumnUpdateManyWithoutTableNestedInput
+    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
+    views?: ViewUpdateManyWithoutTableNestedInput
+  }
+
+  export type TableUncheckedUpdateWithoutRowsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    baseId?: StringFieldUpdateOperationsInput | string
+    columns?: ColumnUncheckedUpdateManyWithoutTableNestedInput
+    views?: ViewUncheckedUpdateManyWithoutTableNestedInput
+  }
+
+  export type ColumnCreateWithoutCellsInput = {
+    id?: string
+    name: string
+    type: string
+    order: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    options?: string | null
+    table: TableCreateNestedOneWithoutColumnsInput
+  }
+
+  export type ColumnUncheckedCreateWithoutCellsInput = {
+    id?: string
+    name: string
+    type: string
+    order: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    tableId: string
+    options?: string | null
+  }
+
+  export type ColumnCreateOrConnectWithoutCellsInput = {
+    where: ColumnWhereUniqueInput
+    create: XOR<ColumnCreateWithoutCellsInput, ColumnUncheckedCreateWithoutCellsInput>
   }
 
   export type RowCreateWithoutCellsInput = {
@@ -16261,31 +16288,37 @@ export namespace Prisma {
     create: XOR<RowCreateWithoutCellsInput, RowUncheckedCreateWithoutCellsInput>
   }
 
-  export type ColumnCreateWithoutCellsInput = {
-    id?: string
-    name: string
-    type: string
-    order: number
-    options?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    table: TableCreateNestedOneWithoutColumnsInput
-  }
-
-  export type ColumnUncheckedCreateWithoutCellsInput = {
-    id?: string
-    name: string
-    type: string
-    order: number
-    options?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    tableId: string
-  }
-
-  export type ColumnCreateOrConnectWithoutCellsInput = {
-    where: ColumnWhereUniqueInput
+  export type ColumnUpsertWithoutCellsInput = {
+    update: XOR<ColumnUpdateWithoutCellsInput, ColumnUncheckedUpdateWithoutCellsInput>
     create: XOR<ColumnCreateWithoutCellsInput, ColumnUncheckedCreateWithoutCellsInput>
+    where?: ColumnWhereInput
+  }
+
+  export type ColumnUpdateToOneWithWhereWithoutCellsInput = {
+    where?: ColumnWhereInput
+    data: XOR<ColumnUpdateWithoutCellsInput, ColumnUncheckedUpdateWithoutCellsInput>
+  }
+
+  export type ColumnUpdateWithoutCellsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    order?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
+    table?: TableUpdateOneRequiredWithoutColumnsNestedInput
+  }
+
+  export type ColumnUncheckedUpdateWithoutCellsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    order?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    tableId?: StringFieldUpdateOperationsInput | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RowUpsertWithoutCellsInput = {
@@ -16315,47 +16348,14 @@ export namespace Prisma {
     tableId?: StringFieldUpdateOperationsInput | string
   }
 
-  export type ColumnUpsertWithoutCellsInput = {
-    update: XOR<ColumnUpdateWithoutCellsInput, ColumnUncheckedUpdateWithoutCellsInput>
-    create: XOR<ColumnCreateWithoutCellsInput, ColumnUncheckedCreateWithoutCellsInput>
-    where?: ColumnWhereInput
-  }
-
-  export type ColumnUpdateToOneWithWhereWithoutCellsInput = {
-    where?: ColumnWhereInput
-    data: XOR<ColumnUpdateWithoutCellsInput, ColumnUncheckedUpdateWithoutCellsInput>
-  }
-
-  export type ColumnUpdateWithoutCellsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
-    order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    table?: TableUpdateOneRequiredWithoutColumnsNestedInput
-  }
-
-  export type ColumnUncheckedUpdateWithoutCellsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    name?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
-    order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    tableId?: StringFieldUpdateOperationsInput | string
-  }
-
   export type TableCreateWithoutViewsInput = {
     id?: string
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
-    base: BaseCreateNestedOneWithoutTablesInput
     columns?: ColumnCreateNestedManyWithoutTableInput
     rows?: RowCreateNestedManyWithoutTableInput
+    base: BaseCreateNestedOneWithoutTablesInput
   }
 
   export type TableUncheckedCreateWithoutViewsInput = {
@@ -16389,9 +16389,9 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
     columns?: ColumnUpdateManyWithoutTableNestedInput
     rows?: RowUpdateManyWithoutTableNestedInput
+    base?: BaseUpdateOneRequiredWithoutTablesNestedInput
   }
 
   export type TableUncheckedUpdateWithoutViewsInput = {
@@ -16410,8 +16410,8 @@ export namespace Prisma {
     email?: string | null
     emailVerified?: Date | string | null
     image?: string | null
-    sessions?: SessionCreateNestedManyWithoutUserInput
     bases?: BaseCreateNestedManyWithoutUserInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAccountsInput = {
@@ -16420,8 +16420,8 @@ export namespace Prisma {
     email?: string | null
     emailVerified?: Date | string | null
     image?: string | null
-    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     bases?: BaseUncheckedCreateNestedManyWithoutUserInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAccountsInput = {
@@ -16446,8 +16446,8 @@ export namespace Prisma {
     email?: NullableStringFieldUpdateOperationsInput | string | null
     emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    sessions?: SessionUpdateManyWithoutUserNestedInput
     bases?: BaseUpdateManyWithoutUserNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -16456,8 +16456,8 @@ export namespace Prisma {
     email?: NullableStringFieldUpdateOperationsInput | string | null
     emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     bases?: BaseUncheckedUpdateManyWithoutUserNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionsInput = {
@@ -16556,28 +16556,6 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type SessionCreateWithoutUserInput = {
-    id?: string
-    sessionToken: string
-    expires: Date | string
-  }
-
-  export type SessionUncheckedCreateWithoutUserInput = {
-    id?: string
-    sessionToken: string
-    expires: Date | string
-  }
-
-  export type SessionCreateOrConnectWithoutUserInput = {
-    where: SessionWhereUniqueInput
-    create: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput>
-  }
-
-  export type SessionCreateManyUserInputEnvelope = {
-    data: SessionCreateManyUserInput | SessionCreateManyUserInput[]
-    skipDuplicates?: boolean
-  }
-
   export type BaseCreateWithoutUserInput = {
     id?: string
     name: string
@@ -16601,6 +16579,28 @@ export namespace Prisma {
 
   export type BaseCreateManyUserInputEnvelope = {
     data: BaseCreateManyUserInput | BaseCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SessionCreateWithoutUserInput = {
+    id?: string
+    sessionToken: string
+    expires: Date | string
+  }
+
+  export type SessionUncheckedCreateWithoutUserInput = {
+    id?: string
+    sessionToken: string
+    expires: Date | string
+  }
+
+  export type SessionCreateOrConnectWithoutUserInput = {
+    where: SessionWhereUniqueInput
+    create: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput>
+  }
+
+  export type SessionCreateManyUserInputEnvelope = {
+    data: SessionCreateManyUserInput | SessionCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -16639,32 +16639,6 @@ export namespace Prisma {
     refresh_token_expires_in?: IntNullableFilter<"Account"> | number | null
   }
 
-  export type SessionUpsertWithWhereUniqueWithoutUserInput = {
-    where: SessionWhereUniqueInput
-    update: XOR<SessionUpdateWithoutUserInput, SessionUncheckedUpdateWithoutUserInput>
-    create: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput>
-  }
-
-  export type SessionUpdateWithWhereUniqueWithoutUserInput = {
-    where: SessionWhereUniqueInput
-    data: XOR<SessionUpdateWithoutUserInput, SessionUncheckedUpdateWithoutUserInput>
-  }
-
-  export type SessionUpdateManyWithWhereWithoutUserInput = {
-    where: SessionScalarWhereInput
-    data: XOR<SessionUpdateManyMutationInput, SessionUncheckedUpdateManyWithoutUserInput>
-  }
-
-  export type SessionScalarWhereInput = {
-    AND?: SessionScalarWhereInput | SessionScalarWhereInput[]
-    OR?: SessionScalarWhereInput[]
-    NOT?: SessionScalarWhereInput | SessionScalarWhereInput[]
-    id?: StringFilter<"Session"> | string
-    sessionToken?: StringFilter<"Session"> | string
-    userId?: StringFilter<"Session"> | string
-    expires?: DateTimeFilter<"Session"> | Date | string
-  }
-
   export type BaseUpsertWithWhereUniqueWithoutUserInput = {
     where: BaseWhereUniqueInput
     update: XOR<BaseUpdateWithoutUserInput, BaseUncheckedUpdateWithoutUserInput>
@@ -16690,6 +16664,32 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Base"> | Date | string
     updatedAt?: DateTimeFilter<"Base"> | Date | string
     userId?: StringFilter<"Base"> | string
+  }
+
+  export type SessionUpsertWithWhereUniqueWithoutUserInput = {
+    where: SessionWhereUniqueInput
+    update: XOR<SessionUpdateWithoutUserInput, SessionUncheckedUpdateWithoutUserInput>
+    create: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput>
+  }
+
+  export type SessionUpdateWithWhereUniqueWithoutUserInput = {
+    where: SessionWhereUniqueInput
+    data: XOR<SessionUpdateWithoutUserInput, SessionUncheckedUpdateWithoutUserInput>
+  }
+
+  export type SessionUpdateManyWithWhereWithoutUserInput = {
+    where: SessionScalarWhereInput
+    data: XOR<SessionUpdateManyMutationInput, SessionUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type SessionScalarWhereInput = {
+    AND?: SessionScalarWhereInput | SessionScalarWhereInput[]
+    OR?: SessionScalarWhereInput[]
+    NOT?: SessionScalarWhereInput | SessionScalarWhereInput[]
+    id?: StringFilter<"Session"> | string
+    sessionToken?: StringFilter<"Session"> | string
+    userId?: StringFilter<"Session"> | string
+    expires?: DateTimeFilter<"Session"> | Date | string
   }
 
   export type TableCreateManyBaseInput = {
@@ -16731,9 +16731,9 @@ export namespace Prisma {
     name: string
     type: string
     order: number
-    options?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    options?: string | null
   }
 
   export type RowCreateManyTableInput = {
@@ -16756,9 +16756,9 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUpdateManyWithoutColumnNestedInput
   }
 
@@ -16767,9 +16767,9 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUncheckedUpdateManyWithoutColumnNestedInput
   }
 
@@ -16778,9 +16778,9 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     type?: StringFieldUpdateOperationsInput | string
     order?: IntFieldUpdateOperationsInput | number
-    options?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    options?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RowUpdateWithoutTableInput = {
@@ -16909,17 +16909,17 @@ export namespace Prisma {
     refresh_token_expires_in?: number | null
   }
 
-  export type SessionCreateManyUserInput = {
-    id?: string
-    sessionToken: string
-    expires: Date | string
-  }
-
   export type BaseCreateManyUserInput = {
     id?: string
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+  }
+
+  export type SessionCreateManyUserInput = {
+    id?: string
+    sessionToken: string
+    expires: Date | string
   }
 
   export type AccountUpdateWithoutUserInput = {
@@ -16967,24 +16967,6 @@ export namespace Prisma {
     refresh_token_expires_in?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
-  export type SessionUpdateWithoutUserInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    sessionToken?: StringFieldUpdateOperationsInput | string
-    expires?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type SessionUncheckedUpdateWithoutUserInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    sessionToken?: StringFieldUpdateOperationsInput | string
-    expires?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type SessionUncheckedUpdateManyWithoutUserInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    sessionToken?: StringFieldUpdateOperationsInput | string
-    expires?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
   export type BaseUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
@@ -17006,6 +16988,24 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sessionToken?: StringFieldUpdateOperationsInput | string
+    expires?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sessionToken?: StringFieldUpdateOperationsInput | string
+    expires?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sessionToken?: StringFieldUpdateOperationsInput | string
+    expires?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 
