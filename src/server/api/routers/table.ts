@@ -57,10 +57,10 @@ export const tableRouter = createTRPCRouter({
         },
       });
 
-      // Generate 10 rows with faker data
+      // Generate 3 rows: 1 with faker data, 2 empty
       const statusChoices = ["Todo", "In Progress", "Done"];
       
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 3; i++) {
         // Create row
         const row = await ctx.db.row.create({
           data: {
@@ -73,26 +73,29 @@ export const tableRouter = createTRPCRouter({
         for (const column of table.columns) {
           let cellValue = "";
 
-          // Generate appropriate faker data based on column type
-          switch (column.name) {
-            case "Name":
-              cellValue = faker.person.fullName();
-              break;
-            case "Notes":
-              cellValue = faker.lorem.sentence();
-              break;
-            case "Assignee":
-              cellValue = faker.person.firstName();
-              break;
-            case "Status":
-              cellValue = faker.helpers.arrayElement(statusChoices);
-              break;
-            case "Attachments":
-              cellValue = ""; // Empty for now
-              break;
-            default:
-              cellValue = "";
+          // Only first row gets faker data
+          if (i === 0) {
+            switch (column.name) {
+              case "Name":
+                cellValue = faker.person.fullName();
+                break;
+              case "Notes":
+                cellValue = faker.lorem.sentence();
+                break;
+              case "Assignee":
+                cellValue = faker.person.firstName();
+                break;
+              case "Status":
+                cellValue = faker.helpers.arrayElement(statusChoices);
+                break;
+              case "Attachments":
+                cellValue = "";
+                break;
+              default:
+                cellValue = "";
+            }
           }
+          // Rows 2 and 3 are empty (cellValue stays "")
 
           // Create cell
           await ctx.db.cell.create({
@@ -106,5 +109,69 @@ export const tableRouter = createTRPCRouter({
       }
 
       return table;
+    }),
+
+  getData: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const table = await ctx.db.table.findUnique({
+        where: { id: input.tableId },
+        include: {
+          columns: {
+            orderBy: { order: "asc" },
+          },
+          rows: {
+            orderBy: { order: "asc" },
+            include: {
+              cells: {
+                include: {
+                  column: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!table) throw new Error("Table not found");
+
+      return table;
+    }),
+
+  createRow: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Get table with columns and last row for ordering
+      const table = await ctx.db.table.findUnique({
+        where: { id: input.tableId },
+        include: {
+          columns: { orderBy: { order: "asc" } },
+          rows: { orderBy: { order: "desc" }, take: 1 },
+        },
+      });
+
+      if (!table) throw new Error("Table not found");
+
+      // Create row with next order number
+      const nextOrder = (table.rows[0]?.order ?? -1) + 1;
+      const row = await ctx.db.row.create({
+        data: {
+          tableId: input.tableId,
+          order: nextOrder,
+        },
+      });
+
+      // Create empty cells for each column
+      for (const column of table.columns) {
+        await ctx.db.cell.create({
+          data: {
+            rowId: row.id,
+            columnId: column.id,
+            value: "", // Empty cells for new rows
+          },
+        });
+      }
+
+      return row;
     }),
 });

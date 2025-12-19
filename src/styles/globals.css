@@ -371,3 +371,17 @@ h5.quiet {
 .table-creation-dropdown * {
   transition: none !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Table Cell Input Styles                                                    */
+/* -------------------------------------------------------------------------- */
+
+.table-cell-input {
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-feature-settings: normal;
+  font-kerning: auto;
+  font-language-override: normal;
+  font-optical-sizing: auto;
+  font-palette: normal;
+}
