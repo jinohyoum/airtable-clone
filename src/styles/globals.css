@@ -13,3 +13,73 @@
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
 }
+
+/* Light, Airtable-ish scrollbars for popovers/menus */
+.light-scrollbar {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+.light-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+.light-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.light-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.22);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.light-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.32);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Airtable-like pill badges (Beta / Business)                                */
+/* -------------------------------------------------------------------------- */
+
+/* shared tiny utility classes used in Airtable DOM */
+.flex-inline {
+  display: inline-flex;
+}
+.flex-none {
+  flex: none;
+}
+.text-size-small {
+  font-size: 12px;
+  line-height: 16px;
+}
+.px1 {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.ml1 {
+  margin-left: 4px;
+}
+.mr-half {
+  margin-right: 2px;
+}
+
+.pill {
+  border-radius: 9999px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+/* base pill style wrapper Airtable applies */
+.css-1l4uiyf {
+  border: 1px solid transparent;
+}
+
+/* Beta badge colors */
+.css-xeatqr {
+  background: rgba(79, 70, 229, 0.12); /* indigo-600-ish */
+  color: rgb(67, 56, 202); /* indigo-700-ish */
+}
+
+/* Business badge colors */
+.css-1pi0isa {
+  background: rgba(2, 132, 199, 0.12); /* sky-600-ish */
+  color: rgb(3, 105, 161); /* sky-700-ish */
+}
