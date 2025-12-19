@@ -7,7 +7,7 @@ export const tableRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return ctx.db.table.findMany({
         where: { baseId: input.baseId },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: "asc" }, // Oldest first, so new tables appear on the right
       });
     }),
 

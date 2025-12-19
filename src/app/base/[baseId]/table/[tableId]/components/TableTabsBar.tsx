@@ -3,8 +3,7 @@
 import { ChevronDown, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
-import TableCreationDropdown from './TableCreationDropdown';
+import { useParams, useRouter } from 'next/navigation';
 import { api } from '~/trpc/react';
 
 type MenuEntry =
@@ -22,7 +21,9 @@ type MenuEntry =
 
 export default function TableTabsBar() {
   const params = useParams();
+  const router = useRouter();
   const baseId = params.baseId as string;
+  const currentTableId = params.tableId as string;
   
   const popoverId = useId();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -34,55 +35,57 @@ export default function TableTabsBar() {
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number; maxH: number } | null>(
     null,
   );
-  const [showTableCreation, setShowTableCreation] = useState(false);
-  const [tableCreationPos, setTableCreationPos] = useState<{ x: number; y: number } | null>(null);
-  const [tables, setTables] = useState([
-    { id: 1, name: 'Table 1', isActive: true },
-  ]);
-  const [creatingTableId, setCreatingTableId] = useState<number | null>(null);
-  const nextTableIdRef = useRef(2); // Start from 2 since we have Table 1
-  const tableButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const tableButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  
+  // Fetch real tables from database
+  const { data: tablesData, isLoading } = api.table.list.useQuery({ baseId });
+  
+  // Get utils for invalidating queries
+  const utils = api.useUtils();
   
   // tRPC mutation for creating tables
-  const createTableMutation = api.table.create.useMutation();
+  const createTableMutation = api.table.create.useMutation({
+    onSuccess: () => {
+      // Invalidate and refetch the table list so new table appears immediately
+      void utils.table.list.invalidate({ baseId });
+    },
+  });
+  
+  // Transform database tables to UI format
+  const tables = (tablesData ?? []).map((table) => ({
+    id: table.id,
+    name: table.name,
+    isActive: table.id === currentTableId,
+  }));
 
   const entries: MenuEntry[] = useMemo(
     () => [
       { kind: 'heading', label: 'Add a blank table' },
       {
         kind: 'item',
-        label: 'Start from scratch',
+        label: createTableMutation.isPending ? 'Creating...' : 'Start from scratch',
         ariaLabel: 'Start from scratch',
-        onSelect: () => {
-          // Create a new table tab with unique ID
-          const newTableId = nextTableIdRef.current;
-          const tableNumber = tables.length + 1; // Based on how many tables exist
-          const newTable = {
-            id: newTableId,
-            name: `Table ${tableNumber}`,
-            isActive: true, // Set new table as active
-          };
+        disabled: createTableMutation.isPending,
+        onSelect: async () => {
+          // Create table immediately in database
+          const tableNumber = tables.length + 1;
+          const defaultName = `Table ${tableNumber}`;
           
-          nextTableIdRef.current += 1; // Increment for next table's unique ID
-          
-          // Add new table and deactivate all existing tables
-          setTables((prev) => [...prev.map((t) => ({ ...t, isActive: false })), newTable]);
-          setCreatingTableId(newTableId);
-          
-          // Wait for the new tab to render, then position the dropdown below it
-          setTimeout(() => {
-            const newTableBtn = tableButtonRefs.current.get(newTableId);
-            if (!newTableBtn) return;
-            
-            const rect = newTableBtn.getBoundingClientRect();
-            // Center the dropdown (299px wide) with the right edge of the table tab
-            const dropdownWidth = 299;
-            setTableCreationPos({
-              x: Math.round(rect.right - dropdownWidth / 2),
-              y: Math.round(rect.bottom + 8),
+          try {
+            const newTable = await createTableMutation.mutateAsync({
+              baseId,
+              name: defaultName,
+              recordTerm: 'Record',
             });
-            setShowTableCreation(true);
-          }, 10);
+            
+            console.log('Table created:', newTable);
+            
+            // Navigate to the newly created table
+            router.push(`/base/${baseId}/table/${newTable.id}`);
+          } catch (error) {
+            console.error('Failed to create table:', error);
+            alert('Failed to create table. Please try again.');
+          }
         },
       },
       { kind: 'divider' },
@@ -295,7 +298,7 @@ export default function TableTabsBar() {
         ),
       },
     ],
-    [],
+    [tables.length, createTableMutation.isPending, baseId, router, createTableMutation],
   );
 
   const itemEntries = useMemo(
@@ -412,10 +415,8 @@ export default function TableTabsBar() {
             }
           }}
           onClick={() => {
-            // Set this table as active and deactivate all others
-            setTables((prevTables) =>
-              prevTables.map((t) => ({ ...t, isActive: t.id === table.id }))
-            );
+            // Navigate to the clicked table
+            router.push(`/base/${baseId}/table/${table.id}`);
           }}
           className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
             table.isActive
@@ -544,62 +545,6 @@ export default function TableTabsBar() {
         </div>
       )}
 
-      {/* Table Creation Dropdown */}
-      {showTableCreation && tableCreationPos && creatingTableId !== null && (
-        <TableCreationDropdown
-          tableName={tables.find((t) => t.id === creatingTableId)?.name ?? ''}
-          position={tableCreationPos}
-          onSave={async (tableName, recordTerm) => {
-            try {
-              // Create table in database with default columns
-              const newTable = await createTableMutation.mutateAsync({
-                baseId,
-                name: tableName,
-                recordTerm,
-              });
-              
-              console.log('Table created:', newTable);
-              
-              // Update the local table name
-              setTables((prevTables) =>
-                prevTables.map((t) => (t.id === creatingTableId ? { ...t, name: tableName } : t)),
-              );
-              setShowTableCreation(false);
-              setCreatingTableId(null);
-            } catch (error) {
-              console.error('Failed to create table:', error);
-              // Optionally show error to user
-              alert('Failed to create table. Please try again.');
-            }
-          }}
-          onCancel={() => {
-            // Remove the table if cancelled
-            setTables((prevTables) => prevTables.filter((t) => t.id !== creatingTableId));
-            setShowTableCreation(false);
-            setCreatingTableId(null);
-          }}
-          onClickOutside={async () => {
-            // Create table with default name
-            const currentTable = tables.find((t) => t.id === creatingTableId);
-            if (currentTable) {
-              try {
-                const newTable = await createTableMutation.mutateAsync({
-                  baseId,
-                  name: currentTable.name,
-                  recordTerm: 'Record',
-                });
-                
-                console.log('Table created with default name:', newTable);
-              } catch (error) {
-                console.error('Failed to create table:', error);
-              }
-            }
-            
-            setShowTableCreation(false);
-            setCreatingTableId(null);
-          }}
-        />
-      )}
     </div>
   );
 }
