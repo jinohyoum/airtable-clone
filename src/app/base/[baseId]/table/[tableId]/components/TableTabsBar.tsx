@@ -402,59 +402,108 @@ export default function TableTabsBar() {
   };
 
   return (
-    <div className="relative flex items-center px-4 gap-2 border-b border-gray-200" style={{ backgroundColor: 'rgb(255, 236, 227)', height: '32px' }}>
-      {/* Dynamic table tabs */}
-      {tables.map((table) => (
-        <button
-          key={table.id}
-          ref={(el) => {
-            if (el) {
-              tableButtonRefs.current.set(table.id, el);
-            } else {
-              tableButtonRefs.current.delete(table.id);
-            }
-          }}
+    <div className="relative flex items-center" style={{ backgroundColor: 'rgb(230, 252, 232)', height: '32px' }}>
+      {/* Table tabs nav */}
+      <nav aria-label="Tables" className="flex flex-none" id="appControlsTablesTabs" data-tutorial-selector-id="appControlsTablesTabs">
+        {tables.map((table, index) => (
+          <div key={table.id} className="flex" style={{ height: '32px' }}>
+            <div 
+              className={`flex relative hover-container text-size-default tableTabContainer flex-none lightBase ${
+                table.isActive 
+                  ? 'rounded-top-right activeTab' 
+                  : index === tables.length - 1 
+                    ? 'rounded-top clipRightEdge' 
+                    : 'rounded-top'
+              }`}
+              id={`tableTab-${table.id}`}
+              data-testid={`tableTab-${table.name.toLowerCase().replace(/\s+/g, '')}`}
+            >
+              <div 
+                className={`flex flex-auto relative tab focus-visible-within-opaque tableTab flex-none pointer ${
+                  table.isActive 
+                    ? 'rounded-top-right strong colors-background-default' 
+                    : 'rounded-top top-bar-text-dark'
+                }`}
+                data-tableid={table.id}
+                data-tutorial-selector-id={`tableTab-${table.name.toLowerCase().replace(/\s+/g, '')}`}
+              >
+                <div>
+                  <a
+                    className={`height-full flex flex-auto items-center max-width-2 no-user-select pl1-and-half ${
+                      table.isActive ? 'focus-visible' : 'focus-visible-current-color'
+                    }`}
+                    href={`/base/${baseId}/table/${table.id}?blocks=hide`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push(`/base/${baseId}/table/${table.id}`);
+                    }}
+                    style={{
+                      paddingRight: table.isActive ? '32px' : '12px',
+                      outlineOffset: '-5px',
+                      color: 'inherit',
+                    }}
+                  >
+                    <span className="truncate-pre" aria-description={`Tooltip: ${table.name}`}>
+                      {table.name}
+                    </span>
+                  </a>
+                  <div
+                    className="absolute top-0 bottom-0 flex items-center no-user-select"
+                    style={{ right: '12px' }}
+                  >
+                    {table.isActive && (
+                      <div
+                        tabIndex={0}
+                        role="button"
+                        className="pointer flex-none focus-visible focus-visible-opaque ml1 flex items-center colors-foreground-subtle colors-foreground-default-parent-hover"
+                        aria-label={`${table.name} table options`}
+                        data-tutorial-selector-id="openTableMenuButton"
+                      >
+                        <ChevronDown className="w-4 h-4 flex-none icon" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {!table.isActive && <div className="css-baufhl"></div>}
+          </div>
+        ))}
+
+        {/* Add or import button */}
+        <div
+          ref={buttonRef}
+          tabIndex={0}
+          role="button"
+          className="pointer flex items-center flex-none focus-visible-opaque rounded px1-and-half top-bar-text-dark top-bar-text-dark-hover focus-visible"
+          id="addTableButton"
+          aria-expanded={isOpen}
+          aria-haspopup="true"
+          aria-label="Add or import table"
+          data-tutorial-selector-id="addTableButton"
+          style={{ height: '32px' }}
           onClick={() => {
-            // Navigate to the clicked table
-            router.push(`/base/${baseId}/table/${table.id}`);
+            setIsOpen((v) => {
+              const next = !v;
+              if (next) setActiveItemIndex(0);
+              return next;
+            });
           }}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
-            table.isActive
-              ? 'bg-white border border-gray-300 font-medium'
-              : 'hover:bg-white/50 text-gray-700'
-          }`}
         >
-          <span>{table.name}</span>
+          <Plus className="w-4 h-4 flex-none my-half" />
+          <p className="table-tab-text ml1">
+            Add or import
+          </p>
+        </div>
+      </nav>
+
+      <div className="ml-auto flex items-center gap-2 px-4">
+        {/* Tools (moved up from view bar) */}
+        <button className="flex items-center gap-1.5 px-2 py-1 hover:bg-white/50 rounded text-sm text-gray-700">
+          <span>Tools</span>
           <ChevronDown className="w-4 h-4 text-gray-500" />
         </button>
-      ))}
-
-      {/* Add button */}
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-controls={isOpen ? `${popoverId}-menu` : undefined}
-        onClick={() => {
-          setIsOpen((v) => {
-            const next = !v;
-            if (next) setActiveItemIndex(0);
-            return next;
-          });
-        }}
-        className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/50 rounded text-sm text-gray-700"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-
-      <div className="flex-1" />
-
-      {/* Tools (moved up from view bar) */}
-      <button className="flex items-center gap-1.5 px-2 py-1 hover:bg-white/50 rounded text-sm text-gray-700">
-        <span>Tools</span>
-        <ChevronDown className="w-4 h-4 text-gray-500" />
-      </button>
+      </div>
 
       {isOpen && popoverPos && (
         <div

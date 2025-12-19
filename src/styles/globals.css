@@ -385,3 +385,503 @@ h5.quiet {
   font-optical-sizing: auto;
   font-palette: normal;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Sidebar Styles                                                             */
+/* -------------------------------------------------------------------------- */
+
+.height-full {
+  height: 100%;
+}
+
+.width-full {
+  width: 100%;
+}
+
+.flex-column {
+  flex-direction: column;
+}
+
+.py1-and-quarter {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.pb1 {
+  padding-bottom: 8px;
+}
+
+.px1-and-half {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.pl1-and-half {
+  padding-left: 12px;
+}
+
+.pt1 {
+  padding-top: 8px;
+}
+
+.mr1 {
+  margin-right: 8px;
+}
+
+.mt-half {
+  margin-top: 4px;
+}
+
+.mr-half {
+  margin-right: 4px;
+}
+
+.button-size-default {
+  height: 36px;
+  font-size: 13px;
+}
+
+.cursor-col-resize {
+  cursor: col-resize;
+}
+
+.colors-background-primary-control-hover:hover {
+  background-color: rgba(22, 110, 225, 0.2);
+}
+
+.overflowy-auto {
+  overflow-y: auto;
+}
+
+.overflowx-hidden {
+  overflow-x: hidden;
+}
+
+.events {
+  pointer-events: auto;
+}
+
+.flex-auto {
+  flex: 1 1 auto;
+}
+
+.visually-hidden {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.visually-hidden:hover,
+.visually-hidden:focus-visible,
+li:hover .visually-hidden {
+  opacity: 1;
+}
+
+.font-family-default {
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+.text-size-default {
+  font-size: 13px;
+}
+
+.text-color-default {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.line-height-3 {
+  line-height: 1.5;
+}
+
+.line-height-4 {
+  line-height: 1.6;
+}
+
+.font-weight-strong {
+  font-weight: 600;
+}
+
+.font-weight-default {
+  font-weight: 400;
+}
+
+.text-size-small {
+  font-size: 12px;
+}
+
+.text-color-quieter {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.colors-foreground-subtle {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.quieter {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.link-unquiet {
+  text-decoration: none;
+}
+
+.dragHandle {
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.solid {
+  display: flex;
+}
+
+.css-bi2s67 {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stroked-blue-inset-outset-focus:focus {
+  border-color: rgb(22, 110, 225);
+  box-shadow: 0 0 0 2px rgba(22, 110, 225, 0.2);
+}
+
+/* Sidebar specific styles */
+.sidebar-text {
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  font-feature-settings: normal;
+  font-kerning: auto;
+  font-language-override: normal;
+  font-optical-sizing: auto;
+  font-palette: normal;
+  font-size-adjust: none;
+  font-stretch: 100%;
+  font-style: normal;
+  font-synthesis-small-caps: auto;
+  font-synthesis-style: auto;
+  font-synthesis-weight: auto;
+  font-variant-alternates: normal;
+  font-variant-caps: normal;
+  font-variant-east-asian: normal;
+  font-variant-emoji: normal;
+  font-variant-ligatures: normal;
+  font-variant-numeric: normal;
+  font-variant-position: normal;
+  font-variation-settings: normal;
+}
+
+.sidebar-button {
+  background-color: white;
+}
+
+.sidebar-search-input {
+  background-color: white;
+  border: none;
+}
+
+.sidebar-search-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.sidebar-view-item-selected {
+  color: rgb(29, 31, 37);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Left Sidebar Narrow Styles                                                 */
+/* -------------------------------------------------------------------------- */
+
+.circle {
+  border-radius: 50%;
+}
+
+.animate {
+  transition: all 0.2s ease;
+}
+
+.focus-visible-white:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+.colors-border-emphasis {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Top Nav Tab Styles                                                         */
+/* -------------------------------------------------------------------------- */
+
+.top-nav-tab-text {
+  font-family: Geist, "Geist Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-size: 14px;
+  font-weight: 500;
+  font-feature-settings: normal;
+  font-kerning: auto;
+  font-language-override: normal;
+  font-optical-sizing: auto;
+  font-size-adjust: none;
+  font-stretch: 100%;
+  font-style: normal;
+  font-variant-alternates: normal;
+  font-variant-caps: normal;
+  font-variant-east-asian: normal;
+  font-variant-emoji: normal;
+  font-variant-ligatures: normal;
+  font-variant-numeric: normal;
+  font-variant-position: normal;
+  font-variation-settings: normal;
+}
+
+.gap2 {
+  gap: 12px;
+}
+
+.px1 {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.py2 {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.min-width-0 {
+  min-width: 0;
+}
+
+.huge {
+  font-size: 17px;
+}
+
+.focus-visible-current-color:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.css-w1u7fo {
+  /* Additional Airtable specific styles if needed */
+}
+
+.heading-size-small {
+  font-size: 17px;
+}
+
+.strongest {
+  font-weight: 675;
+}
+
+.font-family-display-updated {
+  font-family: "Inter Display", -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+.colors-foreground-default-hover:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.green {
+  background-color: rgb(4, 138, 14);
+}
+
+.items-stretch {
+  align-items: stretch;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Secondary Button Styles (Hide fields, etc.)                                */
+/* -------------------------------------------------------------------------- */
+
+.button-secondary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 4px 8px;
+  transition: background-color 0.085s ease-in;
+  box-sizing: border-box;
+  height: 26px;
+}
+
+.button-secondary:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.button-secondary-text {
+  display: block;
+  color: rgb(97, 102, 112);
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  height: 18px;
+  line-height: 18px;
+  margin: 0;
+  margin-left: 4px;
+  padding: 0;
+  user-select: none;
+  box-sizing: border-box;
+  max-width: 384px;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Table Tab Styles                                                           */
+/* -------------------------------------------------------------------------- */
+
+.table-tab-container {
+  box-sizing: border-box;
+  color: rgb(29, 31, 37);
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  flex: 0 0 auto;
+}
+
+.hover-container {
+  position: relative;
+}
+
+.tableTabContainer {
+  background-color: white;
+  border-radius: 6px 6px 0 0;
+}
+
+.lightBase {
+  background-color: rgb(230, 252, 232);
+}
+
+.activeTab {
+  background-color: rgb(255, 255, 255);
+  z-index: 1;
+}
+
+.clipRightEdge {
+  overflow: hidden;
+}
+
+.rounded-top {
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.rounded-top-right {
+  border-top-right-radius: 6px;
+}
+
+.tab {
+  box-sizing: border-box;
+}
+
+.focus-visible-within-opaque:focus-within {
+  opacity: 1;
+}
+
+.focus-visible-opaque {
+  opacity: 1;
+}
+
+.tableTab {
+  padding: 4px 0;
+}
+
+.top-bar-text-dark {
+  color: rgb(29, 31, 37);
+}
+
+.top-bar-text-dark-hover:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.my-half {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.table-tab-text {
+  box-sizing: border-box;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  display: block;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  height: 16.25px;
+  line-height: 16.25px;
+  margin: 0;
+  margin-left: 8px;
+  padding: 0;
+}
+
+.strong {
+  font-weight: 600;
+}
+
+.max-width-2 {
+  max-width: 100%;
+}
+
+.truncate-pre {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  display: block;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 16.25px;
+  margin: 0;
+  padding: 0;
+}
+
+.css-baufhl {
+  width: 8px;
+}
+
+.colors-foreground-default-parent-hover:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+/* Add table button */
+.table-add-button {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  height: 32px;
+  line-height: 18px;
+  align-items: center;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 0 8px;
+}
+
+.table-add-button:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+}
+
+.table-add-button-text {
+  display: block;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  height: 16px;
+  line-height: 18px;
+  flex: 0 0 auto;
+}
