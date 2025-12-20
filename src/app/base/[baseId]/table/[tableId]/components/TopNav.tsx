@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Clock, Monitor } from 'lucide-react';
 
 export default function TopNav() {
   const [savingCount, setSavingCount] = useState(0);
+  const [showSaved, setShowSaved] = useState(false);
+  const savedTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const onSaving = (e: Event) => {
@@ -16,10 +18,38 @@ export default function TopNav() {
     return () => window.removeEventListener('grid:saving', onSaving as EventListener);
   }, []);
 
+  // When saving finishes, show "All changes saved" briefly (Airtable-like).
+  useEffect(() => {
+    // If saving resumed, hide the saved indicator and clear any pending timer.
+    if (savingCount > 0) {
+      setShowSaved(false);
+      if (savedTimerRef.current) {
+        window.clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = null;
+      }
+      return;
+    }
+
+    // savingCount === 0 → show "saved" for ~4.5s
+    setShowSaved(true);
+    if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = window.setTimeout(() => {
+      setShowSaved(false);
+      savedTimerRef.current = null;
+    }, 4500);
+
+    return () => {
+      if (savedTimerRef.current) {
+        window.clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = null;
+      }
+    };
+  }, [savingCount]);
+
   return (
-    <div className="h-14 bg-white border-b border-gray-200 flex items-center px-4">
+    <div className="relative h-14 bg-white border-b border-gray-200 flex items-center px-4">
       {/* Left section with logo and base name */}
-      <div className="flex items-center gap-3">
+      <div className="relative z-10 flex items-center gap-3">
         {/* Logo */}
         <div 
           data-testid="universal-top-nav-icon-background" 
@@ -84,7 +114,7 @@ export default function TopNav() {
       </div>
 
       {/* Center tabs - positioned in the center */}
-      <div className="flex-1 flex justify-center">
+      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex items-center">
         <ul 
           data-tutorial-selector-id="appTopBarNavigationItems" 
           className="relative flex items-stretch justify-center gap2 px1 colors-background-default"
@@ -150,7 +180,7 @@ export default function TopNav() {
       </div>
 
       {/* Right section */}
-      <div className="flex items-center justify-end pr2 colors-background-default overflow-hidden">
+      <div className="relative z-10 ml-auto flex items-center justify-end pr2 colors-background-default overflow-hidden">
         {savingCount > 0 && (
           <div
             className="global-status-indicator ignore-visual-diff"
@@ -193,11 +223,29 @@ export default function TopNav() {
           </div>
         )}
 
+        {savingCount === 0 && showSaved && (
+          <div
+            className="global-status-indicator ignore-visual-diff"
+            data-testid="globalStatusIndicator"
+            data-global-status="saved"
+            aria-live="polite"
+          >
+            <span className="flex-inline items-center align-items">
+              <span className="flex-inline items-center align-items hide" style={{ width: 16 }} />
+              <span className="ml-half">All changes saved</span>
+            </span>
+          </div>
+        )}
+
         <div className="flex-inline items-center gap1">
           <div className="flex-none flex items-center gap1">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Clock className="w-4 h-4" />
-              <span>Trial: 11 days left</span>
+            <div
+              tabIndex={0}
+              role="button"
+              className="flex items-baseline justify-center pointer px1-and-half pill focus-visible mx1 nowrap darken1 colors-foreground-default css-1amw26v"
+              aria-label="Trial status"
+            >
+              Trial: 11 days left
             </div>
             <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium">
               <Monitor className="w-4 h-4" />

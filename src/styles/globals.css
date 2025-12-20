@@ -14,6 +14,11 @@
   display: none; /* Chrome/Safari */
 }
 
+/* Airtable DOM utility */
+.hide {
+  display: none !important;
+}
+
 /* Light, Airtable-ish scrollbars for popovers/menus */
 .light-scrollbar {
   scrollbar-width: thin; /* Firefox */
@@ -259,6 +264,42 @@
 .focus-visible:focus-visible {
   outline: 2px solid rgb(22, 110, 225);
   outline-offset: 2px;
+}
+
+.items-baseline {
+  align-items: baseline;
+}
+
+.mx1 {
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.darken1 {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.colors-foreground-default {
+  color: rgb(29, 31, 37);
+}
+
+/* Airtable trial pill sizing */
+.css-1amw26v {
+  box-sizing: border-box;
+  height: 32px;
+  line-height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: 9999px;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans,
+    Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .colors-foreground-subtle {
