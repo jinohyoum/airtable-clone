@@ -48,10 +48,81 @@ export default function MainContent() {
     },
   );
   
-  // Row creation
+  // Row creation with optimistic updates (Option B: allow rapid clicks)
   const utils = api.useUtils();
   const createRowMutation = api.table.createRow.useMutation({
-    onSuccess: () => {
+    onMutate: async ({ clientRowId }) => {
+      // Cancel outgoing refetches (so they don't overwrite our optimistic update)
+      await utils.table.getData.cancel({ tableId });
+      
+      // Snapshot the previous value
+      const previousData = utils.table.getData.getData({ tableId });
+      
+      // Optimistically insert the new row immediately
+      const tempRow = {
+        id: `__temp__${clientRowId}`,
+        order: (previousData?.rows.length ?? 0),
+        tableId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        cells: (previousData?.columns ?? []).map(col => ({
+          id: `__temp_cell__${col.id}__${clientRowId}`,
+          rowId: `__temp__${clientRowId}`,
+          columnId: col.id,
+          value: '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          column: col,
+        })),
+      };
+      
+      utils.table.getData.setData({ tableId }, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          rows: [...oldData.rows, tempRow],
+        };
+      });
+      
+      // Return context with the data we need for rollback
+      return { previousData, clientRowId };
+    },
+    onSuccess: (newRow, variables, context) => {
+      if (!context) return;
+      
+      // Replace optimistic temp row with real row from server
+      utils.table.getData.setData({ tableId }, (oldData) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          rows: oldData.rows.map(row => {
+            // Replace the specific temp row that matches this clientRowId
+            if (row.id === `__temp__${context.clientRowId}`) {
+              return newRow;
+            }
+            return row;
+          }),
+        };
+      });
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return;
+      
+      // Remove only the failed optimistic row
+      utils.table.getData.setData({ tableId }, (oldData) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          rows: oldData.rows.filter(row => row.id !== `__temp__${context.clientRowId}`),
+        };
+      });
+      
+      alert('Failed to create row. Please try again.');
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure consistency
       void utils.table.getData.invalidate({ tableId });
     },
   });
@@ -65,7 +136,12 @@ export default function MainContent() {
   
   const handleCreateRow = () => {
     if (isCreatingTable) return;
-    createRowMutation.mutate({ tableId });
+    
+    // Generate unique client ID for this row creation
+    const clientRowId = crypto.randomUUID();
+    
+    // Start mutation (optimistic insert happens in onMutate)
+    createRowMutation.mutate({ tableId, clientRowId });
   };
   
   // Handle cell editing
@@ -111,7 +187,7 @@ export default function MainContent() {
         columnId,
         value: newValue,
       });
-    } catch (error) {
+    } catch {
       // On error, refetch to get the correct state
       void utils.table.getData.invalidate({ tableId });
     } finally {

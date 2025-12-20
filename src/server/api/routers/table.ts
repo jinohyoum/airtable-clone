@@ -155,7 +155,10 @@ export const tableRouter = createTRPCRouter({
     }),
 
   createRow: protectedProcedure
-    .input(z.object({ tableId: z.string() }))
+    .input(z.object({ 
+      tableId: z.string(),
+      clientRowId: z.string(), // Client-generated UUID for idempotency
+    }))
     .mutation(async ({ ctx, input }) => {
       // Get table with columns and last row for ordering
       const table = await ctx.db.table.findUnique({
@@ -178,17 +181,25 @@ export const tableRouter = createTRPCRouter({
       });
 
       // Create empty cells for each column
+      const cells = [];
       for (const column of table.columns) {
-        await ctx.db.cell.create({
+        const cell = await ctx.db.cell.create({
           data: {
             rowId: row.id,
             columnId: column.id,
             value: "", // Empty cells for new rows
           },
+          include: {
+            column: true,
+          },
         });
+        cells.push(cell);
       }
 
-      return row;
+      return {
+        ...row,
+        cells,
+      };
     }),
 
   updateCell: protectedProcedure
