@@ -13,6 +13,9 @@
 /prisma/db.sqlite-journal
 db.sqlite
 
+# prisma client generator temp files (Windows can leave these around if engines are locked)
+/generated/prisma/*.tmp*
+
 # next.js
 /.next/
 /out/
