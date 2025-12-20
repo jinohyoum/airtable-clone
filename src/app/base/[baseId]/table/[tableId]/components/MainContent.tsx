@@ -25,6 +25,11 @@ export default function MainContent() {
   const [bottomSpacerWidth, setBottomSpacerWidth] = useState<number>(0);
   const [hoveredRow, setHoveredRow] = useState<number | 'add' | null>(null);
   
+  // Cell editing state
+  const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  
   // Transition mask: brief skeleton on every table switch (like Airtable)
   // This signals "context change" even when data is cached
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -51,9 +56,86 @@ export default function MainContent() {
     },
   });
   
+  // Cell update mutation
+  const updateCellMutation = api.table.updateCell.useMutation({
+    onSuccess: () => {
+      void utils.table.getData.invalidate({ tableId });
+    },
+  });
+  
   const handleCreateRow = () => {
     if (isCreatingTable) return;
     createRowMutation.mutate({ tableId });
+  };
+  
+  // Handle cell editing
+  const handleCellClick = (rowId: string, columnId: string, currentValue: string) => {
+    setEditingCell({ rowId, columnId });
+    setEditValue(currentValue);
+  };
+  
+  const handleCellSave = async (rowId: string, columnId: string) => {
+    if (!editingCell) return;
+    
+    const cellKey = `${rowId}-${columnId}`;
+    const newValue = editValue;
+    
+    // Clear editing state immediately (optimistic)
+    setEditingCell(null);
+    setEditValue('');
+    setSavingCells(prev => new Set(prev).add(cellKey));
+    
+    // Optimistically update the cache
+    utils.table.getData.setData({ tableId }, (oldData) => {
+      if (!oldData) return oldData;
+      
+      return {
+        ...oldData,
+        rows: oldData.rows.map(row => {
+          if (row.id !== rowId) return row;
+          
+          return {
+            ...row,
+            cells: row.cells.map(cell => {
+              if (cell.columnId !== columnId) return cell;
+              return { ...cell, value: newValue };
+            }),
+          };
+        }),
+      };
+    });
+    
+    try {
+      await updateCellMutation.mutateAsync({
+        rowId,
+        columnId,
+        value: newValue,
+      });
+    } catch (error) {
+      // On error, refetch to get the correct state
+      void utils.table.getData.invalidate({ tableId });
+    } finally {
+      setSavingCells(prev => {
+        const next = new Set(prev);
+        next.delete(cellKey);
+        return next;
+      });
+    }
+  };
+  
+  const handleCellCancel = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+  
+  const handleCellKeyDown = (e: React.KeyboardEvent, rowId: string, columnId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void handleCellSave(rowId, columnId);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCellCancel();
+    }
   };
   
   // Show transition mask for 150-200ms on table switch
@@ -158,23 +240,9 @@ export default function MainContent() {
   }, []);
 
   if (showCreatingState) {
+    // Blank screen while creating table (no visual elements)
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }}>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <div className="h-full overflow-y-auto overflow-x-hidden">
-            <div className="p-6 text-sm text-gray-600">Creating table…</div>
-            <div className="px-6">
-              <div className="h-8 w-64 rounded bg-gray-200/70" />
-              <div className="mt-4 space-y-2">
-                <div className="h-8 w-full rounded bg-gray-200/50" />
-                <div className="h-8 w-full rounded bg-gray-200/50" />
-                <div className="h-8 w-full rounded bg-gray-200/50" />
-                <div className="h-8 w-full rounded bg-gray-200/50" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }} />
     );
   }
 
@@ -217,6 +285,15 @@ export default function MainContent() {
                 {reactTable.getRowModel().rows.map((row, idx) => {
                   const isHovered = hoveredRow === idx;
                   const firstCell = row.getVisibleCells()[0];
+                  if (!firstCell) return null;
+                  
+                  const rowId = row.original._id;
+                  if (!rowId) return null;
+                  
+                  const columnId = firstCell.column.id;
+                  const cellValue = (firstCell.getValue() as string ?? '');
+                  const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
+                  const isSaving = savingCells.has(`${rowId}-${columnId}`);
                   
                   return (
                     <tr
@@ -242,8 +319,16 @@ export default function MainContent() {
                         <input
                           key={`${tableId}-${row.id}-name`}
                           type="text"
-                          className="w-full h-8 px-2 bg-transparent outline-none focus:bg-blue-50 table-cell-input"
-                          defaultValue={firstCell ? (firstCell.getValue() as string ?? '') : ''}
+                          className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
+                            isEditing ? 'bg-blue-50' : 'focus:bg-blue-50'
+                          }`}
+                          value={isEditing ? editValue : cellValue}
+                          onClick={() => handleCellClick(rowId, columnId, cellValue)}
+                          onChange={(e) => isEditing && setEditValue(e.target.value)}
+                          onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
+                          onKeyDown={(e) => isEditing && handleCellKeyDown(e, rowId, columnId)}
+                          disabled={isSaving}
+                          readOnly={!isEditing}
                         />
                       </td>
                     </tr>
@@ -309,6 +394,8 @@ export default function MainContent() {
                 {reactTable.getRowModel().rows.map((row, idx) => {
                   const isHovered = hoveredRow === idx;
                   const visibleCells = row.getVisibleCells().slice(1); // Skip first column (Name)
+                  const rowId = row.original._id;
+                  if (!rowId) return null;
                   
                   return (
                     <tr
@@ -317,21 +404,36 @@ export default function MainContent() {
                       onMouseEnter={() => setHoveredRow(idx)}
                       onMouseLeave={() => setHoveredRow(null)}
                     >
-                      {visibleCells.map((cell) => (
-                        <td
-                          key={cell.id}
-                          className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
-                            isHovered ? 'bg-gray-50' : 'bg-white'
-                          }`}
-                        >
-                          <input
-                            key={`${tableId}-${cell.id}`}
-                            type="text"
-                            className="w-full h-8 pl-3 pr-2 bg-transparent outline-none focus:bg-blue-50 table-cell-input"
-                            defaultValue={(cell.getValue() as string ?? '')}
-                          />
-                        </td>
-                      ))}
+                      {visibleCells.map((cell) => {
+                        const columnId = cell.column.id;
+                        const cellValue = (cell.getValue() as string ?? '');
+                        const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
+                        const isSaving = savingCells.has(`${rowId}-${columnId}`);
+                        
+                        return (
+                          <td
+                            key={cell.id}
+                            className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
+                              isHovered ? 'bg-gray-50' : 'bg-white'
+                            }`}
+                          >
+                            <input
+                              key={`${tableId}-${cell.id}`}
+                              type="text"
+                              className={`w-full h-8 pl-3 pr-2 bg-transparent outline-none table-cell-input ${
+                                isEditing ? 'bg-blue-50' : 'focus:bg-blue-50'
+                              }`}
+                              value={isEditing ? editValue : cellValue}
+                              onClick={() => handleCellClick(rowId, columnId, cellValue)}
+                              onChange={(e) => isEditing && setEditValue(e.target.value)}
+                              onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
+                              onKeyDown={(e) => isEditing && handleCellKeyDown(e, rowId, columnId)}
+                              disabled={isSaving}
+                              readOnly={!isEditing}
+                            />
+                          </td>
+                        );
+                      })}
 
                       {/* Add column cell */}
                       <td 

@@ -190,4 +190,32 @@ export const tableRouter = createTRPCRouter({
 
       return row;
     }),
+
+  updateCell: protectedProcedure
+    .input(
+      z.object({
+        rowId: z.string(),
+        columnId: z.string(),
+        value: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Upsert: update if cell exists, create if it doesn't
+      return ctx.db.cell.upsert({
+        where: {
+          rowId_columnId: {
+            rowId: input.rowId,
+            columnId: input.columnId,
+          },
+        },
+        update: {
+          value: input.value,
+        },
+        create: {
+          rowId: input.rowId,
+          columnId: input.columnId,
+          value: input.value,
+        },
+      });
+    }),
 });

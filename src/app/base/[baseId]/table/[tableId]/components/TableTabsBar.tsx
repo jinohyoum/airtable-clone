@@ -66,8 +66,10 @@ export default function TableTabsBar() {
           const activeTab = document.querySelector('.activeTab');
           if (activeTab) {
             const rect = activeTab.getBoundingClientRect();
+            // Center the dropdown (299px width) on the tab's right edge
+            const dropdownWidth = 299;
             setRenameFormPos({
-              x: rect.left,
+              x: rect.right - dropdownWidth / 2,
               y: rect.bottom,
             });
             setShowRenameForm(true);
@@ -91,7 +93,9 @@ export default function TableTabsBar() {
       const activeTab = document.querySelector('.activeTab');
       if (!activeTab) return;
       const rect = activeTab.getBoundingClientRect();
-      setRenameFormPos({ x: rect.left, y: rect.bottom });
+      // Center the dropdown (299px width) on the tab's right edge
+      const dropdownWidth = 299;
+      setRenameFormPos({ x: rect.right - dropdownWidth / 2, y: rect.bottom });
     }, 0);
   }, [showRenameForm, activeOverrideTableId, currentTableId, tablesData, optimisticTable]);
 
