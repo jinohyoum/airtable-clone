@@ -8,61 +8,40 @@ import {
   flexRender,
   type ColumnDef,
 } from '@tanstack/react-table';
-import {
-  Plus,
-  Type,
-  User,
-  Paperclip,
-  Bell,
-} from 'lucide-react';
+import { Plus, Type } from 'lucide-react';
 import { api } from '~/trpc/react';
-
-function LongTextFieldIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      className={className}
-      fill="none"
-    >
-      {/* "A=" */}
-      <path
-        d="M2.5 4.5h3M2.5 6h3"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M6.2 4.3h2.2M6.2 6.2h2.2"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
-      {/* lines */}
-      <path
-        d="M2.5 9h11M2.5 11h8.5M2.5 13h10"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 type CellData = Record<string, string>;
 
 export default function MainContent() {
   const params = useParams();
   const tableId = params.tableId as string;
+  const isCreatingTable = tableId.startsWith('__creating__');
   
   const middleScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
   const syncingRef = useRef<'middle' | 'bottom' | null>(null);
+  const prevTableIdRef = useRef<string>(tableId);
   const [bottomSpacerWidth, setBottomSpacerWidth] = useState<number>(0);
   const [hoveredRow, setHoveredRow] = useState<number | 'add' | null>(null);
   
-  // Fetch table data
-  const { data: tableData, isLoading } = api.table.getData.useQuery({ tableId });
+  // Transition mask: brief skeleton on every table switch (like Airtable)
+  // This signals "context change" even when data is cached
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Fetch table data with stale-while-revalidate pattern
+  // Shows cached data instantly while fetching fresh data in background
+  const { data: tableData, isLoading } = api.table.getData.useQuery(
+    { tableId },
+    { 
+      enabled: !isCreatingTable,
+      // Stale-while-revalidate: show cached data, refetch in background
+      staleTime: 1000 * 60 * 5, // Data is fresh for 5 minutes
+      gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+      refetchOnMount: 'always', // Always check for updates, but show cache first
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+    },
+  );
   
   // Row creation
   const utils = api.useUtils();
@@ -73,8 +52,27 @@ export default function MainContent() {
   });
   
   const handleCreateRow = () => {
+    if (isCreatingTable) return;
     createRowMutation.mutate({ tableId });
   };
+  
+  // Show transition mask for 150-200ms on table switch
+  // This is a UX pattern to signal "you changed context"
+  useEffect(() => {
+    if (prevTableIdRef.current !== tableId && !isCreatingTable) {
+      setIsTransitioning(true);
+      const timer = setTimeout(() => {
+        setIsTransitioning(false);
+      }, 175); // Brief transition mask like Airtable
+      prevTableIdRef.current = tableId;
+      return () => clearTimeout(timer);
+    }
+  }, [tableId, isCreatingTable]);
+  
+  const showCreatingState = isCreatingTable;
+  
+  // Show transition mask on every switch, or loading state if no cached data
+  const showTransitionMask = !isCreatingTable && (isTransitioning || isLoading);
   
   // Transform data for TanStack Table
   const columns = useMemo<ColumnDef<CellData>[]>(() => {
@@ -157,8 +155,36 @@ export default function MainContent() {
   useEffect(() => {
     // Initial sync so bottom scrollbar matches current position
     syncFromMiddle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (showCreatingState) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }}>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="h-full overflow-y-auto overflow-x-hidden">
+            <div className="p-6 text-sm text-gray-600">Creating table…</div>
+            <div className="px-6">
+              <div className="h-8 w-64 rounded bg-gray-200/70" />
+              <div className="mt-4 space-y-2">
+                <div className="h-8 w-full rounded bg-gray-200/50" />
+                <div className="h-8 w-full rounded bg-gray-200/50" />
+                <div className="h-8 w-full rounded bg-gray-200/50" />
+                <div className="h-8 w-full rounded bg-gray-200/50" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showTransitionMask) {
+    // Transition mask: completely blank screen for ~175ms to signal "context change"
+    // This appears even when data is cached (like Airtable)
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }} />
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }}>
@@ -214,6 +240,7 @@ export default function MainContent() {
                         }`}
                       >
                         <input
+                          key={`${tableId}-${row.id}-name`}
                           type="text"
                           className="w-full h-8 px-2 bg-transparent outline-none focus:bg-blue-50 table-cell-input"
                           defaultValue={firstCell ? (firstCell.getValue() as string ?? '') : ''}
@@ -298,6 +325,7 @@ export default function MainContent() {
                           }`}
                         >
                           <input
+                            key={`${tableId}-${cell.id}`}
                             type="text"
                             className="w-full h-8 pl-3 pr-2 bg-transparent outline-none focus:bg-blue-50 table-cell-input"
                             defaultValue={(cell.getValue() as string ?? '')}

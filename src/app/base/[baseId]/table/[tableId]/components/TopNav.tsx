@@ -48,7 +48,7 @@ export default function TopNav() {
             aria-label="Open base settings menu"
             data-tutorial-selector-id="openBaseMenuButton"
             style={{ minWidth: '0px', flex: '0 1 auto' }}
-            aria-description="Tooltip: Untitled Base"
+            title="Untitled Base"
           >
             <div 
               className="truncate font-family-display-updated heading-size-small strongest" 

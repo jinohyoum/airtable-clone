@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '~/trpc/react';
+import TableCreationDropdown from './TableCreationDropdown';
 
 type MenuEntry =
   | { kind: 'heading'; label: string }
@@ -35,34 +36,147 @@ export default function TableTabsBar() {
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number; maxH: number } | null>(
     null,
   );
-  const tableButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  
+  const [showRenameForm, setShowRenameForm] = useState(false);
+  const [renameFormPos, setRenameFormPos] = useState<{ x: number; y: number } | null>(null);
+  const [activeOverrideTableId, setActiveOverrideTableId] = useState<string | null>(null);
+  const [optimisticTable, setOptimisticTable] = useState<{ id: string; name: string } | null>(null);
+  const pendingCreateRef = useRef<{ tempId: string; defaultName: string; prevTableId: string } | null>(
+    null,
+  );
+  const queuedRenameRef = useRef<{ name: string; recordTerm: string } | null>(null);
   // Fetch real tables from database
-  const { data: tablesData, isLoading } = api.table.list.useQuery({ baseId });
+  const { data: tablesData } = api.table.list.useQuery({ baseId });
   
   // Get utils for invalidating queries
   const utils = api.useUtils();
   
+  // Check URL for showRename parameter and display form
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const shouldShowRename = urlParams.get('showRename') === 'true';
+      
+      if (shouldShowRename && tablesData) {
+        // Remove the parameter from URL immediately
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+        
+        // Wait a bit for the tab to render, then show the form
+        setTimeout(() => {
+          const activeTab = document.querySelector('.activeTab');
+          if (activeTab) {
+            const rect = activeTab.getBoundingClientRect();
+            setRenameFormPos({
+              x: rect.left,
+              y: rect.bottom,
+            });
+            setShowRenameForm(true);
+          }
+        }, 50);
+      }
+    }
+  }, [tablesData, currentTableId]);
+
+  // Clear the active override once the URL has caught up
+  useEffect(() => {
+    if (activeOverrideTableId && currentTableId === activeOverrideTableId) {
+      setActiveOverrideTableId(null);
+    }
+  }, [activeOverrideTableId, currentTableId]);
+
+  // Keep the rename dropdown pinned under the active tab
+  useEffect(() => {
+    if (!showRenameForm) return;
+    setTimeout(() => {
+      const activeTab = document.querySelector('.activeTab');
+      if (!activeTab) return;
+      const rect = activeTab.getBoundingClientRect();
+      setRenameFormPos({ x: rect.left, y: rect.bottom });
+    }, 0);
+  }, [showRenameForm, activeOverrideTableId, currentTableId, tablesData, optimisticTable]);
+
+  // Drop the optimistic tab once it exists in the real list and we're on it
+  useEffect(() => {
+    if (!optimisticTable) return;
+    if (!tablesData) return;
+    const exists = tablesData.some((t) => t.id === optimisticTable.id);
+    if (exists && currentTableId === optimisticTable.id) {
+      setOptimisticTable(null);
+    }
+  }, [currentTableId, optimisticTable, tablesData]);
+  
   // tRPC mutation for creating tables
   const createTableMutation = api.table.create.useMutation({
     onSuccess: (newTable) => {
+      const pending = pendingCreateRef.current;
+
       // Invalidate and refetch the table list so new table appears immediately
       void utils.table.list.invalidate({ baseId });
+
+      // Optimistically append to the cached list so the tab appears instantly
+      utils.table.list.setData({ baseId }, (old) => {
+        const prev = old ?? [];
+        if (prev.some((t) => t.id === newTable.id)) return prev;
+        return [...prev, newTable];
+      });
       
-      // Update URL without full page navigation (client-side only)
-      window.history.pushState(null, '', `/base/${baseId}/table/${newTable.id}`);
-      
-      // Close the dropdown
+      // Close the add table dropdown
       setIsOpen(false);
+
+      // Keep the new tab selected while we navigate
+      setActiveOverrideTableId(newTable.id);
+
+      // Replace optimistic temp tab (if any) with the real one
+      if (pending) {
+        setOptimisticTable({ id: newTable.id, name: newTable.name });
+        pendingCreateRef.current = null;
+      }
+
+      // Navigate to the new table (client-side, fast)
+      void router.replace(`/base/${baseId}/table/${newTable.id}`);
+
+      // If the user already typed a different name while creating, apply it now
+      const queued = queuedRenameRef.current;
+      const queuedName = queued?.name;
+      if (queuedName && queuedName !== newTable.name) {
+        updateTableMutation.mutate({ id: newTable.id, name: queuedName });
+        queuedRenameRef.current = null;
+      }
     },
   });
   
+  // tRPC mutation for updating table name
+  const updateTableMutation = api.table.update.useMutation({
+    onSuccess: () => {
+      void utils.table.list.invalidate({ baseId });
+      setShowRenameForm(false);
+    },
+  });
+  
+  const activeTableId = activeOverrideTableId ?? currentTableId;
+
   // Transform database tables to UI format
   const tables = (tablesData ?? []).map((table) => ({
     id: table.id,
     name: table.name,
-    isActive: table.id === currentTableId,
+    isActive: table.id === activeTableId,
+    isOptimistic: false,
   }));
+
+  const tabs = useMemo(() => {
+    if (!optimisticTable) return tables;
+    // Avoid duplicates if the optimistic table has already landed in the query result
+    if (tables.some((t) => t.id === optimisticTable.id)) return tables;
+    return [
+      ...tables.map((t) => ({ ...t, isActive: t.id === activeTableId })),
+      {
+        id: optimisticTable.id,
+        name: optimisticTable.name,
+        isActive: optimisticTable.id === activeTableId,
+        isOptimistic: true,
+      },
+    ];
+  }, [activeTableId, optimisticTable, tables]);
 
   const entries: MenuEntry[] = useMemo(
     () => [
@@ -72,22 +186,46 @@ export default function TableTabsBar() {
         label: createTableMutation.isPending ? 'Creating...' : 'Start from scratch',
         ariaLabel: 'Start from scratch',
         disabled: createTableMutation.isPending,
-        onSelect: async () => {
-          // Create table immediately in database
-          const tableNumber = tables.length + 1;
-          const defaultName = `Table ${tableNumber}`;
-          
-          try {
-            await createTableMutation.mutateAsync({
+        onSelect: () => {
+          // Make the tab + dropdown appear immediately (Airtable-like),
+          // while the real table is created in the background.
+          const existingCount = (tablesData?.length ?? 0) + (optimisticTable ? 1 : 0);
+          const defaultName = `Table ${existingCount + 1}`;
+          const tempId = `__creating__${Date.now()}`;
+
+          pendingCreateRef.current = { tempId, defaultName, prevTableId: currentTableId };
+          queuedRenameRef.current = null;
+
+          setIsOpen(false);
+          setOptimisticTable({ id: tempId, name: defaultName });
+          setActiveOverrideTableId(tempId);
+          setRenameFormPos(null);
+          setShowRenameForm(true);
+
+          // Switch the main content to a lightweight "Creating…" state immediately
+          void router.push(`/base/${baseId}/table/${tempId}`);
+
+          createTableMutation.mutate(
+            {
               baseId,
               name: defaultName,
               recordTerm: 'Record',
-            });
-            // URL update and close happens in onSuccess
-          } catch (error) {
-            console.error('Failed to create table:', error);
-            alert('Failed to create table. Please try again.');
-          }
+            },
+            {
+              onError: (err) => {
+                console.error('Failed to create table:', err);
+                setShowRenameForm(false);
+                setRenameFormPos(null);
+                setOptimisticTable(null);
+                setActiveOverrideTableId(null);
+                const prev = pendingCreateRef.current?.prevTableId;
+                if (prev) void router.replace(`/base/${baseId}/table/${prev}`);
+                pendingCreateRef.current = null;
+                queuedRenameRef.current = null;
+                alert('Failed to create table. Please try again.');
+              },
+            },
+          );
         },
       },
       { kind: 'divider' },
@@ -300,7 +438,14 @@ export default function TableTabsBar() {
         ),
       },
     ],
-    [tables.length, createTableMutation.isPending, baseId, router, createTableMutation],
+    [
+      baseId,
+      router,
+      createTableMutation,
+      currentTableId,
+      tablesData?.length,
+      optimisticTable,
+    ],
   );
 
   const itemEntries = useMemo(
@@ -407,13 +552,13 @@ export default function TableTabsBar() {
     <div className="relative flex items-center" style={{ backgroundColor: 'rgb(230, 252, 232)', height: '32px' }}>
       {/* Table tabs nav */}
       <nav aria-label="Tables" className="flex flex-none" id="appControlsTablesTabs" data-tutorial-selector-id="appControlsTablesTabs">
-        {tables.map((table, index) => (
+        {tabs.map((table, index) => (
           <div key={table.id} className="flex" style={{ height: '32px' }}>
             <div 
               className={`flex relative hover-container text-size-default tableTabContainer flex-none lightBase ${
                 table.isActive 
                   ? 'rounded-top-right activeTab' 
-                  : index === tables.length - 1 
+                  : index === tabs.length - 1 
                     ? 'rounded-top clipRightEdge' 
                     : 'rounded-top'
               }`}
@@ -439,6 +584,12 @@ export default function TableTabsBar() {
                       e.preventDefault();
                       router.push(`/base/${baseId}/table/${table.id}`);
                     }}
+                    onMouseEnter={() => {
+                      // Prefetch table data on hover for instant switching
+                      if (!table.isActive && !table.isOptimistic) {
+                        void utils.table.getData.prefetch({ tableId: table.id });
+                      }
+                    }}
                     style={{
                       paddingRight: table.isActive ? '32px' : '12px',
                       outlineOffset: '-5px',
@@ -453,7 +604,7 @@ export default function TableTabsBar() {
                     className="absolute top-0 bottom-0 flex items-center no-user-select"
                     style={{ right: '12px' }}
                   >
-                    {table.isActive && (
+                    {table.isActive && !table.isOptimistic && (
                       <div
                         tabIndex={0}
                         role="button"
@@ -594,6 +745,47 @@ export default function TableTabsBar() {
             })}
           </ul>
         </div>
+      )}
+
+      {/* Table Rename Form (appears after table is created) */}
+      {showRenameForm && renameFormPos && (
+        <TableCreationDropdown
+          tableName={tabs.find((t) => t.id === (activeOverrideTableId ?? currentTableId))?.name ?? 'Table'}
+          onSave={async (name: string, recordTerm: string) => {
+            const activeId = activeOverrideTableId ?? currentTableId;
+            const currentTable = tabs.find((t) => t.id === activeId);
+
+            // If we're still creating (temp id), queue the rename and close.
+            if (activeId.startsWith('__creating__')) {
+              queuedRenameRef.current = { name, recordTerm };
+              setShowRenameForm(false);
+              return;
+            }
+
+            // Only update if name changed
+            if (currentTable && name !== currentTable.name) {
+              try {
+                await updateTableMutation.mutateAsync({
+                  id: activeId,
+                  name,
+                });
+              } catch (error) {
+                console.error('Failed to update table:', error);
+                alert('Failed to update table name. Please try again.');
+              }
+            } else {
+              // Just close the form
+              setShowRenameForm(false);
+            }
+          }}
+          onCancel={() => {
+            setShowRenameForm(false);
+          }}
+          onClickOutside={() => {
+            setShowRenameForm(false);
+          }}
+          position={renameFormPos}
+        />
       )}
 
     </div>

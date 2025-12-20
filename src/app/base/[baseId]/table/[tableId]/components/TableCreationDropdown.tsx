@@ -18,7 +18,7 @@ export default function TableCreationDropdown({
   position = { x: 0, y: 0 },
 }: TableCreationDropdownProps) {
   const [name, setName] = useState(tableName);
-  const [recordTerm, setRecordTerm] = useState('Record');
+  const [recordTerm] = useState('Record');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

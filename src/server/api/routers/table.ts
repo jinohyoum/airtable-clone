@@ -111,6 +111,22 @@ export const tableRouter = createTRPCRouter({
       return table;
     }),
 
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      
+      return ctx.db.table.update({
+        where: { id },
+        data,
+      });
+    }),
+
   getData: protectedProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }) => {
