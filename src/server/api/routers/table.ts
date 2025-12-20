@@ -158,6 +158,7 @@ export const tableRouter = createTRPCRouter({
     .input(z.object({ 
       tableId: z.string(),
       clientRowId: z.string(), // Client-generated UUID for idempotency
+      afterRowId: z.string().optional(), // Insert after this row (Shift+Enter behavior)
     }))
     .mutation(async ({ ctx, input }) => {
       // Check if this row already exists (idempotency)
@@ -193,14 +194,41 @@ export const tableRouter = createTRPCRouter({
 
       if (!table) throw new Error("Table not found");
 
-      // Create row with next order number and clientRowId
-      const nextOrder = (table.rows[0]?.order ?? -1) + 1;
-      const row = await ctx.db.row.create({
-        data: {
-          tableId: input.tableId,
-          order: nextOrder,
-          clientRowId: input.clientRowId,
-        },
+      // Create row either appended (default) or inserted after a specific row.
+      // Order is an Int, so insertion requires shifting subsequent rows.
+      const row = await ctx.db.$transaction(async (tx) => {
+        let orderToUse: number;
+
+        if (input.afterRowId) {
+          const after = await tx.row.findFirst({
+            where: { id: input.afterRowId, tableId: input.tableId },
+            select: { order: true },
+          });
+
+          if (!after) {
+            // Fallback: if the target row doesn't exist, append.
+            orderToUse = (table.rows[0]?.order ?? -1) + 1;
+          } else {
+            orderToUse = after.order + 1;
+
+            // Shift rows at/after the insert point down by 1.
+            await tx.row.updateMany({
+              where: { tableId: input.tableId, order: { gte: orderToUse } },
+              data: { order: { increment: 1 } },
+            });
+          }
+        } else {
+          // Append at end.
+          orderToUse = (table.rows[0]?.order ?? -1) + 1;
+        }
+
+        return tx.row.create({
+          data: {
+            tableId: input.tableId,
+            order: orderToUse,
+            clientRowId: input.clientRowId,
+          },
+        });
       });
 
       // Create empty cells for each column

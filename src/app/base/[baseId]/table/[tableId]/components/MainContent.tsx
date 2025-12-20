@@ -18,6 +18,7 @@ export default function MainContent() {
   const tableId = params.tableId as string;
   const isCreatingTable = tableId.startsWith('__creating__');
   
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const middleScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
   const syncingRef = useRef<'middle' | 'bottom' | null>(null);
@@ -28,6 +29,10 @@ export default function MainContent() {
   // Active cell for keyboard navigation (row index, column index)
   const [activeCell, setActiveCell] = useState<{ rowIdx: number; colIdx: number } | null>(null);
   const cellInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+
+  // Track whether the current active cell came from keyboard navigation (arrows/tab)
+  // so we can show "hover-like" styling only for keyboard, not mouse.
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   
   // Cell editing state with local draft
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
@@ -64,7 +69,7 @@ export default function MainContent() {
   // Row creation with optimistic updates (Option B: allow rapid clicks)
   const utils = api.useUtils();
   const createRowMutation = api.table.createRow.useMutation({
-    onMutate: async ({ clientRowId }) => {
+    onMutate: async ({ clientRowId, afterRowId }) => {
       // Cancel outgoing refetches (so they don't overwrite our optimistic update)
       await utils.table.getData.cancel({ tableId });
       
@@ -72,9 +77,22 @@ export default function MainContent() {
       const previousData = utils.table.getData.getData({ tableId });
       
       // Optimistically insert the new row immediately
+      const insertIndex = (() => {
+        if (!previousData) return undefined;
+        if (!afterRowId) return undefined;
+        const idx = previousData.rows.findIndex((r) => r.id === afterRowId);
+        return idx >= 0 ? idx + 1 : undefined;
+      })();
+
       const tempRow = {
         id: `__temp__${clientRowId}`,
-        order: (previousData?.rows.length ?? 0),
+        order: (() => {
+          if (!previousData) return 0;
+          if (insertIndex === undefined) return previousData.rows.length;
+          const after = previousData.rows[insertIndex - 1];
+          const afterOrder = after?.order ?? -1;
+          return afterOrder + 1;
+        })(),
         tableId,
         clientRowId,
         createdAt: new Date(),
@@ -92,14 +110,33 @@ export default function MainContent() {
       
       utils.table.getData.setData({ tableId }, (oldData) => {
         if (!oldData) return oldData;
+
+        const idx = insertIndex ?? oldData.rows.length;
+
+        // If inserting into the middle, shift order values for rows after the insertion point.
+        // (Server will do the same in a transaction.)
+        const nextRows = oldData.rows.map((r, i) => {
+          if (i >= idx) return { ...r, order: r.order + 1 };
+          return r;
+        });
+
         return {
           ...oldData,
-          rows: [...oldData.rows, tempRow],
+          rows: [...nextRows.slice(0, idx), tempRow, ...nextRows.slice(idx)],
         };
       });
+
+      // If this was created via keyboard insertion (Shift+Enter), move selection to the new row.
+      if (insertIndex !== undefined && activeCell) {
+        const targetRowIdx = insertIndex;
+        const targetColIdx = activeCell.colIdx;
+        setActiveCell({ rowIdx: targetRowIdx, colIdx: targetColIdx });
+        setIsKeyboardNav(true);
+        setTimeout(() => navigateToCell(targetRowIdx, targetColIdx), 0);
+      }
       
       // Return context with the data we need for rollback
-      return { previousData, clientRowId };
+      return { previousData, clientRowId, insertIndex };
     },
     onSuccess: (newRow, variables, context) => {
       if (!context) return;
@@ -169,20 +206,21 @@ export default function MainContent() {
     },
   });
   
-  const handleCreateRow = () => {
+  const handleCreateRow = (opts?: { afterRowId?: string }) => {
     if (isCreatingTable) return;
     
     // Generate unique client ID for this row creation
     const clientRowId = crypto.randomUUID();
     
     // Start mutation (optimistic insert happens in onMutate)
-    createRowMutation.mutate({ tableId, clientRowId });
+    createRowMutation.mutate({ tableId, clientRowId, afterRowId: opts?.afterRowId });
   };
   
   // Handle cell editing with local draft state
   const handleCellClick = (rowId: string, columnId: string, currentValue: string, rowIdx: number, colIdx: number) => {
     // Only set active cell on click, don't enter edit mode
     // User must type to enter edit mode
+    setIsKeyboardNav(false);
     setActiveCell({ rowIdx, colIdx });
   };
   
@@ -372,29 +410,34 @@ export default function MainContent() {
     if (e.key === 'ArrowUp' && !isCurrentlyEditing) {
       console.log('⬆️ ArrowUp - navigating to row:', currentRowIdx - 1);
       e.preventDefault();
+      setIsKeyboardNav(true);
       if (currentRowIdx > 0) {
         navigateToCell(currentRowIdx - 1, currentColIdx);
       }
     } else if (e.key === 'ArrowDown' && !isCurrentlyEditing) {
       console.log('⬇️ ArrowDown - navigating to row:', currentRowIdx + 1);
       e.preventDefault();
+      setIsKeyboardNav(true);
       if (currentRowIdx < rows.length - 1) {
         navigateToCell(currentRowIdx + 1, currentColIdx);
       }
     } else if (e.key === 'ArrowLeft' && !isCurrentlyEditing) {
       console.log('⬅️ ArrowLeft - navigating to col:', currentColIdx - 1);
       e.preventDefault();
+      setIsKeyboardNav(true);
       if (currentColIdx > 0) {
         navigateToCell(currentRowIdx, currentColIdx - 1);
       }
     } else if (e.key === 'ArrowRight' && !isCurrentlyEditing) {
       console.log('➡️ ArrowRight - navigating to col:', currentColIdx + 1);
       e.preventDefault();
+      setIsKeyboardNav(true);
       if (currentColIdx < allCells.length - 1) {
         navigateToCell(currentRowIdx, currentColIdx + 1);
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
+      setIsKeyboardNav(true);
       if (editingCell) {
         void handleCellSave(rowId, columnId);
       }
@@ -419,6 +462,11 @@ export default function MainContent() {
           navigateToCell(currentRowIdx + 1, 0);
         }
       }
+    } else if (e.key === 'Enter' && e.shiftKey && !isCurrentlyEditing) {
+      // Shift+Enter inserts a new row below the current row (Airtable-like)
+      e.preventDefault();
+      setIsKeyboardNav(true);
+      handleCreateRow({ afterRowId: rowId });
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (isCurrentlyEditing) {
@@ -452,7 +500,14 @@ export default function MainContent() {
     const inputRef = cellInputRefs.current.get(cellKey);
     if (inputRef) {
       inputRef.focus();
-      inputRef.select(); // Select all text for easy editing
+      // Don't auto-select text on keyboard navigation; Airtable keeps the value unhighlighted.
+      // If we want a caret without selection, place it at the end.
+      try {
+        const len = inputRef.value?.length ?? 0;
+        inputRef.setSelectionRange(len, len);
+      } catch {
+        // Some browsers/edge cases (e.g. type changes) can throw; safe to ignore.
+      }
       
       // Scroll into view
       inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
@@ -508,6 +563,93 @@ export default function MainContent() {
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  // Keep keyboard navigation working even if focus temporarily leaves the input (e.g. during save).
+  // Capture at the root so default browser behavior (horizontal scrolling, focus traversal) doesn't win.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const onKeyDownCapture = (e: KeyboardEvent) => {
+      if (!activeCell) return;
+
+      // If the user is actively typing into an input/textarea/contenteditable, don't steal keys
+      // EXCEPT for Tab which we always keep within the grid.
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isEditableTarget =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        (target?.isContentEditable ?? false);
+
+      const key = e.key;
+
+      // Tab should never escape the grid while a cell is active.
+      if (key === 'Tab') {
+        e.preventDefault();
+        setIsKeyboardNav(true);
+
+        const rows = reactTable.getRowModel().rows;
+        const row = rows[activeCell.rowIdx];
+        if (!row) return;
+        const maxCol = row.getVisibleCells().length - 1;
+
+        if (e.shiftKey) {
+          if (activeCell.colIdx > 0) navigateToCell(activeCell.rowIdx, activeCell.colIdx - 1);
+          else if (activeCell.rowIdx > 0) {
+            const prev = rows[activeCell.rowIdx - 1];
+            if (prev) navigateToCell(activeCell.rowIdx - 1, prev.getVisibleCells().length - 1);
+          }
+        } else {
+          if (activeCell.colIdx < maxCol) navigateToCell(activeCell.rowIdx, activeCell.colIdx + 1);
+          else if (activeCell.rowIdx < rows.length - 1) navigateToCell(activeCell.rowIdx + 1, 0);
+        }
+        return;
+      }
+
+      // If the focus is in an editable element, let it handle arrows/enter/etc.
+      if (isEditableTarget) return;
+
+      // When focus drifts to a scroll container, arrows can scroll horizontally.
+      // If we have an active cell, route navigation keys back into the grid.
+      if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {
+        e.preventDefault();
+        setIsKeyboardNav(true);
+
+        const rows = reactTable.getRowModel().rows;
+        const rowCount = rows.length;
+        const next = { ...activeCell };
+
+        if (key === 'ArrowUp') next.rowIdx = Math.max(0, activeCell.rowIdx - 1);
+        if (key === 'ArrowDown') next.rowIdx = Math.min(rowCount - 1, activeCell.rowIdx + 1);
+        if (key === 'ArrowLeft') next.colIdx = Math.max(0, activeCell.colIdx - 1);
+        if (key === 'ArrowRight') next.colIdx = activeCell.colIdx + 1;
+
+        // Clamp colIdx to row's visible cell count
+        const row = rows[next.rowIdx];
+        const maxCol = row ? row.getVisibleCells().length - 1 : 0;
+        next.colIdx = Math.min(Math.max(0, next.colIdx), maxCol);
+
+        navigateToCell(next.rowIdx, next.colIdx);
+        return;
+      }
+
+      // Shift+Enter inserts a new row below the current active row even if focus isn't on an input.
+      if (key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        setIsKeyboardNav(true);
+        const rows = reactTable.getRowModel().rows;
+        const current = rows[activeCell.rowIdx];
+        const currentRowId = current?.original?._id as string | undefined;
+        if (currentRowId) {
+          handleCreateRow({ afterRowId: currentRowId });
+        }
+      }
+    };
+
+    root.addEventListener('keydown', onKeyDownCapture, { capture: true });
+    return () => root.removeEventListener('keydown', onKeyDownCapture, { capture: true } as never);
+  }, [activeCell, reactTable]);
 
   const syncFromMiddle = () => {
     const middle = middleScrollRef.current;
@@ -576,7 +718,11 @@ export default function MainContent() {
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden" style={{ backgroundColor: '#f6f8fc' }}>
+    <div
+      ref={rootRef}
+      className="flex-1 min-h-0 flex flex-col overflow-hidden"
+      style={{ backgroundColor: '#f6f8fc' }}
+    >
       {/* Spreadsheet grid
           - Left (checkbox + Name) is fixed
           - Middle scrolls horizontally
@@ -605,6 +751,8 @@ export default function MainContent() {
               <tbody>
                 {reactTable.getRowModel().rows.map((row, idx) => {
                   const isHovered = hoveredRow === idx;
+                  const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
+                  const isRowHighlighted = isHovered || isKeyboardRowActive;
                   const firstCell = row.getVisibleCells()[0];
                   if (!firstCell) return null;
                   
@@ -619,17 +767,18 @@ export default function MainContent() {
                   const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
                   const isSaving = savingCells.has(cellKey);
                   const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === 0;
+                  const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
                   
                   return (
                     <tr
                       key={row.id}
-                      className={isHovered ? 'bg-gray-50' : ''}
+                      className={isRowHighlighted ? 'bg-gray-50' : ''}
                       onMouseEnter={() => setHoveredRow(idx)}
                       onMouseLeave={() => setHoveredRow(null)}
                     >
                       <td
                         className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
-                          isHovered ? 'bg-gray-50' : 'bg-white'
+                          isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
                       >
                         <div className="h-8 flex items-center justify-center text-xs text-gray-500 font-medium">
@@ -638,7 +787,7 @@ export default function MainContent() {
                       </td>
                       <td
                         className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
-                          isHovered ? 'bg-gray-50' : 'bg-white'
+                          isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
                       >
                         <input
@@ -652,7 +801,11 @@ export default function MainContent() {
                           key={`${tableId}-${row.id}-name`}
                           type="text"
                           className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
-                            isEditing ? 'bg-blue-50' : isActive ? 'ring-2 ring-blue-500 ring-inset' : 'focus:bg-blue-50'
+                            isEditing
+                              ? 'bg-blue-50'
+                              : isActive
+                                ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                : 'focus:bg-blue-50'
                           }`}
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
@@ -683,7 +836,7 @@ export default function MainContent() {
                   className="cursor-pointer"
                   onMouseEnter={() => setHoveredRow('add')}
                   onMouseLeave={() => setHoveredRow(null)}
-                  onClick={handleCreateRow}
+                  onClick={() => handleCreateRow()}
                   title="Insert new record in grid"
                 >
                   <td
@@ -737,6 +890,8 @@ export default function MainContent() {
               <tbody>
                 {reactTable.getRowModel().rows.map((row, idx) => {
                   const isHovered = hoveredRow === idx;
+                  const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
+                  const isRowHighlighted = isHovered || isKeyboardRowActive;
                   const visibleCells = row.getVisibleCells().slice(1); // Skip first column (Name)
                   const rowId = row.original._id;
                   if (!rowId) return null;
@@ -744,7 +899,7 @@ export default function MainContent() {
                   return (
                     <tr
                       key={row.id}
-                      className={isHovered ? 'bg-gray-50' : ''}
+                      className={isRowHighlighted ? 'bg-gray-50' : ''}
                       onMouseEnter={() => setHoveredRow(idx)}
                       onMouseLeave={() => setHoveredRow(null)}
                     >
@@ -758,12 +913,13 @@ export default function MainContent() {
                         const isSaving = savingCells.has(cellKey);
                         const colIdx = cellIdx + 1; // +1 because first column (Name) is in left pane
                         const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === colIdx;
+                        const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
                         
                         return (
                           <td
                             key={cell.id}
                             className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
-                              isHovered ? 'bg-gray-50' : 'bg-white'
+                              isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                             }`}
                           >
                             <input
@@ -777,7 +933,11 @@ export default function MainContent() {
                               key={`${tableId}-${cell.id}`}
                               type="text"
                               className={`w-full h-8 pl-3 pr-2 bg-transparent outline-none table-cell-input ${
-                                isEditing ? 'bg-blue-50' : isActive ? 'ring-2 ring-blue-500 ring-inset' : 'focus:bg-blue-50'
+                                isEditing
+                                  ? 'bg-blue-50'
+                                  : isActive
+                                    ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                    : 'focus:bg-blue-50'
                               }`}
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
@@ -819,7 +979,7 @@ export default function MainContent() {
                   className="cursor-pointer"
                   onMouseEnter={() => setHoveredRow('add')}
                   onMouseLeave={() => setHoveredRow(null)}
-                  onClick={handleCreateRow}
+                  onClick={() => handleCreateRow()}
                   title="Insert new record in grid"
                 >
                   <td
