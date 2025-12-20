@@ -38,10 +38,22 @@ export default function MainContent() {
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  // Cells with unsaved local changes (turns on immediately when typing; used for global "Saving…" UX).
+  const [pendingCells, setPendingCells] = useState<Set<string>>(new Set());
+  // Cells with an in-flight *explicit commit* (blur/enter). Used only to prevent double-commit edge cases.
+  // IMPORTANT: autosave must NOT lock typing, so autosave does not use this.
+  const [committingCells, setCommittingCells] = useState<Set<string>>(new Set());
+  // Track row creation inflight by clientRowId so global "Saving…" reflects row inserts too (supports rapid clicks).
+  const [rowCreatesInFlight, setRowCreatesInFlight] = useState<Set<string>>(new Set());
 
   // Prevent double-saves: saving a focused input temporarily disables it, which triggers blur.
   // That blur should NOT trigger another save (otherwise focus restoration gets lost).
   const committingCellKeyRef = useRef<string | null>(null);
+
+  // Autosave (debounced) per cell. We keep a simple version counter so we only clear "pending"
+  // when the latest value has been persisted.
+  const autosaveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const autosaveVersionRef = useRef<Map<string, number>>(new Map());
   
   // Local draft map: keeps pending edits that haven't been saved yet
   // This prevents refetches from overwriting text you're typing
@@ -55,14 +67,24 @@ export default function MainContent() {
   // Broadcast saving state so TopNav can render the global "Saving…" indicator.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Include non-cell mutations (like row creation) so the global indicator matches Airtable-like UX.
+    const count = new Set<string>([...pendingCells, ...savingCells]).size + rowCreatesInFlight.size;
     window.dispatchEvent(
-      new CustomEvent('grid:saving', { detail: { count: savingCells.size } }),
+      new CustomEvent('grid:saving', { detail: { count } }),
     );
     return () => {
       // Clear on unmount so we don't leave a stale indicator visible after route changes.
       window.dispatchEvent(new CustomEvent('grid:saving', { detail: { count: 0 } }));
     };
-  }, [savingCells]);
+  }, [pendingCells, savingCells, rowCreatesInFlight]);
+
+  // Cleanup any pending autosave timers on unmount / table switch.
+  useEffect(() => {
+    return () => {
+      autosaveTimersRef.current.forEach((t) => clearTimeout(t));
+      autosaveTimersRef.current.clear();
+    };
+  }, [tableId]);
   
   // Fetch table data with stale-while-revalidate pattern
   // Shows cached data instantly while fetching fresh data in background
@@ -207,6 +229,14 @@ export default function MainContent() {
       // This handles cases where the row might have been created despite the error
       void utils.table.getData.invalidate({ tableId });
     },
+    onSettled: (_data, _error, variables) => {
+      // Clear global "Saving…" for this specific row creation (supports concurrent creates).
+      setRowCreatesInFlight(prev => {
+        const next = new Set(prev);
+        if (variables?.clientRowId) next.delete(variables.clientRowId);
+        return next;
+      });
+    },
   });
   
   // Cell update mutation - don't refetch on success to avoid disrupting typing
@@ -223,6 +253,7 @@ export default function MainContent() {
     
     // Generate unique client ID for this row creation
     const clientRowId = crypto.randomUUID();
+    setRowCreatesInFlight(prev => new Set(prev).add(clientRowId));
     
     // Start mutation (optimistic insert happens in onMutate)
     createRowMutation.mutate({ tableId, clientRowId, afterRowId: opts?.afterRowId });
@@ -234,6 +265,55 @@ export default function MainContent() {
     // User must type to enter edit mode
     setIsKeyboardNav(false);
     setActiveCell({ rowIdx, colIdx });
+  };
+
+  const scheduleAutosave = (rowId: string, columnId: string, value: string) => {
+    const cellKey = `${rowId}-${columnId}`;
+    if (rowId.startsWith('__temp__')) return; // temp rows persist when the row is created
+
+    // Flip "Saving…" on immediately.
+    setPendingCells((prev) => (prev.has(cellKey) ? prev : new Set(prev).add(cellKey)));
+
+    const nextVersion = (autosaveVersionRef.current.get(cellKey) ?? 0) + 1;
+    autosaveVersionRef.current.set(cellKey, nextVersion);
+
+    const existing = autosaveTimersRef.current.get(cellKey);
+    if (existing) clearTimeout(existing);
+
+    // Debounce the actual network write while typing.
+    const t = setTimeout(() => {
+      void (async () => {
+        setSavingCells((prev) => new Set(prev).add(cellKey));
+        try {
+          await updateCellMutation.mutateAsync({
+            rowId,
+            columnId,
+            value,
+          });
+
+          // Only clear pending if no newer edits happened since this save was scheduled.
+          const latestVersion = autosaveVersionRef.current.get(cellKey) ?? nextVersion;
+          if (latestVersion === nextVersion) {
+            setPendingCells((prev) => {
+              const next = new Set(prev);
+              next.delete(cellKey);
+              return next;
+            });
+          }
+        } catch (error) {
+          console.error('Failed to autosave cell:', error);
+          void utils.table.getData.invalidate({ tableId });
+        } finally {
+          setSavingCells((prev) => {
+            const next = new Set(prev);
+            next.delete(cellKey);
+            return next;
+          });
+        }
+      })();
+    }, 500);
+
+    autosaveTimersRef.current.set(cellKey, t);
   };
   
   const handleCellChange = (rowId: string, columnId: string, newValue: string) => {
@@ -268,6 +348,9 @@ export default function MainContent() {
         }),
       };
     });
+
+    // Start saving process immediately on any typed change (network write is debounced).
+    scheduleAutosave(rowId, columnId, newValue);
   };
   
   const handleCellSave = async (rowId: string, columnId: string, maintainFocus = true) => {
@@ -279,6 +362,13 @@ export default function MainContent() {
 
     // Mark as committing so onBlur doesn't fire a second save while we disable the input.
     committingCellKeyRef.current = cellKey;
+
+    // Cancel any pending autosave timer; we're committing explicitly now.
+    const pendingTimer = autosaveTimersRef.current.get(cellKey);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      autosaveTimersRef.current.delete(cellKey);
+    }
     
     // Find the row and column indices for activeCell
     const rows = reactTable.getRowModel().rows;
@@ -307,6 +397,9 @@ export default function MainContent() {
     
     // Only save to server if not a temp row
     if (!rowId.startsWith('__temp__')) {
+      // Treat an explicit commit as "saving started" as well.
+      setPendingCells(prev => new Set(prev).add(cellKey));
+      setCommittingCells(prev => new Set(prev).add(cellKey));
       setSavingCells(prev => new Set(prev).add(cellKey));
       
       try {
@@ -320,7 +413,17 @@ export default function MainContent() {
         // On error, refetch to get the correct state
         void utils.table.getData.invalidate({ tableId });
       } finally {
+        setCommittingCells(prev => {
+          const next = new Set(prev);
+          next.delete(cellKey);
+          return next;
+        });
         setSavingCells(prev => {
+          const next = new Set(prev);
+          next.delete(cellKey);
+          return next;
+        });
+        setPendingCells(prev => {
           const next = new Set(prev);
           next.delete(cellKey);
           return next;
@@ -366,6 +469,17 @@ export default function MainContent() {
   
   const handleCellCancel = (rowId: string, columnId: string) => {
     const cellKey = `${rowId}-${columnId}`;
+
+    const pendingTimer = autosaveTimersRef.current.get(cellKey);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      autosaveTimersRef.current.delete(cellKey);
+    }
+    setPendingCells(prev => {
+      const next = new Set(prev);
+      next.delete(cellKey);
+      return next;
+    });
     
     // Remove local draft
     setLocalDrafts(prev => {
@@ -398,7 +512,7 @@ export default function MainContent() {
 
     // If this cell is currently saving, don't allow starting a new edit here.
     // (But still allow navigation keys below.)
-    if (!isCurrentlyEditing && isPrintableChar && savingCells.has(cellKey)) {
+    if (!isCurrentlyEditing && isPrintableChar && committingCells.has(cellKey)) {
       e.preventDefault();
       return;
     }
@@ -411,6 +525,27 @@ export default function MainContent() {
       
       // Update local draft with just the new character
       setLocalDrafts(prev => new Map(prev).set(cellKey, e.key));
+
+      // Also update cache immediately so refetches don't lose data (same as handleCellChange).
+      utils.table.getData.setData({ tableId }, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          rows: oldData.rows.map(row => {
+            if (row.id !== rowId) return row;
+            return {
+              ...row,
+              cells: row.cells.map(cell => {
+                if (cell.columnId !== columnId) return cell;
+                return { ...cell, value: e.key };
+              }),
+            };
+          }),
+        };
+      });
+
+      // Start saving process immediately on the very first typed character.
+      scheduleAutosave(rowId, columnId, e.key);
       
       // Prevent default to avoid the character being added twice
       e.preventDefault();
@@ -777,7 +912,8 @@ export default function MainContent() {
                   // Use local draft if available, otherwise use server value
                   const cellValue = localDrafts.get(cellKey) ?? serverValue;
                   const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
-                  const isSaving = savingCells.has(cellKey);
+                  const isSaving = savingCells.has(cellKey) || pendingCells.has(cellKey);
+                  const isCommitting = committingCells.has(cellKey);
                   const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === 0;
                   const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
                   
@@ -837,7 +973,7 @@ export default function MainContent() {
                           }}
                           onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
                           aria-busy={isSaving ? 'true' : 'false'}
-                          readOnly={!isEditing || isSaving}
+                          readOnly={!isEditing || isCommitting}
                         />
                       </td>
                     </tr>
@@ -922,7 +1058,8 @@ export default function MainContent() {
                         // Use local draft if available, otherwise use server value
                         const cellValue = localDrafts.get(cellKey) ?? serverValue;
                         const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
-                        const isSaving = savingCells.has(cellKey);
+                        const isSaving = savingCells.has(cellKey) || pendingCells.has(cellKey);
+                        const isCommitting = committingCells.has(cellKey);
                         const colIdx = cellIdx + 1; // +1 because first column (Name) is in left pane
                         const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === colIdx;
                         const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
@@ -969,7 +1106,7 @@ export default function MainContent() {
                               }}
                               onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
                               aria-busy={isSaving ? 'true' : 'false'}
-                              readOnly={!isEditing || isSaving}
+                              readOnly={!isEditing || isCommitting}
                             />
                           </td>
                         );
