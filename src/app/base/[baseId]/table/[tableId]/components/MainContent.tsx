@@ -51,6 +51,18 @@ export default function MainContent() {
   // Transition mask: brief skeleton on every table switch (like Airtable)
   // This signals "context change" even when data is cached
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Broadcast saving state so TopNav can render the global "Saving…" indicator.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('grid:saving', { detail: { count: savingCells.size } }),
+    );
+    return () => {
+      // Clear on unmount so we don't leave a stale indicator visible after route changes.
+      window.dispatchEvent(new CustomEvent('grid:saving', { detail: { count: 0 } }));
+    };
+  }, [savingCells]);
   
   // Fetch table data with stale-while-revalidate pattern
   // Shows cached data instantly while fetching fresh data in background

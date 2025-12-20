@@ -61,6 +61,75 @@
   margin-right: 2px;
 }
 
+.mr1 {
+  margin-right: 8px;
+}
+
+.ml-half {
+  margin-left: 2px;
+}
+
+.pr2 {
+  padding-right: 8px;
+}
+
+.gap1 {
+  gap: 4px;
+}
+
+.align-items {
+  align-items: center;
+}
+
+.text-dark {
+  color: rgb(29, 31, 37);
+}
+
+.ignore-visual-diff {
+  /* No-op: class exists in Airtable DOM; kept for 1:1 markup parity */
+}
+
+.animate-infinite {
+  animation-iteration-count: infinite;
+}
+
+@keyframes spin-scale {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.04);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.animate-spin-scale {
+  animation-name: spin-scale;
+  animation-duration: 900ms;
+  animation-timing-function: linear;
+}
+
+/* Airtable-like global saving indicator (computed styles parity) */
+.global-status-indicator {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  color: rgb(29, 31, 37);
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans,
+    Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  height: 18px;
+  line-height: 18px;
+  margin: 0;
+  margin-right: 8px;
+  opacity: 0.5;
+}
+
 .pill {
   border-radius: 9999px;
   padding-top: 1px;
