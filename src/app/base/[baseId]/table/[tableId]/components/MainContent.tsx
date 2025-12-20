@@ -33,6 +33,10 @@ export default function MainContent() {
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+
+  // Prevent double-saves: saving a focused input temporarily disables it, which triggers blur.
+  // That blur should NOT trigger another save (otherwise focus restoration gets lost).
+  const committingCellKeyRef = useRef<string | null>(null);
   
   // Local draft map: keeps pending edits that haven't been saved yet
   // This prevents refetches from overwriting text you're typing
@@ -177,13 +181,9 @@ export default function MainContent() {
   
   // Handle cell editing with local draft state
   const handleCellClick = (rowId: string, columnId: string, currentValue: string, rowIdx: number, colIdx: number) => {
-    const cellKey = `${rowId}-${columnId}`;
-    // Use local draft if it exists, otherwise use server value
-    const draftValue = localDrafts.get(cellKey) ?? currentValue;
-    
+    // Only set active cell on click, don't enter edit mode
+    // User must type to enter edit mode
     setActiveCell({ rowIdx, colIdx });
-    setEditingCell({ rowId, columnId });
-    setEditValue(draftValue);
   };
   
   const handleCellChange = (rowId: string, columnId: string, newValue: string) => {
@@ -220,15 +220,33 @@ export default function MainContent() {
     });
   };
   
-  const handleCellSave = async (rowId: string, columnId: string) => {
-    if (!editingCell) return;
-    
+  const handleCellSave = async (rowId: string, columnId: string, maintainFocus = true) => {
+    // Only save if we're currently editing THIS cell.
+    if (!editingCell || editingCell.rowId !== rowId || editingCell.columnId !== columnId) return;
+
     const cellKey = `${rowId}-${columnId}`;
     const newValue = editValue;
+
+    // Mark as committing so onBlur doesn't fire a second save while we disable the input.
+    committingCellKeyRef.current = cellKey;
+    
+    // Find the row and column indices for activeCell
+    const rows = reactTable.getRowModel().rows;
+    const currentRowIdx = rows.findIndex(r => r.original._id === rowId);
+    const currentRow = rows[currentRowIdx];
+    let currentColIdx = 0;
+    
+    if (currentRow) {
+      const allCells = currentRow.getVisibleCells();
+      currentColIdx = allCells.findIndex(c => c.column.id === columnId);
+    }
     
     // Clear editing state
     setEditingCell(null);
     setEditValue('');
+    
+    // Set active cell so navigation knows which cell to move from
+    setActiveCell({ rowIdx: currentRowIdx, colIdx: currentColIdx });
     
     // Remove from local drafts (it's now committed)
     setLocalDrafts(prev => {
@@ -257,6 +275,40 @@ export default function MainContent() {
           next.delete(cellKey);
           return next;
         });
+        
+        // Refocus the input AFTER save completes so it's no longer disabled
+        if (maintainFocus) {
+          requestAnimationFrame(() => {
+            const inputRef = cellInputRefs.current.get(cellKey);
+            if (inputRef) {
+              inputRef.focus();
+              console.log('✅ Refocused input after save completed:', cellKey);
+              console.log('Input disabled:', inputRef.disabled, 'readOnly:', inputRef.readOnly);
+              console.log('Focus matches:', document.activeElement === inputRef ? 'YES' : 'NO');
+            }
+          });
+        }
+
+        // Allow blur saves again after commit is done
+        if (committingCellKeyRef.current === cellKey) {
+          committingCellKeyRef.current = null;
+        }
+      }
+    } else {
+      // For temp rows, refocus immediately since there's no async save
+      if (maintainFocus) {
+        requestAnimationFrame(() => {
+          const inputRef = cellInputRefs.current.get(cellKey);
+          if (inputRef) {
+            inputRef.focus();
+            console.log('✅ Refocused input (temp row):', cellKey);
+          }
+        });
+      }
+
+      // Allow blur saves again after commit is done
+      if (committingCellKeyRef.current === cellKey) {
+        committingCellKeyRef.current = null;
       }
     }
     // For temp rows, the value is already in cache, will be sent when row is created
@@ -277,6 +329,10 @@ export default function MainContent() {
   };
   
   const handleCellKeyDown = (e: React.KeyboardEvent, rowId: string, columnId: string) => {
+    console.log('🔑 Key pressed:', e.key, 'isEditing:', editingCell?.rowId === rowId && editingCell?.columnId === columnId);
+    
+    const cellKey = `${rowId}-${columnId}`;
+
     // Get current cell position
     const rows = reactTable.getRowModel().rows;
     const currentRowIdx = rows.findIndex(r => r.original._id === rowId);
@@ -285,47 +341,60 @@ export default function MainContent() {
     
     const allCells = currentRow.getVisibleCells();
     const currentColIdx = allCells.findIndex(c => c.column.id === columnId);
+    const isCurrentlyEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
     
-    // Handle navigation keys
-    if (e.key === 'ArrowUp') {
+    // Check if key is a printable character (to start editing)
+    const isPrintableChar = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+
+    // If this cell is currently saving, don't allow starting a new edit here.
+    // (But still allow navigation keys below.)
+    if (!isCurrentlyEditing && isPrintableChar && savingCells.has(cellKey)) {
+      e.preventDefault();
+      return;
+    }
+    
+    // If not editing and user types a printable character, enter edit mode and replace content
+    if (!isCurrentlyEditing && isPrintableChar) {
+      // Enter edit mode with the new character (replacing existing content)
+      setEditingCell({ rowId, columnId });
+      setEditValue(e.key);
+      
+      // Update local draft with just the new character
+      setLocalDrafts(prev => new Map(prev).set(cellKey, e.key));
+      
+      // Prevent default to avoid the character being added twice
+      e.preventDefault();
+      return;
+    }
+    
+    // Handle navigation keys - only intercept if NOT editing
+    // When editing, let arrow keys work normally for cursor movement
+    if (e.key === 'ArrowUp' && !isCurrentlyEditing) {
+      console.log('⬆️ ArrowUp - navigating to row:', currentRowIdx - 1);
       e.preventDefault();
       if (currentRowIdx > 0) {
-        // Save current cell first if editing
-        if (editingCell) {
-          void handleCellSave(rowId, columnId);
-        }
         navigateToCell(currentRowIdx - 1, currentColIdx);
       }
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown' && !isCurrentlyEditing) {
+      console.log('⬇️ ArrowDown - navigating to row:', currentRowIdx + 1);
       e.preventDefault();
       if (currentRowIdx < rows.length - 1) {
-        // Save current cell first if editing
-        if (editingCell) {
-          void handleCellSave(rowId, columnId);
-        }
         navigateToCell(currentRowIdx + 1, currentColIdx);
       }
-    } else if (e.key === 'ArrowLeft') {
+    } else if (e.key === 'ArrowLeft' && !isCurrentlyEditing) {
+      console.log('⬅️ ArrowLeft - navigating to col:', currentColIdx - 1);
       e.preventDefault();
       if (currentColIdx > 0) {
-        // Save current cell first if editing
-        if (editingCell) {
-          void handleCellSave(rowId, columnId);
-        }
         navigateToCell(currentRowIdx, currentColIdx - 1);
       }
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowRight' && !isCurrentlyEditing) {
+      console.log('➡️ ArrowRight - navigating to col:', currentColIdx + 1);
       e.preventDefault();
       if (currentColIdx < allCells.length - 1) {
-        // Save current cell first if editing
-        if (editingCell) {
-          void handleCellSave(rowId, columnId);
-        }
         navigateToCell(currentRowIdx, currentColIdx + 1);
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      // Save current cell first if editing
       if (editingCell) {
         void handleCellSave(rowId, columnId);
       }
@@ -352,7 +421,10 @@ export default function MainContent() {
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      void handleCellSave(rowId, columnId);
+      if (isCurrentlyEditing) {
+        // If editing, save and exit edit mode
+        void handleCellSave(rowId, columnId);
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handleCellCancel(rowId, columnId);
@@ -585,10 +657,22 @@ export default function MainContent() {
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
                           onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
-                          onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
+                          onBlur={(e) => {
+                            console.log('❌ Input blur:', cellKey);
+                            // When saving, the input becomes disabled which causes blur.
+                            // Avoid triggering a second save that would drop focus restoration.
+                            if (committingCellKeyRef.current === cellKey) return;
+
+                            if (isEditing) {
+                              void handleCellSave(rowId, columnId, false);
+                            }
+                          }}
+                          onFocus={(e) => {
+                            console.log('✨ Input focus:', cellKey);
+                          }}
                           onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
-                          disabled={isSaving}
-                          readOnly={!isEditing}
+                          aria-busy={isSaving ? 'true' : 'false'}
+                          readOnly={!isEditing || isSaving}
                         />
                       </td>
                     </tr>
@@ -698,10 +782,22 @@ export default function MainContent() {
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
                               onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
-                              onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
+                              onBlur={(e) => {
+                                console.log('❌ Input blur:', cellKey);
+                                // When saving, the input becomes disabled which causes blur.
+                                // Avoid triggering a second save that would drop focus restoration.
+                                if (committingCellKeyRef.current === cellKey) return;
+
+                                if (isEditing) {
+                                  void handleCellSave(rowId, columnId, false);
+                                }
+                              }}
+                              onFocus={(e) => {
+                                console.log('✨ Input focus:', cellKey);
+                              }}
                               onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
-                              disabled={isSaving}
-                              readOnly={!isEditing}
+                              aria-busy={isSaving ? 'true' : 'false'}
+                              readOnly={!isEditing || isSaving}
                             />
                           </td>
                         );
