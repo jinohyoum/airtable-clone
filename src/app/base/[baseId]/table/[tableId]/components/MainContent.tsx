@@ -272,7 +272,7 @@ export default function MainContent() {
   
   const handleCellSave = async (rowId: string, columnId: string, maintainFocus = true) => {
     // Only save if we're currently editing THIS cell.
-    if (!editingCell || editingCell.rowId !== rowId || editingCell.columnId !== columnId) return;
+    if (editingCell?.rowId !== rowId || editingCell?.columnId !== columnId) return;
 
     const cellKey = `${rowId}-${columnId}`;
     const newValue = editValue;
@@ -652,7 +652,7 @@ export default function MainContent() {
         setIsKeyboardNav(true);
         const rows = reactTable.getRowModel().rows;
         const current = rows[activeCell.rowIdx];
-        const currentRowId = current?.original?._id as string | undefined;
+        const currentRowId = current?.original?._id;
         if (currentRowId) {
           handleCreateRow({ afterRowId: currentRowId });
         }
@@ -822,7 +822,7 @@ export default function MainContent() {
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
                           onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
-                          onBlur={(e) => {
+                          onBlur={() => {
                             console.log('❌ Input blur:', cellKey);
                             // When saving, the input becomes disabled which causes blur.
                             // Avoid triggering a second save that would drop focus restoration.
@@ -832,7 +832,7 @@ export default function MainContent() {
                               void handleCellSave(rowId, columnId, false);
                             }
                           }}
-                          onFocus={(e) => {
+                          onFocus={() => {
                             console.log('✨ Input focus:', cellKey);
                           }}
                           onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
@@ -954,7 +954,7 @@ export default function MainContent() {
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
                               onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
-                              onBlur={(e) => {
+                              onBlur={() => {
                                 console.log('❌ Input blur:', cellKey);
                                 // When saving, the input becomes disabled which causes blur.
                                 // Avoid triggering a second save that would drop focus restoration.
@@ -964,7 +964,7 @@ export default function MainContent() {
                                   void handleCellSave(rowId, columnId, false);
                                 }
                               }}
-                              onFocus={(e) => {
+                              onFocus={() => {
                                 console.log('✨ Input focus:', cellKey);
                               }}
                               onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}

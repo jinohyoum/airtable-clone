@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Clock, Monitor } from 'lucide-react';
+import { ChevronDown, Monitor } from 'lucide-react';
 
 export default function TopNav() {
   const [savingCount, setSavingCount] = useState(0);
