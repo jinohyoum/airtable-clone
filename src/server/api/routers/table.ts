@@ -160,6 +160,28 @@ export const tableRouter = createTRPCRouter({
       clientRowId: z.string(), // Client-generated UUID for idempotency
     }))
     .mutation(async ({ ctx, input }) => {
+      // Check if this row already exists (idempotency)
+      const existingRow = await ctx.db.row.findUnique({
+        where: {
+          tableId_clientRowId: {
+            tableId: input.tableId,
+            clientRowId: input.clientRowId,
+          },
+        },
+        include: {
+          cells: {
+            include: {
+              column: true,
+            },
+          },
+        },
+      });
+
+      // If row already exists, return it (idempotent)
+      if (existingRow) {
+        return existingRow;
+      }
+
       // Get table with columns and last row for ordering
       const table = await ctx.db.table.findUnique({
         where: { id: input.tableId },
@@ -171,12 +193,13 @@ export const tableRouter = createTRPCRouter({
 
       if (!table) throw new Error("Table not found");
 
-      // Create row with next order number
+      // Create row with next order number and clientRowId
       const nextOrder = (table.rows[0]?.order ?? -1) + 1;
       const row = await ctx.db.row.create({
         data: {
           tableId: input.tableId,
           order: nextOrder,
+          clientRowId: input.clientRowId,
         },
       });
 

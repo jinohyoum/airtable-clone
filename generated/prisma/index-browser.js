@@ -153,7 +153,8 @@ exports.Prisma.RowScalarFieldEnum = {
   order: 'order',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  tableId: 'tableId'
+  tableId: 'tableId',
+  clientRowId: 'clientRowId'
 };
 
 exports.Prisma.CellScalarFieldEnum = {

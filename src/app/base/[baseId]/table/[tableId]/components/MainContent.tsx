@@ -25,10 +25,15 @@ export default function MainContent() {
   const [bottomSpacerWidth, setBottomSpacerWidth] = useState<number>(0);
   const [hoveredRow, setHoveredRow] = useState<number | 'add' | null>(null);
   
-  // Cell editing state
+  // Cell editing state with local draft
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  
+  // Local draft map: keeps pending edits that haven't been saved yet
+  // This prevents refetches from overwriting text you're typing
+  // Key: "rowId-columnId", Value: draft text
+  const [localDrafts, setLocalDrafts] = useState<Map<string, string>>(new Map());
   
   // Transition mask: brief skeleton on every table switch (like Airtable)
   // This signals "context change" even when data is cached
@@ -63,6 +68,7 @@ export default function MainContent() {
         id: `__temp__${clientRowId}`,
         order: (previousData?.rows.length ?? 0),
         tableId,
+        clientRowId,
         createdAt: new Date(),
         updatedAt: new Date(),
         cells: (previousData?.columns ?? []).map(col => ({
@@ -91,6 +97,7 @@ export default function MainContent() {
       if (!context) return;
       
       // Replace optimistic temp row with real row from server
+      // BUT preserve any cell values that were edited locally
       utils.table.getData.setData({ tableId }, (oldData) => {
         if (!oldData) return oldData;
         
@@ -99,37 +106,57 @@ export default function MainContent() {
           rows: oldData.rows.map(row => {
             // Replace the specific temp row that matches this clientRowId
             if (row.id === `__temp__${context.clientRowId}`) {
-              return newRow;
+              // Merge: keep any cells that have local drafts or non-empty values
+              const mergedCells = newRow.cells.map(newCell => {
+                // Check if there's a local draft for this cell
+                const draftKey = `${row.id}-${newCell.columnId}`;
+                const localDraft = localDrafts.get(draftKey);
+                
+                if (localDraft !== undefined) {
+                  // Preserve the draft value, update the draft key to use new row ID
+                  setLocalDrafts(prev => {
+                    const next = new Map(prev);
+                    next.delete(draftKey); // Remove old temp ID key
+                    next.set(`${newRow.id}-${newCell.columnId}`, localDraft); // Add with real ID
+                    return next;
+                  });
+                  return { ...newCell, value: localDraft };
+                }
+                
+                // Check if temp row had a value that was edited
+                const tempCell = row.cells.find(c => c.columnId === newCell.columnId);
+                if (tempCell && tempCell.value && !newCell.value) {
+                  // Preserve the temp cell's value
+                  return { ...newCell, value: tempCell.value };
+                }
+                
+                return newCell;
+              });
+              
+              return { ...newRow, cells: mergedCells };
             }
             return row;
           }),
         };
       });
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       if (!context) return;
       
-      // Remove only the failed optimistic row
-      utils.table.getData.setData({ tableId }, (oldData) => {
-        if (!oldData) return oldData;
-        
-        return {
-          ...oldData,
-          rows: oldData.rows.filter(row => row.id !== `__temp__${context.clientRowId}`),
-        };
-      });
+      // Log error for debugging (can be removed in production)
+      console.log('Row creation error:', error);
       
-      alert('Failed to create row. Please try again.');
-    },
-    onSettled: () => {
-      // Always refetch after error or success to ensure consistency
+      // On error, refetch to see the true state
+      // This handles cases where the row might have been created despite the error
       void utils.table.getData.invalidate({ tableId });
     },
   });
   
-  // Cell update mutation
+  // Cell update mutation - don't refetch on success to avoid disrupting typing
   const updateCellMutation = api.table.updateCell.useMutation({
-    onSuccess: () => {
+    onError: (error) => {
+      console.error('Failed to save cell:', error);
+      // Only refetch on error
       void utils.table.getData.invalidate({ tableId });
     },
   });
@@ -144,24 +171,30 @@ export default function MainContent() {
     createRowMutation.mutate({ tableId, clientRowId });
   };
   
-  // Handle cell editing
+  // Handle cell editing with local draft state
   const handleCellClick = (rowId: string, columnId: string, currentValue: string) => {
+    const cellKey = `${rowId}-${columnId}`;
+    // Use local draft if it exists, otherwise use server value
+    const draftValue = localDrafts.get(cellKey) ?? currentValue;
+    
     setEditingCell({ rowId, columnId });
-    setEditValue(currentValue);
+    setEditValue(draftValue);
   };
   
-  const handleCellSave = async (rowId: string, columnId: string) => {
-    if (!editingCell) return;
-    
+  const handleCellChange = (rowId: string, columnId: string, newValue: string) => {
     const cellKey = `${rowId}-${columnId}`;
-    const newValue = editValue;
     
-    // Clear editing state immediately (optimistic)
-    setEditingCell(null);
-    setEditValue('');
-    setSavingCells(prev => new Set(prev).add(cellKey));
+    // Update local draft immediately
+    setLocalDrafts(prev => {
+      const next = new Map(prev);
+      next.set(cellKey, newValue);
+      return next;
+    });
     
-    // Optimistically update the cache
+    // Update edit state
+    setEditValue(newValue);
+    
+    // Also update cache immediately so refetches don't lose data
     utils.table.getData.setData({ tableId }, (oldData) => {
       if (!oldData) return oldData;
       
@@ -180,26 +213,60 @@ export default function MainContent() {
         }),
       };
     });
-    
-    try {
-      await updateCellMutation.mutateAsync({
-        rowId,
-        columnId,
-        value: newValue,
-      });
-    } catch {
-      // On error, refetch to get the correct state
-      void utils.table.getData.invalidate({ tableId });
-    } finally {
-      setSavingCells(prev => {
-        const next = new Set(prev);
-        next.delete(cellKey);
-        return next;
-      });
-    }
   };
   
-  const handleCellCancel = () => {
+  const handleCellSave = async (rowId: string, columnId: string) => {
+    if (!editingCell) return;
+    
+    const cellKey = `${rowId}-${columnId}`;
+    const newValue = editValue;
+    
+    // Clear editing state
+    setEditingCell(null);
+    setEditValue('');
+    
+    // Remove from local drafts (it's now committed)
+    setLocalDrafts(prev => {
+      const next = new Map(prev);
+      next.delete(cellKey);
+      return next;
+    });
+    
+    // Only save to server if not a temp row
+    if (!rowId.startsWith('__temp__')) {
+      setSavingCells(prev => new Set(prev).add(cellKey));
+      
+      try {
+        await updateCellMutation.mutateAsync({
+          rowId,
+          columnId,
+          value: newValue,
+        });
+      } catch (error) {
+        console.error('Failed to save cell:', error);
+        // On error, refetch to get the correct state
+        void utils.table.getData.invalidate({ tableId });
+      } finally {
+        setSavingCells(prev => {
+          const next = new Set(prev);
+          next.delete(cellKey);
+          return next;
+        });
+      }
+    }
+    // For temp rows, the value is already in cache, will be sent when row is created
+  };
+  
+  const handleCellCancel = (rowId: string, columnId: string) => {
+    const cellKey = `${rowId}-${columnId}`;
+    
+    // Remove local draft
+    setLocalDrafts(prev => {
+      const next = new Map(prev);
+      next.delete(cellKey);
+      return next;
+    });
+    
     setEditingCell(null);
     setEditValue('');
   };
@@ -210,7 +277,7 @@ export default function MainContent() {
       void handleCellSave(rowId, columnId);
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      handleCellCancel();
+      handleCellCancel(rowId, columnId);
     }
   };
   
@@ -367,9 +434,12 @@ export default function MainContent() {
                   if (!rowId) return null;
                   
                   const columnId = firstCell.column.id;
-                  const cellValue = (firstCell.getValue() as string ?? '');
+                  const cellKey = `${rowId}-${columnId}`;
+                  const serverValue = (firstCell.getValue() as string ?? '');
+                  // Use local draft if available, otherwise use server value
+                  const cellValue = localDrafts.get(cellKey) ?? serverValue;
                   const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
-                  const isSaving = savingCells.has(`${rowId}-${columnId}`);
+                  const isSaving = savingCells.has(cellKey);
                   
                   return (
                     <tr
@@ -400,7 +470,7 @@ export default function MainContent() {
                           }`}
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue)}
-                          onChange={(e) => isEditing && setEditValue(e.target.value)}
+                          onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                           onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
                           onKeyDown={(e) => isEditing && handleCellKeyDown(e, rowId, columnId)}
                           disabled={isSaving}
@@ -482,9 +552,12 @@ export default function MainContent() {
                     >
                       {visibleCells.map((cell) => {
                         const columnId = cell.column.id;
-                        const cellValue = (cell.getValue() as string ?? '');
+                        const cellKey = `${rowId}-${columnId}`;
+                        const serverValue = (cell.getValue() as string ?? '');
+                        // Use local draft if available, otherwise use server value
+                        const cellValue = localDrafts.get(cellKey) ?? serverValue;
                         const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
-                        const isSaving = savingCells.has(`${rowId}-${columnId}`);
+                        const isSaving = savingCells.has(cellKey);
                         
                         return (
                           <td
@@ -501,7 +574,7 @@ export default function MainContent() {
                               }`}
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue)}
-                              onChange={(e) => isEditing && setEditValue(e.target.value)}
+                              onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                               onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
                               onKeyDown={(e) => isEditing && handleCellKeyDown(e, rowId, columnId)}
                               disabled={isSaving}
