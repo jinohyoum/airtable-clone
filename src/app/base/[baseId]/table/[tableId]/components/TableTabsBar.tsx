@@ -45,9 +45,15 @@ export default function TableTabsBar() {
   
   // tRPC mutation for creating tables
   const createTableMutation = api.table.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (newTable) => {
       // Invalidate and refetch the table list so new table appears immediately
       void utils.table.list.invalidate({ baseId });
+      
+      // Update URL without full page navigation (client-side only)
+      window.history.pushState(null, '', `/base/${baseId}/table/${newTable.id}`);
+      
+      // Close the dropdown
+      setIsOpen(false);
     },
   });
   
@@ -72,16 +78,12 @@ export default function TableTabsBar() {
           const defaultName = `Table ${tableNumber}`;
           
           try {
-            const newTable = await createTableMutation.mutateAsync({
+            await createTableMutation.mutateAsync({
               baseId,
               name: defaultName,
               recordTerm: 'Record',
             });
-            
-            console.log('Table created:', newTable);
-            
-            // Navigate to the newly created table
-            router.push(`/base/${baseId}/table/${newTable.id}`);
+            // URL update and close happens in onSuccess
           } catch (error) {
             console.error('Failed to create table:', error);
             alert('Failed to create table. Please try again.');
