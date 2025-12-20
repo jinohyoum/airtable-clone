@@ -25,6 +25,10 @@ export default function MainContent() {
   const [bottomSpacerWidth, setBottomSpacerWidth] = useState<number>(0);
   const [hoveredRow, setHoveredRow] = useState<number | 'add' | null>(null);
   
+  // Active cell for keyboard navigation (row index, column index)
+  const [activeCell, setActiveCell] = useState<{ rowIdx: number; colIdx: number } | null>(null);
+  const cellInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  
   // Cell editing state with local draft
   const [editingCell, setEditingCell] = useState<{ rowId: string; columnId: string } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -172,11 +176,12 @@ export default function MainContent() {
   };
   
   // Handle cell editing with local draft state
-  const handleCellClick = (rowId: string, columnId: string, currentValue: string) => {
+  const handleCellClick = (rowId: string, columnId: string, currentValue: string, rowIdx: number, colIdx: number) => {
     const cellKey = `${rowId}-${columnId}`;
     // Use local draft if it exists, otherwise use server value
     const draftValue = localDrafts.get(cellKey) ?? currentValue;
     
+    setActiveCell({ rowIdx, colIdx });
     setEditingCell({ rowId, columnId });
     setEditValue(draftValue);
   };
@@ -272,12 +277,113 @@ export default function MainContent() {
   };
   
   const handleCellKeyDown = (e: React.KeyboardEvent, rowId: string, columnId: string) => {
-    if (e.key === 'Enter') {
+    // Get current cell position
+    const rows = reactTable.getRowModel().rows;
+    const currentRowIdx = rows.findIndex(r => r.original._id === rowId);
+    const currentRow = rows[currentRowIdx];
+    if (!currentRow) return;
+    
+    const allCells = currentRow.getVisibleCells();
+    const currentColIdx = allCells.findIndex(c => c.column.id === columnId);
+    
+    // Handle navigation keys
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (currentRowIdx > 0) {
+        // Save current cell first if editing
+        if (editingCell) {
+          void handleCellSave(rowId, columnId);
+        }
+        navigateToCell(currentRowIdx - 1, currentColIdx);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (currentRowIdx < rows.length - 1) {
+        // Save current cell first if editing
+        if (editingCell) {
+          void handleCellSave(rowId, columnId);
+        }
+        navigateToCell(currentRowIdx + 1, currentColIdx);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (currentColIdx > 0) {
+        // Save current cell first if editing
+        if (editingCell) {
+          void handleCellSave(rowId, columnId);
+        }
+        navigateToCell(currentRowIdx, currentColIdx - 1);
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (currentColIdx < allCells.length - 1) {
+        // Save current cell first if editing
+        if (editingCell) {
+          void handleCellSave(rowId, columnId);
+        }
+        navigateToCell(currentRowIdx, currentColIdx + 1);
+      }
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      // Save current cell first if editing
+      if (editingCell) {
+        void handleCellSave(rowId, columnId);
+      }
+      
+      if (e.shiftKey) {
+        // Shift+Tab: Move left
+        if (currentColIdx > 0) {
+          navigateToCell(currentRowIdx, currentColIdx - 1);
+        } else if (currentRowIdx > 0) {
+          // Wrap to end of previous row
+          const prevRow = rows[currentRowIdx - 1];
+          if (prevRow) {
+            navigateToCell(currentRowIdx - 1, prevRow.getVisibleCells().length - 1);
+          }
+        }
+      } else {
+        // Tab: Move right
+        if (currentColIdx < allCells.length - 1) {
+          navigateToCell(currentRowIdx, currentColIdx + 1);
+        } else if (currentRowIdx < rows.length - 1) {
+          // Wrap to start of next row
+          navigateToCell(currentRowIdx + 1, 0);
+        }
+      }
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       void handleCellSave(rowId, columnId);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handleCellCancel(rowId, columnId);
+    }
+  };
+  
+  // Navigate to a specific cell by row/column index
+  const navigateToCell = (rowIdx: number, colIdx: number) => {
+    const rows = reactTable.getRowModel().rows;
+    const targetRow = rows[rowIdx];
+    if (!targetRow) return;
+    
+    const targetCell = targetRow.getVisibleCells()[colIdx];
+    if (!targetCell) return;
+    
+    const rowId = targetRow.original._id;
+    const columnId = targetCell.column.id;
+    if (!rowId || !columnId) return;
+    
+    // Set active cell
+    setActiveCell({ rowIdx, colIdx });
+    
+    // Focus the input
+    const cellKey = `${rowId}-${columnId}`;
+    const inputRef = cellInputRefs.current.get(cellKey);
+    if (inputRef) {
+      inputRef.focus();
+      inputRef.select(); // Select all text for easy editing
+      
+      // Scroll into view
+      inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
   };
   
@@ -440,6 +546,7 @@ export default function MainContent() {
                   const cellValue = localDrafts.get(cellKey) ?? serverValue;
                   const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
                   const isSaving = savingCells.has(cellKey);
+                  const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === 0;
                   
                   return (
                     <tr
@@ -463,16 +570,23 @@ export default function MainContent() {
                         }`}
                       >
                         <input
+                          ref={(el) => {
+                            if (el) {
+                              cellInputRefs.current.set(cellKey, el);
+                            } else {
+                              cellInputRefs.current.delete(cellKey);
+                            }
+                          }}
                           key={`${tableId}-${row.id}-name`}
                           type="text"
                           className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
-                            isEditing ? 'bg-blue-50' : 'focus:bg-blue-50'
+                            isEditing ? 'bg-blue-50' : isActive ? 'ring-2 ring-blue-500 ring-inset' : 'focus:bg-blue-50'
                           }`}
                           value={isEditing ? editValue : cellValue}
-                          onClick={() => handleCellClick(rowId, columnId, cellValue)}
+                          onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
                           onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                           onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
-                          onKeyDown={(e) => isEditing && handleCellKeyDown(e, rowId, columnId)}
+                          onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
                           disabled={isSaving}
                           readOnly={!isEditing}
                         />
@@ -550,7 +664,7 @@ export default function MainContent() {
                       onMouseEnter={() => setHoveredRow(idx)}
                       onMouseLeave={() => setHoveredRow(null)}
                     >
-                      {visibleCells.map((cell) => {
+                      {visibleCells.map((cell, cellIdx) => {
                         const columnId = cell.column.id;
                         const cellKey = `${rowId}-${columnId}`;
                         const serverValue = (cell.getValue() as string ?? '');
@@ -558,6 +672,8 @@ export default function MainContent() {
                         const cellValue = localDrafts.get(cellKey) ?? serverValue;
                         const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
                         const isSaving = savingCells.has(cellKey);
+                        const colIdx = cellIdx + 1; // +1 because first column (Name) is in left pane
+                        const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === colIdx;
                         
                         return (
                           <td
@@ -567,16 +683,23 @@ export default function MainContent() {
                             }`}
                           >
                             <input
+                              ref={(el) => {
+                                if (el) {
+                                  cellInputRefs.current.set(cellKey, el);
+                                } else {
+                                  cellInputRefs.current.delete(cellKey);
+                                }
+                              }}
                               key={`${tableId}-${cell.id}`}
                               type="text"
                               className={`w-full h-8 pl-3 pr-2 bg-transparent outline-none table-cell-input ${
-                                isEditing ? 'bg-blue-50' : 'focus:bg-blue-50'
+                                isEditing ? 'bg-blue-50' : isActive ? 'ring-2 ring-blue-500 ring-inset' : 'focus:bg-blue-50'
                               }`}
                               value={isEditing ? editValue : cellValue}
-                              onClick={() => handleCellClick(rowId, columnId, cellValue)}
+                              onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
                               onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                               onBlur={() => isEditing && void handleCellSave(rowId, columnId)}
-                              onKeyDown={(e) => isEditing && handleCellKeyDown(e, rowId, columnId)}
+                              onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
                               disabled={isSaving}
                               readOnly={!isEditing}
                             />
