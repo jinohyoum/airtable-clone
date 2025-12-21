@@ -19,9 +19,10 @@ export default function MainContent() {
   const isCreatingTable = tableId.startsWith('__creating__');
   
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const middleHeaderScrollRef = useRef<HTMLDivElement | null>(null);
   const middleScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
-  const syncingRef = useRef<'middle' | 'bottom' | null>(null);
+  const syncingRef = useRef<'middle' | 'bottom' | 'header' | null>(null);
   const prevTableIdRef = useRef<string>(tableId);
   const [bottomSpacerWidth, setBottomSpacerWidth] = useState<number>(0);
   const [hoveredRow, setHoveredRow] = useState<number | 'add' | null>(null);
@@ -799,26 +800,66 @@ export default function MainContent() {
   }, [activeCell, reactTable]);
 
   const syncFromMiddle = () => {
+    const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;
     const bottom = bottomScrollRef.current;
     if (!middle || !bottom) return;
-    if (syncingRef.current === 'bottom') return;
+    if (syncingRef.current === 'bottom' || syncingRef.current === 'header') return;
     syncingRef.current = 'middle';
-    bottom.scrollLeft = middle.scrollLeft;
+    
+    // Clamp scroll position to max scrollable for each container
+    const scrollPos = middle.scrollLeft;
+    const bottomMax = Math.max(0, bottom.scrollWidth - bottom.clientWidth);
+    bottom.scrollLeft = Math.min(scrollPos, bottomMax);
+    
+    if (middleHeader) {
+      const headerMax = Math.max(0, middleHeader.scrollWidth - middleHeader.clientWidth);
+      middleHeader.scrollLeft = Math.min(scrollPos, headerMax);
+    }
     syncingRef.current = null;
   };
 
   const syncFromBottom = () => {
+    const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;
     const bottom = bottomScrollRef.current;
     if (!middle || !bottom) return;
-    if (syncingRef.current === 'middle') return;
+    if (syncingRef.current === 'middle' || syncingRef.current === 'header') return;
     syncingRef.current = 'bottom';
-    middle.scrollLeft = bottom.scrollLeft;
+    
+    // Clamp scroll position to max scrollable for each container
+    const scrollPos = bottom.scrollLeft;
+    const middleMax = Math.max(0, middle.scrollWidth - middle.clientWidth);
+    middle.scrollLeft = Math.min(scrollPos, middleMax);
+    
+    if (middleHeader) {
+      const headerMax = Math.max(0, middleHeader.scrollWidth - middleHeader.clientWidth);
+      middleHeader.scrollLeft = Math.min(scrollPos, headerMax);
+    }
+    syncingRef.current = null;
+  };
+
+  const syncFromHeader = () => {
+    const middleHeader = middleHeaderScrollRef.current;
+    const middle = middleScrollRef.current;
+    const bottom = bottomScrollRef.current;
+    if (!middleHeader || !middle || !bottom) return;
+    if (syncingRef.current === 'middle' || syncingRef.current === 'bottom') return;
+    syncingRef.current = 'header';
+    
+    // Clamp scroll position to max scrollable for each container
+    const scrollPos = middleHeader.scrollLeft;
+    const middleMax = Math.max(0, middle.scrollWidth - middle.clientWidth);
+    middle.scrollLeft = Math.min(scrollPos, middleMax);
+    
+    const bottomMax = Math.max(0, bottom.scrollWidth - bottom.clientWidth);
+    bottom.scrollLeft = Math.min(scrollPos, bottomMax);
+    
     syncingRef.current = null;
   };
 
   useLayoutEffect(() => {
+    const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;
     const bottom = bottomScrollRef.current;
     if (!middle || !bottom) return;
@@ -838,14 +879,17 @@ export default function MainContent() {
     const ro = new ResizeObserver(update);
     ro.observe(middle);
     ro.observe(bottom);
+    if (middleHeader) ro.observe(middleHeader);
     const table = middle.querySelector('table');
     if (table) ro.observe(table);
+    const headerTable = middleHeader?.querySelector('table');
+    if (headerTable) ro.observe(headerTable);
 
     return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
-    // Initial sync so bottom scrollbar matches current position
+    // Initial sync so bottom scrollbar and header match current position
     syncFromMiddle();
   }, []);
 
@@ -874,10 +918,10 @@ export default function MainContent() {
           - Left (checkbox + Name) is fixed
           - Middle scrolls horizontally
           - Right (+) stays fixed */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="h-full overflow-y-auto overflow-x-hidden">
-          <div className="flex min-w-0 h-full">
-          {/* Left fixed pane */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Fixed Header Row */}
+        <div className="flex flex-shrink-0">
+          {/* Left header (checkbox + Name) */}
           <div className="w-[224px] flex-shrink-0 border-r border-gray-200">
             <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
@@ -895,6 +939,48 @@ export default function MainContent() {
                   </th>
                 </tr>
               </thead>
+            </table>
+          </div>
+          {/* Middle header (other columns) - syncs horizontal scroll with body */}
+          <div
+            ref={middleHeaderScrollRef}
+            onScroll={syncFromHeader}
+            className="flex-1 min-w-0 overflow-x-auto hide-scrollbar"
+          >
+            <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead>
+                <tr className="bg-white h-8">
+                  {reactTable.getHeaderGroups()[0]?.headers.slice(1).map((header) => (
+                    <th
+                      key={header.id}
+                      className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
+                    >
+                      <div className="h-8 px-2 flex items-center gap-2">
+                        <Type className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-xs font-semibold text-gray-700">
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </span>
+                      </div>
+                    </th>
+                  ))}
+                  {/* Add column button */}
+                  <th className="w-28 h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
+                    <button className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className="flex min-w-0">
+          {/* Left body (Name cells) */}
+          <div className="w-[224px] flex-shrink-0 border-r border-gray-200">
+            <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <tbody>
                 {reactTable.getRowModel().rows.map((row, idx) => {
                   const isHovered = hoveredRow === idx;
@@ -1004,37 +1090,13 @@ export default function MainContent() {
             </table>
           </div>
 
-          {/* Middle scrollable pane (scrollbar hidden; controlled by bottom scrollbar) */}
+          {/* Middle body (other cells) - controls horizontal scroll */}
           <div
             ref={middleScrollRef}
             onScroll={syncFromMiddle}
-            className="flex-1 min-w-0 h-full overflow-x-auto overflow-y-hidden hide-scrollbar"
+            className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar"
           >
             <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-              <thead>
-                <tr className="bg-white h-8">
-                  {reactTable.getHeaderGroups()[0]?.headers.slice(1).map((header) => (
-                    <th
-                      key={header.id}
-                      className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
-                    >
-                      <div className="h-8 px-2 flex items-center gap-2">
-                        <Type className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="text-xs font-semibold text-gray-700">
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
-
-                  {/* Add column button */}
-                  <th className="w-28 h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
-                    <button className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500">
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </th>
-                </tr>
-              </thead>
               <tbody>
                 {reactTable.getRowModel().rows.map((row, idx) => {
                   const isHovered = hoveredRow === idx;
@@ -1139,6 +1201,8 @@ export default function MainContent() {
                   >
                     <div className="h-8" />
                   </td>
+                  {/* Add column cell to match header width */}
+                  <td className="w-28 h-8 border-0 bg-transparent" />
                 </tr>
               </tbody>
             </table>
