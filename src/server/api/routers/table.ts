@@ -2,6 +2,13 @@ import { z } from "zod";
 import { faker } from "@faker-js/faker";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
+// Simple cuid generator compatible with Prisma's format
+function generateCuid(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `c${timestamp}${random}`.substring(0, 25);
+}
+
 export const tableRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ baseId: z.string() }))
@@ -57,32 +64,31 @@ export const tableRouter = createTRPCRouter({
         },
       });
 
-      // Generate ~200 rows with faker data, then create empty rows for the rest
-      // For now, create 3 rows: first with faker data, rest empty
+      // Generate 3 rows with faker data for initial table creation
       const statusChoices = ["Todo", "In Progress", "Done"];
-      const numRowsWithFaker = 1;
       const totalRows = 3;
       
       for (let i = 0; i < totalRows; i++) {
         // Build values JSONB object keyed by columnId
         const values: Record<string, string> = {};
         
-        // Only first row(s) get faker data
-        if (i < numRowsWithFaker) {
-          for (const column of table.columns) {
-            switch (column.name) {
-              case "Name":
-                values[column.id] = faker.person.fullName();
-                break;
-              case "Assignee":
-                values[column.id] = faker.person.firstName();
-                break;
-              case "Status":
-                values[column.id] = faker.helpers.arrayElement(statusChoices);
-                break;
-              default:
-                values[column.id] = "";
-            }
+        // All rows get faker data
+        for (const column of table.columns) {
+          switch (column.name) {
+            case "Name":
+              values[column.id] = faker.person.fullName();
+              break;
+            case "Notes":
+              values[column.id] = faker.lorem.sentence();
+              break;
+            case "Assignee":
+              values[column.id] = faker.person.firstName();
+              break;
+            case "Status":
+              values[column.id] = faker.helpers.arrayElement(statusChoices);
+              break;
+            default:
+              values[column.id] = "";
           }
         }
 
@@ -397,13 +403,23 @@ export const tableRouter = createTRPCRouter({
       return table;
     }),
 
-  // Bulk insert rows - optimized for 100k+ rows
+  // Get total row count for a table
+  getRowCount: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const count = await ctx.db.row.count({
+        where: { tableId: input.tableId },
+      });
+
+      return { count };
+    }),
+
+  // Bulk insert rows - HIGHLY OPTIMIZED for 100k+ rows
   bulkInsertRows: protectedProcedure
     .input(
       z.object({
         tableId: z.string(),
         count: z.number().min(1).max(1000000).default(100000),
-        startOrderOffset: z.number().optional(), // Optional offset for sequential calls
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -420,89 +436,101 @@ export const tableRouter = createTRPCRouter({
 
         if (!table) throw new Error("Table not found");
 
-        // Get current max order (only if not provided as offset)
-        let startOrder: number;
-        if (input.startOrderOffset !== undefined) {
-          // Use provided offset (for sequential client-side calls)
-          const lastRow = await ctx.db.row.findFirst({
-            where: { tableId: input.tableId },
-            orderBy: { order: "desc" },
-            select: { order: true },
-          });
-          startOrder = (lastRow?.order ?? -1) + 1 + input.startOrderOffset;
-        } else {
-          // Calculate from scratch (standalone call)
-          const lastRow = await ctx.db.row.findFirst({
-            where: { tableId: input.tableId },
-            orderBy: { order: "desc" },
-            select: { order: true },
-          });
-          startOrder = (lastRow?.order ?? -1) + 1;
-        }
+        // Use aggregate _max for faster order calculation
+        const maxOrder = await ctx.db.row.aggregate({
+          where: { tableId: input.tableId },
+          _max: { order: true },
+        });
+        const startOrder = (maxOrder._max.order ?? -1) + 1;
 
         // Find columns for faker data
         const nameColumn = table.columns.find((c) => c.name === "Name");
+        const notesColumn = table.columns.find((c) => c.name === "Notes");
         const assigneeColumn = table.columns.find((c) => c.name === "Assignee");
         const statusColumn = table.columns.find((c) => c.name === "Status");
         const statusChoices = ["Todo", "In Progress", "Done"];
 
-        // Generate rows in chunks to avoid timeouts
-        const chunkSize = 5000; // Chunk size for inserts
-        const numRowsWithFaker = 200; // Only first 200 rows get faker data
+        const numRowsWithFaker = 1000; // First 1000 rows get faker data
         const totalRows = input.count;
         let totalInserted = 0;
 
-        // Process in chunks
-        for (let chunkStart = 0; chunkStart < totalRows; chunkStart += chunkSize) {
-          const chunkEnd = Math.min(chunkStart + chunkSize, totalRows);
-          const chunkRows = [];
+        // OPTIMIZATION 1: Insert first 1000 rows with faker data via createMany
+        // Only include populated fields in JSONB (no empty strings)
+        if (totalRows > 0 && numRowsWithFaker > 0) {
+          const fakerRows = [];
+          const fakerCount = Math.min(numRowsWithFaker, totalRows);
 
-          for (let i = chunkStart; i < chunkEnd; i++) {
+          for (let i = 0; i < fakerCount; i++) {
             const values: Record<string, string> = {};
             
-            // Calculate global index across all batches for faker data
-            // Only first 200 rows globally (across all mutation calls) should have faker data
-            const globalRowIndex = (input.startOrderOffset ?? 0) + i;
-
-            // Only first 200 rows globally get faker data
-            if (globalRowIndex < numRowsWithFaker) {
-              if (nameColumn) {
-                values[nameColumn.id] = faker.person.fullName();
-              }
-              if (assigneeColumn) {
-                values[assigneeColumn.id] = faker.person.firstName();
-              }
-              if (statusColumn) {
-                values[statusColumn.id] = faker.helpers.arrayElement(statusChoices);
-              }
-
-              // Initialize empty values for other columns
-              for (const column of table.columns) {
-                if (!values[column.id]) {
-                  values[column.id] = "";
-                }
-              }
-            } else {
-              // Empty values for remaining rows
-              for (const column of table.columns) {
-                values[column.id] = "";
-              }
+            // Only include populated fields (no empty strings for other columns)
+            if (nameColumn) {
+              values[nameColumn.id] = faker.person.fullName();
+            }
+            if (notesColumn) {
+              values[notesColumn.id] = faker.lorem.sentence();
+            }
+            if (assigneeColumn) {
+              values[assigneeColumn.id] = faker.person.firstName();
+            }
+            if (statusColumn) {
+              values[statusColumn.id] = faker.helpers.arrayElement(statusChoices);
             }
 
-            chunkRows.push({
+            fakerRows.push({
               tableId: input.tableId,
               order: startOrder + i,
-              values: values,
+              values: values, // Only populated fields, empty object {} for other columns
             });
           }
 
-          // Bulk insert chunk
-          const result = await ctx.db.row.createMany({
-            data: chunkRows,
-            skipDuplicates: true, // Skip if there are any duplicates
-          });
-          
-          totalInserted += result.count;
+          if (fakerRows.length > 0) {
+            const result = await ctx.db.row.createMany({
+              data: fakerRows,
+            });
+            totalInserted += result.count;
+          }
+        }
+
+        // OPTIMIZATION 2: Insert remaining empty rows using raw SQL with generate_series
+        // This is MUCH faster than creating JSON objects for 99k rows
+        const emptyRowCount = totalRows - numRowsWithFaker;
+        if (emptyRowCount > 0) {
+          // Generate cuids in batches for raw SQL insert
+          // We'll insert in chunks of 10k to avoid huge SQL statements
+          const sqlChunkSize = 10000;
+          const sqlChunks = Math.ceil(emptyRowCount / sqlChunkSize);
+
+          for (let chunk = 0; chunk < sqlChunks; chunk++) {
+            const chunkStart = chunk * sqlChunkSize;
+            const chunkEnd = Math.min(chunkStart + sqlChunkSize, emptyRowCount);
+            const chunkSizeActual = chunkEnd - chunkStart;
+
+            // Generate cuids for this chunk
+            const ids = Array.from({ length: chunkSizeActual }, () => generateCuid());
+            
+            // Build VALUES clause for raw SQL
+            // Escape IDs and tableId to prevent SQL injection
+            const orderStart = startOrder + numRowsWithFaker + chunkStart;
+            const escapedTableId = input.tableId.replace(/'/g, "''");
+            
+            const valuesParts: string[] = [];
+            for (let i = 0; i < chunkSizeActual; i++) {
+              const order = orderStart + i;
+              // Escape single quotes in IDs for SQL safety
+              const escapedId = ids[i]!.replace(/'/g, "''");
+              valuesParts.push(`('${escapedId}', '${escapedTableId}', ${order}, '{}'::jsonb, NULL, NOW(), NOW())`);
+            }
+
+            // Insert via raw SQL - MUCH faster than createMany for empty rows
+            // Note: tableId is validated by Zod and IDs are generated in JS, so escaping is sufficient
+            await ctx.db.$executeRawUnsafe(`
+              INSERT INTO "Row" ("id", "tableId", "order", "values", "searchText", "createdAt", "updatedAt")
+              VALUES ${valuesParts.join(', ')}
+            `);
+
+            totalInserted += chunkSizeActual;
+          }
         }
 
         return {

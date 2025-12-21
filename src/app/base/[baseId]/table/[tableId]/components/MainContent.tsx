@@ -104,6 +104,12 @@ export default function MainContent() {
       gcTime: 1000 * 60 * 30,
     },
   );
+
+  // Fetch total row count from database (for accurate record count display)
+  const { data: rowCountData } = api.table.getRowCount.useQuery(
+    { tableId },
+    { enabled: !isCreatingTable },
+  );
   
   // Infinite query for rows with cursor-based paging
   const {
@@ -155,13 +161,19 @@ export default function MainContent() {
       
       // Get the cached data - must match the query key exactly including limit
       const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+      const currentCount = utils.table.getRowCount.getData({ tableId });
       
       console.log('previousPages:', previousPages ? `exists with ${previousPages.pages.length} pages` : 'null');
       console.log('tableMeta:', tableMeta ? 'exists' : 'null');
       
+      // Optimistically update the row count immediately (before server responds)
+      if (currentCount) {
+        utils.table.getRowCount.setData({ tableId }, { count: currentCount.count + 1 });
+      }
+      
       if (!previousPages || !tableMeta) {
         console.warn('Cannot do optimistic update - missing data');
-        return { previousPages, clientRowId };
+        return { previousPages: undefined, clientRowId, previousCount: currentCount };
       }
       
       // Create temp row
@@ -283,7 +295,7 @@ export default function MainContent() {
         }, 0);
       }
       
-      return { previousPages, clientRowId };
+      return { previousPages, clientRowId, previousCount: currentCount };
     },
     onSuccess: (newRow, variables, context) => {
       if (!context) return;
@@ -331,11 +343,21 @@ export default function MainContent() {
           pageParams: oldData.pageParams,
         };
       });
+      
+      // Count was already optimistically updated in onMutate, so no need to invalidate here
+      // The server has confirmed the row was created, so our optimistic update was correct
     },
     onError: (error, _variables, context) => {
       if (!context) return;
       console.log('Row creation error:', error);
+      
+      // Rollback optimistic count update on error
+      if (context.previousCount) {
+        utils.table.getRowCount.setData({ tableId }, context.previousCount);
+      }
+      
       void utils.table.getRows.invalidate({ tableId, limit: 200 });
+      void utils.table.getRowCount.invalidate({ tableId });
     },
     onSettled: (_data, _error, variables) => {
       setRowCreatesInFlight(prev => {
@@ -348,8 +370,9 @@ export default function MainContent() {
   
   // Cell update mutation
   const updateCellMutation = api.table.updateCell.useMutation({
-    onSuccess: (updatedRow, variables) => {
-      // Update the cache with the server's response to ensure consistency
+    onSuccess: (_updatedCell, variables) => {
+      // Update the cache with the new cell value
+      // The mutation returns a simple object, so we update the cache directly
       utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
         if (!oldData) return oldData;
         const newData = {
@@ -357,17 +380,18 @@ export default function MainContent() {
             ...page,
             rows: page.rows.map(row => {
               if (row.id !== variables.rowId) return row;
-              // Update the row with new values and recompute cells
-              const values = (updatedRow.values as Record<string, string>) ?? {};
+              // Update the specific cell value
               const updatedCells = row.cells.map(cell => {
-                const newValue = values[cell.columnId];
-                return {
-                  ...cell,
-                  value: (newValue !== null && newValue !== undefined ? newValue : cell.value) ?? "",
-                };
+                if (cell.columnId === variables.columnId) {
+                  return {
+                    ...cell,
+                    value: variables.value,
+                  };
+                }
+                return cell;
               });
               return {
-                ...updatedRow,
+                ...row,
                 cells: updatedCells,
               };
             }),
@@ -1359,7 +1383,7 @@ export default function MainContent() {
       {/* Bottom status bar */}
       <div className="h-9 border-t border-gray-200 flex items-center px-4 bg-gray-50 flex-shrink-0">
         <span className="text-xs text-gray-600">
-          {allRows.length} {allRows.length === 1 ? 'record' : 'records'}
+          {rowCountData?.count ?? allRows.length} {(rowCountData?.count ?? allRows.length) === 1 ? 'record' : 'records'}
           {isFetchingNextPage && ' • Loading more...'}
         </span>
       </div>
