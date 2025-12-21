@@ -177,7 +177,7 @@ export default function LeftSidebarNarrow() {
             <span
               style={{
                 position: 'relative',
-                top: '-7px',
+                top: '-9px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -233,6 +233,8 @@ export default function LeftSidebarNarrow() {
             margin: 0,
             cursor: 'pointer',
             border: 'none',
+            position: 'relative',
+            top: '-4px',
           }}
           aria-label="Account"
         >
