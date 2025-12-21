@@ -357,6 +357,12 @@ export const tableRouter = createTRPCRouter({
         nextCursor = nextItem?.id;
       }
 
+      // Get total count for virtualizer (only on first page for performance)
+      // We return it on every page so the client always has the latest count
+      const totalCount = await ctx.db.row.count({
+        where: { tableId },
+      });
+
       // Transform JSONB values to cells array for backward compatibility
       const rowsWithCells = rows.map((row) => {
         const values = (row.values as Record<string, string | null | undefined>) ?? {};
@@ -382,6 +388,7 @@ export const tableRouter = createTRPCRouter({
       return {
         rows: rowsWithCells,
         nextCursor,
+        totalCount,
       };
     }),
 

@@ -121,15 +121,21 @@ export default function MainContent() {
   } = api.table.getRows.useInfiniteQuery(
     { 
       tableId,
-      limit: 200, // Fetch 200 rows per page
+      limit: 500, // Fetch 500 rows per page for smoother scrolling
     },
     {
       enabled: !isCreatingTable,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
-      staleTime: 1000 * 60 * 5,
+      staleTime: 30_000, // 30 seconds
       gcTime: 1000 * 60 * 30,
+      refetchOnWindowFocus: false,
     },
   );
+
+  // Get total count from first page (for virtualizer)
+  const totalCount = useMemo(() => {
+    return rowPages?.pages?.[0]?.totalCount ?? 0;
+  }, [rowPages]);
 
   // Flatten all pages into a single rows array
   const allRows = useMemo(() => {
@@ -138,6 +144,11 @@ export default function MainContent() {
     console.log('allRows recalculated:', rows.length, 'rows');
     return rows;
   }, [rowPages]);
+  
+  // Helper to get row by index (returns null if not loaded yet)
+  const rowByIndex = useCallback((index: number) => {
+    return allRows[index] ?? null;
+  }, [allRows]);
   
   // Debug: log when rowPages changes
   useEffect(() => {
@@ -157,10 +168,10 @@ export default function MainContent() {
       console.log('onMutate called:', { clientRowId, afterRowId });
       
       // Cancel outgoing refetches - must match the query key exactly
-      await utils.table.getRows.cancel({ tableId, limit: 200 });
+      await utils.table.getRows.cancel({ tableId, limit: 500 });
       
       // Get the cached data - must match the query key exactly including limit
-      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
       const currentCount = utils.table.getRowCount.getData({ tableId });
       
       console.log('previousPages:', previousPages ? `exists with ${previousPages.pages.length} pages` : 'null');
@@ -218,7 +229,7 @@ export default function MainContent() {
       // Insert the temp row optimistically
       // We MUST use the updater function form to ensure React Query detects the change
       // Must match the query key exactly including limit
-      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
         if (!oldData) {
           console.warn('No oldData in setInfiniteData for row creation');
           return oldData;
@@ -260,7 +271,7 @@ export default function MainContent() {
       console.log('setInfiniteData called, checking if rowPages updated...');
       // Force a check after a brief delay
       setTimeout(() => {
-        const updated = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+        const updated = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
         if (updated) {
           const totalRows = updated.pages.reduce((sum, p) => sum + p.rows.length, 0);
           console.log('Cache after update has', totalRows, 'rows');
@@ -272,7 +283,7 @@ export default function MainContent() {
       if (afterRowId && activeCell) {
         setTimeout(() => {
           // Re-read the data after update to get the correct index
-          const updatedData = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+          const updatedData = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
           if (!updatedData) return;
           
           // Find the temp row to get its index
@@ -301,7 +312,7 @@ export default function MainContent() {
       if (!context) return;
       
       // Replace optimistic temp row with real row from server
-      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
         if (!oldData) return oldData;
         
         return {
@@ -356,7 +367,7 @@ export default function MainContent() {
         utils.table.getRowCount.setData({ tableId }, context.previousCount);
       }
       
-      void utils.table.getRows.invalidate({ tableId, limit: 200 });
+      void utils.table.getRows.invalidate({ tableId, limit: 500 });
       void utils.table.getRowCount.invalidate({ tableId });
     },
     onSettled: (_data, _error, variables) => {
@@ -373,7 +384,7 @@ export default function MainContent() {
     onSuccess: (_updatedCell, variables) => {
       // Update the cache with the new cell value
       // The mutation returns a simple object, so we update the cache directly
-      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
         if (!oldData) return oldData;
         const newData = {
           pages: oldData.pages.map(page => ({
@@ -414,7 +425,7 @@ export default function MainContent() {
     },
     onError: (error) => {
       console.error('Failed to save cell:', error);
-      void utils.table.getRows.invalidate({ tableId, limit: 200 });
+      void utils.table.getRows.invalidate({ tableId, limit: 500 });
     },
   });
   
@@ -467,7 +478,7 @@ export default function MainContent() {
           }
         } catch (error) {
           console.error('Failed to autosave cell:', error);
-          void utils.table.getRows.invalidate({ tableId, limit: 200 });
+          void utils.table.getRows.invalidate({ tableId, limit: 500 });
         } finally {
           setSavingCells((prev) => {
             const next = new Set(prev);
@@ -494,7 +505,7 @@ export default function MainContent() {
     setEditValue(newValue);
     
     // Update cache immediately - ensure we always return the full structure
-    utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+    utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
       if (!oldData) return oldData;
       
       return {
@@ -591,7 +602,7 @@ export default function MainContent() {
         // The local draft will be cleared on next successful refetch or after a delay
       } catch (error) {
         console.error('Failed to save cell:', error);
-        void utils.table.getRows.invalidate({ tableId, limit: 200 });
+        void utils.table.getRows.invalidate({ tableId, limit: 500 });
       } finally {
         setCommittingCells(prev => {
           const next = new Set(prev);
@@ -683,7 +694,7 @@ export default function MainContent() {
       
       setLocalDrafts(prev => new Map(prev).set(cellKey, e.key));
 
-      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
         if (!oldData) return oldData;
         return {
           pages: oldData.pages.map(page => ({
@@ -847,15 +858,17 @@ export default function MainContent() {
   // Reference to the scrollable body container for virtualization
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Set up row virtualizer
+  // Set up row virtualizer with totalCount (not just loaded rows)
   const rowVirtualizer = useVirtualizer({
-    count: allRows.length,
+    count: totalCount || allRows.length, // Use totalCount if available, fallback to loaded count
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 32, // 32px = h-8
-    overscan: 10, // Render 10 extra rows above/below viewport
+    estimateSize: () => 32, // 32px = h-8 (fixed height for smoother scrolling)
+    overscan: 30, // Render 30 extra rows above/below viewport for smoother scrolling
   });
 
-  // Fetch next page when user scrolls close to the bottom
+  // Prefetch next page when user scrolls close to the loaded edge
+  // This ensures seamless scrolling - fetch before user hits the bottom
+  const PREFETCH_THRESHOLD = 60; // Fetch when within 60 rows of loaded edge
   useEffect(() => {
     const virtualItems = rowVirtualizer.getVirtualItems();
     if (virtualItems.length === 0) return;
@@ -863,15 +876,17 @@ export default function MainContent() {
     const lastItem = virtualItems[virtualItems.length - 1];
     if (!lastItem) return;
 
-    // If we're within 5 items of the end and there's more data, fetch next page
+    const loadedCount = allRows.length;
+    
+    // Prefetch if we're within threshold of loaded edge and there's more data
     if (
-      lastItem.index >= allRows.length - 5 &&
+      lastItem.index >= loadedCount - PREFETCH_THRESHOLD &&
       hasNextPage &&
       !isFetchingNextPage
     ) {
       void fetchNextPage();
     }
-  }, [rowVirtualizer.getVirtualItems(), allRows.length, hasNextPage, isFetchingNextPage, fetchNextPage, rowVirtualizer]);
+  }, [rowVirtualizer, allRows.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Keep keyboard navigation working
   useEffect(() => {
@@ -1149,17 +1164,36 @@ export default function MainContent() {
               <tbody>
                       {virtualItems.map((virtualRow) => {
                         const idx = virtualRow.index;
-                        const row = allRows[idx];
-                        if (!row) return null;
+                        const row = rowByIndex(idx);
+                        const firstColumn = tableMeta.columns[0];
+                        if (!firstColumn) return null;
+
+                        // Render placeholder if row not loaded yet
+                        if (!row) {
+                          return (
+                            <tr
+                              key={`placeholder-${idx}`}
+                              className="bg-white"
+                            >
+                              <td className="w-[44px] h-8 border-b border-gray-200 text-center align-middle bg-white">
+                                <div className="h-8 flex items-center justify-center text-xs text-gray-400 font-medium">
+                                  {idx + 1}
+                                </div>
+                              </td>
+                              <td className="w-[180px] h-8 border-b border-gray-200 p-0 align-middle bg-white">
+                                <div className="h-8 px-2 flex items-center text-gray-300">
+                                  {/* Empty placeholder */}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
 
                   const isHovered = hoveredRow === idx;
                   const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
                   const isRowHighlighted = isHovered || isKeyboardRowActive;
                   
                         const rowId = row.id;
-                        const firstColumn = tableMeta.columns[0];
-                        if (!firstColumn) return null;
-                  
                         const columnId = firstColumn.id;
                   const cellKey = `${rowId}-${columnId}`;
                         
@@ -1267,8 +1301,36 @@ export default function MainContent() {
               <tbody>
                       {virtualItems.map((virtualRow) => {
                         const idx = virtualRow.index;
-                        const row = allRows[idx];
-                        if (!row) return null;
+                        const row = rowByIndex(idx);
+
+                        // Render placeholder if row not loaded yet
+                        if (!row) {
+                          return (
+                            <tr
+                              key={`placeholder-${idx}`}
+                              className="bg-white"
+                            >
+                              {tableMeta.columns.slice(1).map((col) => (
+                                <td
+                                  key={col.id}
+                                  className="w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle bg-white"
+                                >
+                                  <div className="h-8 pl-3 pr-2 flex items-center text-gray-300">
+                                    {/* Empty placeholder */}
+                                  </div>
+                                </td>
+                              ))}
+                              {/* Add column cell */}
+                              <td 
+                                className="w-28 h-8 border-0 bg-transparent"
+                                onMouseEnter={(e) => {
+                                  e.stopPropagation();
+                                  setHoveredRow(null);
+                                }}
+                              />
+                            </tr>
+                          );
+                        }
 
                   const isHovered = hoveredRow === idx;
                   const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
