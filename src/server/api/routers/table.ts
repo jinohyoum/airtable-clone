@@ -57,55 +57,43 @@ export const tableRouter = createTRPCRouter({
         },
       });
 
-      // Generate 3 rows: 1 with faker data, 2 empty
+      // Generate ~200 rows with faker data, then create empty rows for the rest
+      // For now, create 3 rows: first with faker data, rest empty
       const statusChoices = ["Todo", "In Progress", "Done"];
+      const numRowsWithFaker = 1;
+      const totalRows = 3;
       
-      for (let i = 0; i < 3; i++) {
-        // Create row
-        const row = await ctx.db.row.create({
+      for (let i = 0; i < totalRows; i++) {
+        // Build values JSONB object keyed by columnId
+        const values: Record<string, string> = {};
+        
+        // Only first row(s) get faker data
+        if (i < numRowsWithFaker) {
+          for (const column of table.columns) {
+            switch (column.name) {
+              case "Name":
+                values[column.id] = faker.person.fullName();
+                break;
+              case "Assignee":
+                values[column.id] = faker.person.firstName();
+                break;
+              case "Status":
+                values[column.id] = faker.helpers.arrayElement(statusChoices);
+                break;
+              default:
+                values[column.id] = "";
+            }
+          }
+        }
+
+        // Create row with JSONB values
+        await ctx.db.row.create({
           data: {
             tableId: table.id,
             order: i,
+            values: values,
           },
         });
-
-        // Create cells for each column
-        for (const column of table.columns) {
-          let cellValue = "";
-
-          // Only first row gets faker data
-          if (i === 0) {
-            switch (column.name) {
-              case "Name":
-                cellValue = faker.person.fullName();
-                break;
-              case "Notes":
-                cellValue = faker.lorem.sentence();
-                break;
-              case "Assignee":
-                cellValue = faker.person.firstName();
-                break;
-              case "Status":
-                cellValue = faker.helpers.arrayElement(statusChoices);
-                break;
-              case "Attachments":
-                cellValue = "";
-                break;
-              default:
-                cellValue = "";
-            }
-          }
-          // Rows 2 and 3 are empty (cellValue stays "")
-
-          // Create cell
-          await ctx.db.cell.create({
-            data: {
-              rowId: row.id,
-              columnId: column.id,
-              value: cellValue,
-            },
-          });
-        }
       }
 
       return table;
@@ -222,30 +210,32 @@ export const tableRouter = createTRPCRouter({
           orderToUse = (table.rows[0]?.order ?? -1) + 1;
         }
 
+        // Initialize empty values JSONB for all columns
+        const values: Record<string, string> = {};
+        for (const column of table.columns) {
+          values[column.id] = "";
+        }
+
         return tx.row.create({
           data: {
             tableId: input.tableId,
             order: orderToUse,
             clientRowId: input.clientRowId,
+            values: values,
           },
         });
       });
 
-      // Create empty cells for each column
-      const cells = [];
-      for (const column of table.columns) {
-        const cell = await ctx.db.cell.create({
-          data: {
-            rowId: row.id,
-            columnId: column.id,
-            value: "", // Empty cells for new rows
-          },
-          include: {
-            column: true,
-          },
-        });
-        cells.push(cell);
-      }
+      // Transform JSONB values to cells array for backward compatibility with frontend
+      const cells = table.columns.map((column) => ({
+        id: `${row.id}-${column.id}`, // Generate synthetic ID
+        value: (row.values as Record<string, string>)[column.id] ?? "",
+        rowId: row.id,
+        columnId: column.id,
+        column: column,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      }));
 
       return {
         ...row,
@@ -262,23 +252,36 @@ export const tableRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Upsert: update if cell exists, create if it doesn't
-      return ctx.db.cell.upsert({
-        where: {
-          rowId_columnId: {
-            rowId: input.rowId,
-            columnId: input.columnId,
-          },
-        },
-        update: {
-          value: input.value,
-        },
-        create: {
-          rowId: input.rowId,
-          columnId: input.columnId,
-          value: input.value,
-        },
+      // Get current row - fetch without select to get all fields including values
+      // (workaround until Prisma client is regenerated)
+      const row = await ctx.db.row.findUnique({
+        where: { id: input.rowId },
       });
+
+      if (!row) throw new Error("Row not found");
+
+      // Access values - use type assertion since Prisma client may not have regenerated
+      const currentValues = ((row as { values?: unknown }).values as Record<string, string>) ?? {};
+      const updatedValues = {
+        ...currentValues,
+        [input.columnId]: input.value,
+      };
+
+      // Update the row's values JSONB column using $executeRaw for reliability
+      // This works even if Prisma client hasn't regenerated
+      await ctx.db.$executeRaw`
+        UPDATE "Row" 
+        SET "values" = ${JSON.stringify(updatedValues)}::jsonb,
+            "updatedAt" = NOW()
+        WHERE "id" = ${input.rowId}
+      `;
+
+      return {
+        id: row.id,
+        rowId: input.rowId,
+        columnId: input.columnId,
+        value: input.value,
+      };
     }),
 
   // Cursor-based paging for rows (infinite scroll)
@@ -293,6 +296,18 @@ export const tableRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { tableId, limit, cursor } = input;
 
+      // Get columns to transform JSONB values to cells
+      const table = await ctx.db.table.findUnique({
+        where: { id: tableId },
+        include: {
+          columns: {
+            orderBy: { order: "asc" },
+          },
+        },
+      });
+
+      if (!table) throw new Error("Table not found");
+
       // Get cursor row's order value if cursor is provided
       let cursorRow: { order: number; id: string } | null = null;
       if (cursor) {
@@ -304,7 +319,7 @@ export const tableRouter = createTRPCRouter({
 
       // Fetch rows with cursor-based pagination
       // Using order + id for stable sorting (even if multiple rows have same order)
-      const rows = await ctx.db.row.findMany({
+      const rowsData = await ctx.db.row.findMany({
         where: {
           tableId,
           // If cursor provided, fetch rows after that cursor
@@ -326,24 +341,40 @@ export const tableRouter = createTRPCRouter({
         },
         orderBy: [{ order: "asc" }, { id: "asc" }],
         take: limit + 1, // Fetch one extra to determine if there's a next page
-        include: {
-          cells: {
-            include: {
-              column: true,
-            },
-          },
-        },
       });
 
       // Determine if there are more pages
       let nextCursor: string | undefined = undefined;
+      let rows = rowsData;
       if (rows.length > limit) {
         const nextItem = rows.pop(); // Remove the extra item
         nextCursor = nextItem?.id;
       }
 
+      // Transform JSONB values to cells array for backward compatibility
+      const rowsWithCells = rows.map((row) => {
+        const values = (row.values as Record<string, string | null | undefined>) ?? {};
+        const cells = table.columns.map((column) => {
+          const cellValue = values[column.id];
+          return {
+            id: `${row.id}-${column.id}`, // Synthetic ID
+            value: (cellValue !== null && cellValue !== undefined ? cellValue : "") as string,
+            rowId: row.id,
+            columnId: column.id,
+            column: column,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+          };
+        });
+
+        return {
+          ...row,
+          cells,
+        };
+      });
+
       return {
-        rows,
+        rows: rowsWithCells,
         nextCursor,
       };
     }),
@@ -364,5 +395,124 @@ export const tableRouter = createTRPCRouter({
       if (!table) throw new Error("Table not found");
 
       return table;
+    }),
+
+  // Bulk insert rows - optimized for 100k+ rows
+  bulkInsertRows: protectedProcedure
+    .input(
+      z.object({
+        tableId: z.string(),
+        count: z.number().min(1).max(1000000).default(100000),
+        startOrderOffset: z.number().optional(), // Optional offset for sequential calls
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Get table with columns
+        const table = await ctx.db.table.findUnique({
+          where: { id: input.tableId },
+          include: {
+            columns: {
+              orderBy: { order: "asc" },
+            },
+          },
+        });
+
+        if (!table) throw new Error("Table not found");
+
+        // Get current max order (only if not provided as offset)
+        let startOrder: number;
+        if (input.startOrderOffset !== undefined) {
+          // Use provided offset (for sequential client-side calls)
+          const lastRow = await ctx.db.row.findFirst({
+            where: { tableId: input.tableId },
+            orderBy: { order: "desc" },
+            select: { order: true },
+          });
+          startOrder = (lastRow?.order ?? -1) + 1 + input.startOrderOffset;
+        } else {
+          // Calculate from scratch (standalone call)
+          const lastRow = await ctx.db.row.findFirst({
+            where: { tableId: input.tableId },
+            orderBy: { order: "desc" },
+            select: { order: true },
+          });
+          startOrder = (lastRow?.order ?? -1) + 1;
+        }
+
+        // Find columns for faker data
+        const nameColumn = table.columns.find((c) => c.name === "Name");
+        const assigneeColumn = table.columns.find((c) => c.name === "Assignee");
+        const statusColumn = table.columns.find((c) => c.name === "Status");
+        const statusChoices = ["Todo", "In Progress", "Done"];
+
+        // Generate rows in chunks to avoid timeouts
+        const chunkSize = 5000; // Chunk size for inserts
+        const numRowsWithFaker = 200; // Only first 200 rows get faker data
+        const totalRows = input.count;
+        let totalInserted = 0;
+
+        // Process in chunks
+        for (let chunkStart = 0; chunkStart < totalRows; chunkStart += chunkSize) {
+          const chunkEnd = Math.min(chunkStart + chunkSize, totalRows);
+          const chunkRows = [];
+
+          for (let i = chunkStart; i < chunkEnd; i++) {
+            const values: Record<string, string> = {};
+            
+            // Calculate global index across all batches for faker data
+            // Only first 200 rows globally (across all mutation calls) should have faker data
+            const globalRowIndex = (input.startOrderOffset ?? 0) + i;
+
+            // Only first 200 rows globally get faker data
+            if (globalRowIndex < numRowsWithFaker) {
+              if (nameColumn) {
+                values[nameColumn.id] = faker.person.fullName();
+              }
+              if (assigneeColumn) {
+                values[assigneeColumn.id] = faker.person.firstName();
+              }
+              if (statusColumn) {
+                values[statusColumn.id] = faker.helpers.arrayElement(statusChoices);
+              }
+
+              // Initialize empty values for other columns
+              for (const column of table.columns) {
+                if (!values[column.id]) {
+                  values[column.id] = "";
+                }
+              }
+            } else {
+              // Empty values for remaining rows
+              for (const column of table.columns) {
+                values[column.id] = "";
+              }
+            }
+
+            chunkRows.push({
+              tableId: input.tableId,
+              order: startOrder + i,
+              values: values,
+            });
+          }
+
+          // Bulk insert chunk
+          const result = await ctx.db.row.createMany({
+            data: chunkRows,
+            skipDuplicates: true, // Skip if there are any duplicates
+          });
+          
+          totalInserted += result.count;
+        }
+
+        return {
+          success: true,
+          inserted: totalInserted,
+          expected: totalRows,
+        };
+      } catch (error) {
+        console.error("Bulk insert error:", error);
+        throw new Error(`Failed to insert rows: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
     }),
 });

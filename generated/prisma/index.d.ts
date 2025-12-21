@@ -5311,6 +5311,7 @@ export namespace Prisma {
     tableId: number
     clientRowId: number
     searchText: number
+    values: number
     _all: number
   }
 
@@ -5351,6 +5352,7 @@ export namespace Prisma {
     tableId?: true
     clientRowId?: true
     searchText?: true
+    values?: true
     _all?: true
   }
 
@@ -5448,6 +5450,7 @@ export namespace Prisma {
     tableId: string
     clientRowId: string | null
     searchText: string | null
+    values: JsonValue
     _count: RowCountAggregateOutputType | null
     _avg: RowAvgAggregateOutputType | null
     _sum: RowSumAggregateOutputType | null
@@ -5477,6 +5480,7 @@ export namespace Prisma {
     tableId?: boolean
     clientRowId?: boolean
     searchText?: boolean
+    values?: boolean
     cells?: boolean | Row$cellsArgs<ExtArgs>
     table?: boolean | TableDefaultArgs<ExtArgs>
     _count?: boolean | RowCountOutputTypeDefaultArgs<ExtArgs>
@@ -5490,6 +5494,7 @@ export namespace Prisma {
     tableId?: boolean
     clientRowId?: boolean
     searchText?: boolean
+    values?: boolean
     table?: boolean | TableDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["row"]>
 
@@ -5501,6 +5506,7 @@ export namespace Prisma {
     tableId?: boolean
     clientRowId?: boolean
     searchText?: boolean
+    values?: boolean
     table?: boolean | TableDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["row"]>
 
@@ -5512,9 +5518,10 @@ export namespace Prisma {
     tableId?: boolean
     clientRowId?: boolean
     searchText?: boolean
+    values?: boolean
   }
 
-  export type RowOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "order" | "createdAt" | "updatedAt" | "tableId" | "clientRowId" | "searchText", ExtArgs["result"]["row"]>
+  export type RowOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "order" | "createdAt" | "updatedAt" | "tableId" | "clientRowId" | "searchText" | "values", ExtArgs["result"]["row"]>
   export type RowInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     cells?: boolean | Row$cellsArgs<ExtArgs>
     table?: boolean | TableDefaultArgs<ExtArgs>
@@ -5541,6 +5548,7 @@ export namespace Prisma {
       tableId: string
       clientRowId: string | null
       searchText: string | null
+      values: Prisma.JsonValue
     }, ExtArgs["result"]["row"]>
     composites: {}
   }
@@ -5973,6 +5981,7 @@ export namespace Prisma {
     readonly tableId: FieldRef<"Row", 'String'>
     readonly clientRowId: FieldRef<"Row", 'String'>
     readonly searchText: FieldRef<"Row", 'String'>
+    readonly values: FieldRef<"Row", 'Json'>
   }
     
 
@@ -12958,7 +12967,8 @@ export namespace Prisma {
     updatedAt: 'updatedAt',
     tableId: 'tableId',
     clientRowId: 'clientRowId',
-    searchText: 'searchText'
+    searchText: 'searchText',
+    values: 'values'
   };
 
   export type RowScalarFieldEnum = (typeof RowScalarFieldEnum)[keyof typeof RowScalarFieldEnum]
@@ -13045,6 +13055,13 @@ export namespace Prisma {
   export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+  export const JsonNullValueInput: {
+    JsonNull: typeof JsonNull
+  };
+
+  export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
   export const QueryMode: {
     default: 'default',
     insensitive: 'insensitive'
@@ -13059,6 +13076,15 @@ export namespace Prisma {
   };
 
   export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+  export const JsonNullValueFilter: {
+    DbNull: typeof DbNull,
+    JsonNull: typeof JsonNull,
+    AnyNull: typeof AnyNull
+  };
+
+  export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
   /**
@@ -13105,6 +13131,20 @@ export namespace Prisma {
    * Reference to a field of type 'Int[]'
    */
   export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Json'
+   */
+  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+  /**
+   * Reference to a field of type 'QueryMode'
+   */
+  export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 
@@ -13333,6 +13373,7 @@ export namespace Prisma {
     tableId?: StringFilter<"Row"> | string
     clientRowId?: StringNullableFilter<"Row"> | string | null
     searchText?: StringNullableFilter<"Row"> | string | null
+    values?: JsonFilter<"Row">
     cells?: CellListRelationFilter
     table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }
@@ -13345,6 +13386,7 @@ export namespace Prisma {
     tableId?: SortOrder
     clientRowId?: SortOrderInput | SortOrder
     searchText?: SortOrderInput | SortOrder
+    values?: SortOrder
     cells?: CellOrderByRelationAggregateInput
     table?: TableOrderByWithRelationInput
   }
@@ -13361,6 +13403,7 @@ export namespace Prisma {
     tableId?: StringFilter<"Row"> | string
     clientRowId?: StringNullableFilter<"Row"> | string | null
     searchText?: StringNullableFilter<"Row"> | string | null
+    values?: JsonFilter<"Row">
     cells?: CellListRelationFilter
     table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }, "id" | "tableId_clientRowId">
@@ -13373,6 +13416,7 @@ export namespace Prisma {
     tableId?: SortOrder
     clientRowId?: SortOrderInput | SortOrder
     searchText?: SortOrderInput | SortOrder
+    values?: SortOrder
     _count?: RowCountOrderByAggregateInput
     _avg?: RowAvgOrderByAggregateInput
     _max?: RowMaxOrderByAggregateInput
@@ -13391,6 +13435,7 @@ export namespace Prisma {
     tableId?: StringWithAggregatesFilter<"Row"> | string
     clientRowId?: StringNullableWithAggregatesFilter<"Row"> | string | null
     searchText?: StringNullableWithAggregatesFilter<"Row"> | string | null
+    values?: JsonWithAggregatesFilter<"Row">
   }
 
   export type CellWhereInput = {
@@ -13982,6 +14027,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellCreateNestedManyWithoutRowInput
     table: TableCreateNestedOneWithoutRowsInput
   }
@@ -13994,6 +14040,7 @@ export namespace Prisma {
     tableId: string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellUncheckedCreateNestedManyWithoutRowInput
   }
 
@@ -14004,6 +14051,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellUpdateManyWithoutRowNestedInput
     table?: TableUpdateOneRequiredWithoutRowsNestedInput
   }
@@ -14016,6 +14064,7 @@ export namespace Prisma {
     tableId?: StringFieldUpdateOperationsInput | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellUncheckedUpdateManyWithoutRowNestedInput
   }
 
@@ -14027,6 +14076,7 @@ export namespace Prisma {
     tableId: string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type RowUpdateManyMutationInput = {
@@ -14036,6 +14086,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type RowUncheckedUpdateManyInput = {
@@ -14046,6 +14097,7 @@ export namespace Prisma {
     tableId?: StringFieldUpdateOperationsInput | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type CellCreateInput = {
@@ -14716,6 +14768,29 @@ export namespace Prisma {
     _min?: NestedStringNullableFilter<$PrismaModel>
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
+  export type JsonFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type RowTableIdClientRowIdCompoundUniqueInput = {
     tableId: string
@@ -14730,6 +14805,7 @@ export namespace Prisma {
     tableId?: SortOrder
     clientRowId?: SortOrder
     searchText?: SortOrder
+    values?: SortOrder
   }
 
   export type RowAvgOrderByAggregateInput = {
@@ -14758,6 +14834,32 @@ export namespace Prisma {
 
   export type RowSumOrderByAggregateInput = {
     order?: SortOrder
+  }
+  export type JsonWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedJsonFilter<$PrismaModel>
+    _max?: NestedJsonFilter<$PrismaModel>
   }
 
   export type ColumnScalarRelationFilter = {
@@ -15713,6 +15815,29 @@ export namespace Prisma {
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
   }
+  export type NestedJsonFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<NestedJsonFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel> | null
@@ -15918,6 +16043,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellCreateNestedManyWithoutRowInput
   }
 
@@ -15928,6 +16054,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellUncheckedCreateNestedManyWithoutRowInput
   }
 
@@ -16045,6 +16172,7 @@ export namespace Prisma {
     tableId?: StringFilter<"Row"> | string
     clientRowId?: StringNullableFilter<"Row"> | string | null
     searchText?: StringNullableFilter<"Row"> | string | null
+    values?: JsonFilter<"Row">
   }
 
   export type BaseUpsertWithoutTablesInput = {
@@ -16344,6 +16472,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
     table: TableCreateNestedOneWithoutRowsInput
   }
 
@@ -16355,6 +16484,7 @@ export namespace Prisma {
     tableId: string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type RowCreateOrConnectWithoutCellsInput = {
@@ -16413,6 +16543,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
     table?: TableUpdateOneRequiredWithoutRowsNestedInput
   }
 
@@ -16424,6 +16555,7 @@ export namespace Prisma {
     tableId?: StringFieldUpdateOperationsInput | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type TableCreateWithoutViewsInput = {
@@ -16821,6 +16953,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     clientRowId?: string | null
     searchText?: string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type ViewCreateManyTableInput = {
@@ -16870,6 +17003,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellUpdateManyWithoutRowNestedInput
   }
 
@@ -16880,6 +17014,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
     cells?: CellUncheckedUpdateManyWithoutRowNestedInput
   }
 
@@ -16890,6 +17025,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
     searchText?: NullableStringFieldUpdateOperationsInput | string | null
+    values?: JsonNullValueInput | InputJsonValue
   }
 
   export type ViewUpdateWithoutTableInput = {

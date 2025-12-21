@@ -14,6 +14,7 @@ import {
   Share2,
 } from 'lucide-react';
 
+import BulkInsertButton from './[tableId]/components/BulkInsertButton';
 import LeftSidebarNarrow from './[tableId]/components/LeftSidebarNarrow';
 import MainContent from './[tableId]/components/MainContent';
 import Sidebar from './[tableId]/components/Sidebar';
@@ -43,6 +44,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
           {/* Right: controls */}
           <div className="flex items-center gap-0.5">
+            <BulkInsertButton />
             <button className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm hover:bg-gray-100">
               <EyeOff className="h-4 w-4 text-gray-600" />
               <span className="text-gray-700">Hide fields</span>

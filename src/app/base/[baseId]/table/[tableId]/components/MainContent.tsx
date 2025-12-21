@@ -171,6 +171,7 @@ export default function MainContent() {
         tableId,
         clientRowId,
         searchText: null,
+        values: {} as Record<string, string>,
         createdAt: new Date(),
         updatedAt: new Date(),
         cells: tableMeta.columns.map(col => ({
@@ -314,11 +315,12 @@ export default function MainContent() {
                 
                   // Preserve temp cell's value if it was edited
                 const tempCell = row.cells.find(c => c.columnId === newCell.columnId);
-                if (tempCell && tempCell.value && !newCell.value) {
+                const cellValue = (newCell.value !== null && newCell.value !== undefined ? newCell.value : "") as string;
+                if (tempCell && tempCell.value && !cellValue) {
                   return { ...newCell, value: tempCell.value };
                 }
                 
-                return newCell;
+                return { ...newCell, value: cellValue };
               });
               
               return { ...newRow, cells: mergedCells };
@@ -346,7 +348,7 @@ export default function MainContent() {
   
   // Cell update mutation
   const updateCellMutation = api.table.updateCell.useMutation({
-    onSuccess: (updatedCell, variables) => {
+    onSuccess: (updatedRow, variables) => {
       // Update the cache with the server's response to ensure consistency
       utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
         if (!oldData) return oldData;
@@ -355,12 +357,18 @@ export default function MainContent() {
             ...page,
             rows: page.rows.map(row => {
               if (row.id !== variables.rowId) return row;
+              // Update the row with new values and recompute cells
+              const values = (updatedRow.values as Record<string, string>) ?? {};
+              const updatedCells = row.cells.map(cell => {
+                const newValue = values[cell.columnId];
+                return {
+                  ...cell,
+                  value: (newValue !== null && newValue !== undefined ? newValue : cell.value) ?? "",
+                };
+              });
               return {
-                ...row,
-                cells: row.cells.map(cell => {
-                  if (cell.columnId !== variables.columnId) return cell;
-                  return { ...cell, value: updatedCell.value };
-                }),
+                ...updatedRow,
+                cells: updatedCells,
               };
             }),
           })),

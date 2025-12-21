@@ -155,7 +155,8 @@ exports.Prisma.RowScalarFieldEnum = {
   updatedAt: 'updatedAt',
   tableId: 'tableId',
   clientRowId: 'clientRowId',
-  searchText: 'searchText'
+  searchText: 'searchText',
+  values: 'values'
 };
 
 exports.Prisma.CellScalarFieldEnum = {
@@ -218,6 +219,10 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -226,6 +231,12 @@ exports.Prisma.QueryMode = {
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
+};
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
 };
 
 
