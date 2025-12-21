@@ -61,6 +61,13 @@ export default function MainContent() {
   // This prevents refetches from overwriting text you're typing
   // Key: "rowId-columnId", Value: draft text
   const [localDrafts, setLocalDrafts] = useState<Map<string, string>>(new Map());
+  // Use a ref to access current localDrafts in callbacks without stale closures
+  const localDraftsRef = useRef<Map<string, string>>(new Map());
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    localDraftsRef.current = localDrafts;
+  }, [localDrafts]);
   
   // Transition mask: brief skeleton on every table switch (like Airtable)
   // This signals "context change" even when data is cached
@@ -121,7 +128,17 @@ export default function MainContent() {
   // Flatten all pages into a single rows array
   const allRows = useMemo(() => {
     if (!rowPages) return [];
-    return rowPages.pages.flatMap((page) => page.rows);
+    const rows = rowPages.pages.flatMap((page) => page.rows);
+    console.log('allRows recalculated:', rows.length, 'rows');
+    return rows;
+  }, [rowPages]);
+  
+  // Debug: log when rowPages changes
+  useEffect(() => {
+    if (rowPages) {
+      const totalRows = rowPages.pages.reduce((sum, p) => sum + p.rows.length, 0);
+      console.log('rowPages changed:', totalRows, 'total rows across', rowPages.pages.length, 'pages');
+    }
   }, [rowPages]);
 
   // Determine if we're loading (first load)
@@ -131,13 +148,21 @@ export default function MainContent() {
   const utils = api.useUtils();
   const createRowMutation = api.table.createRow.useMutation({
     onMutate: async ({ clientRowId, afterRowId }) => {
-      // Cancel outgoing refetches
-      await utils.table.getRows.cancel({ tableId });
+      console.log('onMutate called:', { clientRowId, afterRowId });
       
-      // Get the first page (we'll insert there optimistically)
-      const previousPages = utils.table.getRows.getInfiniteData({ tableId });
+      // Cancel outgoing refetches - must match the query key exactly
+      await utils.table.getRows.cancel({ tableId, limit: 200 });
       
-      if (!previousPages || !tableMeta) return { previousPages, clientRowId };
+      // Get the cached data - must match the query key exactly including limit
+      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+      
+      console.log('previousPages:', previousPages ? `exists with ${previousPages.pages.length} pages` : 'null');
+      console.log('tableMeta:', tableMeta ? 'exists' : 'null');
+      
+      if (!previousPages || !tableMeta) {
+        console.warn('Cannot do optimistic update - missing data');
+        return { previousPages, clientRowId };
+      }
       
       // Create temp row
       const tempRow = {
@@ -178,36 +203,83 @@ export default function MainContent() {
       }
       
       // Insert the temp row optimistically
-      const newPages = previousPages.pages.map((page, pIdx) => {
-        if (pIdx !== insertPageIdx) return page;
+      // We MUST use the updater function form to ensure React Query detects the change
+      // Must match the query key exactly including limit
+      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+        if (!oldData) {
+          console.warn('No oldData in setInfiniteData for row creation');
+          return oldData;
+        }
         
-        const newRows = [...page.rows];
-        newRows.splice(insertRowIdx, 0, tempRow);
+        // Create completely new arrays at every level to ensure React Query detects changes
+        const newPages = oldData.pages.map((page, pIdx) => {
+          if (pIdx !== insertPageIdx) {
+            // Still create new page object for consistency
+            return { ...page, rows: [...page.rows] };
+          }
+          
+          // Create new rows array and insert temp row
+          const newRows = [...page.rows];
+          newRows.splice(insertRowIdx, 0, tempRow);
+          
+          return {
+            ...page,
+            rows: newRows,
+            nextCursor: page.nextCursor,
+          };
+        });
         
-        return {
-          ...page,
-          rows: newRows,
+        const result = {
+          pages: newPages,
+          pageParams: [...(oldData.pageParams ?? [])],
         };
+        
+        console.log('Row creation optimistic update:', {
+          oldRowCount: oldData.pages.reduce((sum, p) => sum + p.rows.length, 0),
+          newRowCount: newPages.reduce((sum, p) => sum + p.rows.length, 0),
+          insertPageIdx,
+          insertRowIdx,
+        });
+        
+        return result;
       });
       
-      utils.table.getRows.setInfiniteData({ tableId }, {
-        ...previousPages,
-        pages: newPages,
-      });
-
-      // If this was created via keyboard insertion (Shift+Enter), move selection to the new row.
-      if (afterRowId && activeCell) {
-        // Calculate the global row index
-        let globalRowIdx = 0;
-        for (let pIdx = 0; pIdx < insertPageIdx; pIdx++) {
-          globalRowIdx += previousPages.pages[pIdx]?.rows.length ?? 0;
+      console.log('setInfiniteData called, checking if rowPages updated...');
+      // Force a check after a brief delay
+      setTimeout(() => {
+        const updated = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+        if (updated) {
+          const totalRows = updated.pages.reduce((sum, p) => sum + p.rows.length, 0);
+          console.log('Cache after update has', totalRows, 'rows');
         }
-        globalRowIdx += insertRowIdx;
-        
-        const targetColIdx = activeCell.colIdx;
-        setActiveCell({ rowIdx: globalRowIdx, colIdx: targetColIdx });
-        setIsKeyboardNav(true);
-        setTimeout(() => navigateToCell(globalRowIdx, targetColIdx), 0);
+      }, 100);
+
+      // We need to update the selection AFTER the cache update
+      // Use setTimeout to ensure the cache update has propagated
+      if (afterRowId && activeCell) {
+        setTimeout(() => {
+          // Re-read the data after update to get the correct index
+          const updatedData = utils.table.getRows.getInfiniteData({ tableId, limit: 200 });
+          if (!updatedData) return;
+          
+          // Find the temp row to get its index
+          let globalRowIdx = 0;
+          for (let pIdx = 0; pIdx < updatedData.pages.length; pIdx++) {
+            const page = updatedData.pages[pIdx];
+            if (!page) continue;
+            const tempRowIdx = page.rows.findIndex(r => r.id === `__temp__${clientRowId}`);
+            if (tempRowIdx >= 0) {
+              globalRowIdx += tempRowIdx;
+              break;
+            }
+            globalRowIdx += page.rows.length;
+          }
+          
+          const targetColIdx = activeCell.colIdx;
+          setActiveCell({ rowIdx: globalRowIdx, colIdx: targetColIdx });
+          setIsKeyboardNav(true);
+          navigateToCell(globalRowIdx, targetColIdx);
+        }, 0);
       }
       
       return { previousPages, clientRowId };
@@ -216,52 +288,52 @@ export default function MainContent() {
       if (!context) return;
       
       // Replace optimistic temp row with real row from server
-      utils.table.getRows.setInfiniteData({ tableId }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
         if (!oldData) return oldData;
         
         return {
-          ...oldData,
           pages: oldData.pages.map(page => ({
             ...page,
             rows: page.rows.map(row => {
-              if (row.id === `__temp__${context.clientRowId}`) {
+            if (row.id === `__temp__${context.clientRowId}`) {
                 // Merge: keep any cells that have local drafts
-                const mergedCells = newRow.cells.map(newCell => {
-                  const draftKey = `${row.id}-${newCell.columnId}`;
-                  const localDraft = localDrafts.get(draftKey);
-                  
-                  if (localDraft !== undefined) {
+              const mergedCells = newRow.cells.map(newCell => {
+                const draftKey = `${row.id}-${newCell.columnId}`;
+                  const localDraft = localDraftsRef.current.get(draftKey);
+                
+                if (localDraft !== undefined) {
                     // Update draft key to use new row ID
-                    setLocalDrafts(prev => {
-                      const next = new Map(prev);
+                  setLocalDrafts(prev => {
+                    const next = new Map(prev);
                       next.delete(draftKey);
                       next.set(`${newRow.id}-${newCell.columnId}`, localDraft);
-                      return next;
-                    });
-                    return { ...newCell, value: localDraft };
-                  }
-                  
-                  // Preserve temp cell's value if it was edited
-                  const tempCell = row.cells.find(c => c.columnId === newCell.columnId);
-                  if (tempCell && tempCell.value && !newCell.value) {
-                    return { ...newCell, value: tempCell.value };
-                  }
-                  
-                  return newCell;
-                });
+                    return next;
+                  });
+                  return { ...newCell, value: localDraft };
+                }
                 
-                return { ...newRow, cells: mergedCells };
-              }
-              return row;
-            }),
+                  // Preserve temp cell's value if it was edited
+                const tempCell = row.cells.find(c => c.columnId === newCell.columnId);
+                if (tempCell && tempCell.value && !newCell.value) {
+                  return { ...newCell, value: tempCell.value };
+                }
+                
+                return newCell;
+              });
+              
+              return { ...newRow, cells: mergedCells };
+            }
+            return row;
+          }),
           })),
+          pageParams: oldData.pageParams,
         };
       });
     },
     onError: (error, _variables, context) => {
       if (!context) return;
       console.log('Row creation error:', error);
-      void utils.table.getRows.invalidate({ tableId });
+      void utils.table.getRows.invalidate({ tableId, limit: 200 });
     },
     onSettled: (_data, _error, variables) => {
       setRowCreatesInFlight(prev => {
@@ -274,9 +346,43 @@ export default function MainContent() {
   
   // Cell update mutation
   const updateCellMutation = api.table.updateCell.useMutation({
+    onSuccess: (updatedCell, variables) => {
+      // Update the cache with the server's response to ensure consistency
+      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
+        if (!oldData) return oldData;
+        const newData = {
+          pages: oldData.pages.map(page => ({
+            ...page,
+            rows: page.rows.map(row => {
+              if (row.id !== variables.rowId) return row;
+              return {
+                ...row,
+                cells: row.cells.map(cell => {
+                  if (cell.columnId !== variables.columnId) return cell;
+                  return { ...cell, value: updatedCell.value };
+                }),
+              };
+            }),
+          })),
+          pageParams: oldData.pageParams,
+        };
+        
+        // Now that cache is updated, we can safely remove the local draft
+        const cellKey = `${variables.rowId}-${variables.columnId}`;
+        setTimeout(() => {
+          setLocalDrafts(prev => {
+            const next = new Map(prev);
+            next.delete(cellKey);
+            return next;
+          });
+        }, 100);
+        
+        return newData;
+      });
+    },
     onError: (error) => {
       console.error('Failed to save cell:', error);
-      void utils.table.getRows.invalidate({ tableId });
+      void utils.table.getRows.invalidate({ tableId, limit: 200 });
     },
   });
   
@@ -324,10 +430,12 @@ export default function MainContent() {
               next.delete(cellKey);
               return next;
             });
+            // DO NOT remove local draft immediately - keep it to ensure cell stays visible
+            // The value will persist in local draft until cache is confirmed updated
           }
         } catch (error) {
           console.error('Failed to autosave cell:', error);
-          void utils.table.getRows.invalidate({ tableId });
+          void utils.table.getRows.invalidate({ tableId, limit: 200 });
         } finally {
           setSavingCells((prev) => {
             const next = new Set(prev);
@@ -353,26 +461,26 @@ export default function MainContent() {
     
     setEditValue(newValue);
     
-    // Update cache immediately
-    utils.table.getRows.setInfiniteData({ tableId }, (oldData) => {
+    // Update cache immediately - ensure we always return the full structure
+    utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
       if (!oldData) return oldData;
       
       return {
-        ...oldData,
         pages: oldData.pages.map(page => ({
           ...page,
           rows: page.rows.map(row => {
-            if (row.id !== rowId) return row;
-            
-            return {
-              ...row,
-              cells: row.cells.map(cell => {
-                if (cell.columnId !== columnId) return cell;
-                return { ...cell, value: newValue };
-              }),
-            };
-          }),
+          if (row.id !== rowId) return row;
+          
+          return {
+            ...row,
+            cells: row.cells.map(cell => {
+              if (cell.columnId !== columnId) return cell;
+              return { ...cell, value: newValue };
+            }),
+          };
+        }),
         })),
+        pageParams: oldData.pageParams,
       };
     });
 
@@ -403,14 +511,34 @@ export default function MainContent() {
       currentColIdx = allColumns.findIndex(c => c.id === columnId);
     }
     
+    // IMPORTANT: Keep local draft - it ensures the cell value is always visible
+    // The local draft will be removed AFTER save succeeds and cache is confirmed updated
+    // Do NOT delete the local draft here!
+    
+    // Clear editing state
     setEditingCell(null);
     setEditValue('');
     setActiveCell({ rowIdx: currentRowIdx, colIdx: currentColIdx });
     
-    setLocalDrafts(prev => {
-      const next = new Map(prev);
-      next.delete(cellKey);
-      return next;
+    // Update cache - ensure we always return the full structure
+    utils.table.getRows.setInfiniteData({ tableId }, (oldData) => {
+      if (!oldData) return oldData;
+      return {
+        pages: oldData.pages.map(page => ({
+          ...page,
+          rows: page.rows.map(row => {
+            if (row.id !== rowId) return row;
+            return {
+              ...row,
+              cells: row.cells.map(cell => {
+                if (cell.columnId !== columnId) return cell;
+                return { ...cell, value: newValue };
+              }),
+            };
+          }),
+        })),
+        pageParams: oldData.pageParams,
+      };
     });
     
     if (!rowId.startsWith('__temp__')) {
@@ -424,9 +552,14 @@ export default function MainContent() {
           columnId,
           value: newValue,
         });
+        
+        // DO NOT remove local draft immediately after save
+        // Keep it until we're certain the cache has the updated value
+        // This ensures the cell value is always visible
+        // The local draft will be cleared on next successful refetch or after a delay
       } catch (error) {
         console.error('Failed to save cell:', error);
-        void utils.table.getRows.invalidate({ tableId });
+        void utils.table.getRows.invalidate({ tableId, limit: 200 });
       } finally {
         setCommittingCells(prev => {
           const next = new Set(prev);
@@ -456,6 +589,7 @@ export default function MainContent() {
         }
       }
     } else {
+      // For temp rows, keep the draft
       if (maintainFocus) {
         requestAnimationFrame(() => {
           const inputRef = cellInputRefs.current.get(cellKey);
@@ -517,23 +651,23 @@ export default function MainContent() {
       
       setLocalDrafts(prev => new Map(prev).set(cellKey, e.key));
 
-      utils.table.getRows.setInfiniteData({ tableId }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 200 }, (oldData) => {
         if (!oldData) return oldData;
         return {
-          ...oldData,
           pages: oldData.pages.map(page => ({
             ...page,
             rows: page.rows.map(row => {
-              if (row.id !== rowId) return row;
-              return {
-                ...row,
-                cells: row.cells.map(cell => {
-                  if (cell.columnId !== columnId) return cell;
-                  return { ...cell, value: e.key };
-                }),
-              };
-            }),
+            if (row.id !== rowId) return row;
+            return {
+              ...row,
+              cells: row.cells.map(cell => {
+                if (cell.columnId !== columnId) return cell;
+                return { ...cell, value: e.key };
+              }),
+            };
+          }),
           })),
+          pageParams: oldData.pageParams,
         };
       });
 
@@ -588,10 +722,12 @@ export default function MainContent() {
           navigateToCell(currentRowIdx + 1, 0);
         }
       }
-    } else if (e.key === 'Enter' && e.shiftKey && !isCurrentlyEditing) {
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      // Shift+Enter should create a new row, even while editing
+      // The global handler will take care of saving the cell and creating the row
       e.preventDefault();
-      setIsKeyboardNav(true);
-      handleCreateRow({ afterRowId: rowId });
+      // Let the global handler process this
+      return;
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (isCurrentlyEditing) {
@@ -722,6 +858,22 @@ export default function MainContent() {
 
       const key = e.key;
 
+      // Shift+Enter should always work to create a new row, even if an input is focused
+      if (key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        setIsKeyboardNav(true);
+        const current = allRows[activeCell.rowIdx];
+        const currentRowId = current?.id;
+        if (currentRowId) {
+          // If currently editing, save the cell first before creating a new row
+          if (editingCell?.rowId === currentRowId && editingCell?.columnId === tableMeta?.columns[activeCell.colIdx]?.id) {
+            void handleCellSave(editingCell.rowId, editingCell.columnId, false); // Save without maintaining focus
+          }
+          handleCreateRow({ afterRowId: currentRowId });
+        }
+        return; // Prevent further processing for Shift+Enter
+      }
+
       if (key === 'Tab') {
         e.preventDefault();
         setIsKeyboardNav(true);
@@ -740,6 +892,8 @@ export default function MainContent() {
         return;
       }
 
+      // If the focus is in an editable element, let it handle arrows/enter/etc.
+      // This check is now *after* Shift+Enter and Tab to ensure they are always handled by the grid.
       if (isEditableTarget) return;
 
       if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {
@@ -760,21 +914,11 @@ export default function MainContent() {
         navigateToCell(next.rowIdx, next.colIdx);
         return;
       }
-
-      if (key === 'Enter' && e.shiftKey) {
-        e.preventDefault();
-        setIsKeyboardNav(true);
-        const current = allRows[activeCell.rowIdx];
-        const currentRowId = current?.id;
-        if (currentRowId) {
-          handleCreateRow({ afterRowId: currentRowId });
-        }
-      }
     };
 
     root.addEventListener('keydown', onKeyDownCapture, { capture: true });
     return () => root.removeEventListener('keydown', onKeyDownCapture, { capture: true } as never);
-  }, [activeCell, allRows, tableMeta, navigateToCell, handleCreateRow]);
+  }, [activeCell, allRows, tableMeta, navigateToCell, handleCreateRow, editingCell, handleCellSave]);
 
   const syncFromMiddle = () => {
     const middleHeader = middleHeaderScrollRef.current;
@@ -966,244 +1110,240 @@ export default function MainContent() {
                 transform: `translateY(${paddingTop}px)`,
               }}
             >
-              <div className="flex min-w-0">
-                {/* Left body (Name cells) */}
-                <div className="w-[224px] flex-shrink-0 border-r border-gray-200">
-                  <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-                    <tbody>
+          <div className="flex min-w-0">
+          {/* Left body (Name cells) */}
+          <div className="w-[224px] flex-shrink-0 border-r border-gray-200">
+            <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <tbody>
                       {virtualItems.map((virtualRow) => {
                         const idx = virtualRow.index;
                         const row = allRows[idx];
                         if (!row) return null;
 
-                        const isHovered = hoveredRow === idx;
-                        const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
-                        const isRowHighlighted = isHovered || isKeyboardRowActive;
-                        
+                  const isHovered = hoveredRow === idx;
+                  const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
+                  const isRowHighlighted = isHovered || isKeyboardRowActive;
+                  
                         const rowId = row.id;
                         const firstColumn = tableMeta.columns[0];
                         if (!firstColumn) return null;
-                        
+                  
                         const columnId = firstColumn.id;
-                        const cellKey = `${rowId}-${columnId}`;
+                  const cellKey = `${rowId}-${columnId}`;
                         
                         const cell = row.cells.find(c => c.columnId === columnId);
                         const serverValue = cell?.value ?? '';
-                        const cellValue = localDrafts.get(cellKey) ?? serverValue;
+                  const cellValue = localDrafts.get(cellKey) ?? serverValue;
                         
-                        const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
-                        const isSaving = savingCells.has(cellKey) || pendingCells.has(cellKey);
-                        const isCommitting = committingCells.has(cellKey);
-                        const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === 0;
-                        const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
-                        
-                        return (
-                          <tr
-                            key={row.id}
-                            className={isRowHighlighted ? 'bg-gray-50' : ''}
-                            onMouseEnter={() => setHoveredRow(idx)}
-                            onMouseLeave={() => setHoveredRow(null)}
-                          >
-                            <td
-                              className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
-                                isRowHighlighted ? 'bg-gray-50' : 'bg-white'
-                              }`}
-                            >
-                              <div className="h-8 flex items-center justify-center text-xs text-gray-500 font-medium">
-                                {idx + 1}
-                              </div>
-                            </td>
-                            <td
-                              className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
-                                isRowHighlighted ? 'bg-gray-50' : 'bg-white'
-                              }`}
-                            >
-                              <input
-                                ref={(el) => {
-                                  if (el) {
-                                    cellInputRefs.current.set(cellKey, el);
-                                  } else {
-                                    cellInputRefs.current.delete(cellKey);
-                                  }
-                                }}
-                                key={`${tableId}-${row.id}-name`}
-                                type="text"
-                                className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
-                                  isEditing
-                                    ? 'bg-blue-50'
-                                    : isActive
-                                      ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
-                                      : 'focus:bg-blue-50'
-                                }`}
-                                value={isEditing ? editValue : cellValue}
-                                onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
-                                onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
-                                onBlur={() => {
-                                  if (committingCellKeyRef.current === cellKey) return;
-                                  if (isEditing) {
-                                    void handleCellSave(rowId, columnId, false);
-                                  }
-                                }}
-                                onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
-                                aria-busy={isSaving ? 'true' : 'false'}
-                                readOnly={!isEditing || isCommitting}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
+                  const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
+                  const isSaving = savingCells.has(cellKey) || pendingCells.has(cellKey);
+                  const isCommitting = committingCells.has(cellKey);
+                  const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === 0;
+                  const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
+                  
+                  return (
+                    <tr
+                      key={row.id}
+                      className={isRowHighlighted ? 'bg-gray-50' : ''}
+                      onMouseEnter={() => setHoveredRow(idx)}
+                      onMouseLeave={() => setHoveredRow(null)}
+                    >
+                      <td
+                        className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
+                          isRowHighlighted ? 'bg-gray-50' : 'bg-white'
+                        }`}
+                      >
+                        <div className="h-8 flex items-center justify-center text-xs text-gray-500 font-medium">
+                          {idx + 1}
+                        </div>
+                      </td>
+                      <td
+                        className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
+                          isRowHighlighted ? 'bg-gray-50' : 'bg-white'
+                        }`}
+                      >
+                        <input
+                          ref={(el) => {
+                            if (el) {
+                              cellInputRefs.current.set(cellKey, el);
+                            } else {
+                              cellInputRefs.current.delete(cellKey);
+                            }
+                          }}
+                          key={`${tableId}-${row.id}-name`}
+                          type="text"
+                          className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
+                            isEditing
+                              ? 'bg-blue-50'
+                              : isActive
+                                ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                : 'focus:bg-blue-50'
+                          }`}
+                          value={isEditing ? editValue : cellValue}
+                          onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
+                          onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
+                          onBlur={() => {
+                            if (committingCellKeyRef.current === cellKey) return;
+                            if (isEditing) {
+                              void handleCellSave(rowId, columnId, false);
+                            }
+                          }}
+                          onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
+                          aria-busy={isSaving ? 'true' : 'false'}
+                          readOnly={!isEditing || isCommitting}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
                     </tbody>
                   </table>
-                  {/* Add row button at the end */}
-                  {paddingBottom === 0 && (
-                    <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-                      <tbody>
-                        <tr
-                          className="cursor-pointer"
-                          onMouseEnter={() => setHoveredRow('add')}
-                          onMouseLeave={() => setHoveredRow(null)}
-                          onClick={() => handleCreateRow()}
-                          title="Insert new record in grid"
+                  {/* Add row button at the end - always visible */}
+                  <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                    <tbody>
+                      <tr
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoveredRow('add')}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        onClick={() => handleCreateRow()}
+                        title="Insert new record in grid"
+                      >
+                        <td
+                          colSpan={2}
+                          className={`h-8 border-b border-gray-200 p-0 align-middle ${
+                            hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                          }`}
                         >
-                          <td
-                            colSpan={2}
-                            className={`h-8 border-b border-gray-200 p-0 align-middle ${
-                              hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
-                            }`}
-                          >
-                            <div className={`h-8 flex items-center px-3 ${
-                              hoveredRow === 'add' ? 'text-gray-600' : 'text-gray-400'
-                            }`}>
-                              <Plus className="w-4 h-4" />
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                          <div className={`h-8 flex items-center px-3 ${
+                            hoveredRow === 'add' ? 'text-gray-600' : 'text-gray-400'
+                          }`}>
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+          </div>
 
                 {/* Middle body (other cells) */}
-                <div
-                  ref={middleScrollRef}
-                  onScroll={syncFromMiddle}
-                  className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar"
-                >
-                  <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-                    <tbody>
+          <div
+            ref={middleScrollRef}
+            onScroll={syncFromMiddle}
+            className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar"
+          >
+            <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+              <tbody>
                       {virtualItems.map((virtualRow) => {
                         const idx = virtualRow.index;
                         const row = allRows[idx];
                         if (!row) return null;
 
-                        const isHovered = hoveredRow === idx;
-                        const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
-                        const isRowHighlighted = isHovered || isKeyboardRowActive;
+                  const isHovered = hoveredRow === idx;
+                  const isKeyboardRowActive = isKeyboardNav && activeCell?.rowIdx === idx;
+                  const isRowHighlighted = isHovered || isKeyboardRowActive;
                         const rowId = row.id;
-                        
-                        return (
-                          <tr
-                            key={row.id}
-                            className={isRowHighlighted ? 'bg-gray-50' : ''}
-                            onMouseEnter={() => setHoveredRow(idx)}
-                            onMouseLeave={() => setHoveredRow(null)}
-                          >
+                  
+                  return (
+                    <tr
+                      key={row.id}
+                      className={isRowHighlighted ? 'bg-gray-50' : ''}
+                      onMouseEnter={() => setHoveredRow(idx)}
+                      onMouseLeave={() => setHoveredRow(null)}
+                    >
                             {tableMeta.columns.slice(1).map((col, cellIdx) => {
                               const columnId = col.id;
-                              const cellKey = `${rowId}-${columnId}`;
+                        const cellKey = `${rowId}-${columnId}`;
                               
                               const cell = row.cells.find(c => c.columnId === columnId);
                               const serverValue = cell?.value ?? '';
-                              const cellValue = localDrafts.get(cellKey) ?? serverValue;
+                        const cellValue = localDrafts.get(cellKey) ?? serverValue;
                               
-                              const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
-                              const isSaving = savingCells.has(cellKey) || pendingCells.has(cellKey);
-                              const isCommitting = committingCells.has(cellKey);
+                        const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
+                        const isSaving = savingCells.has(cellKey) || pendingCells.has(cellKey);
+                        const isCommitting = committingCells.has(cellKey);
                               const colIdx = cellIdx + 1;
-                              const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === colIdx;
-                              const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
-                              
-                              return (
-                                <td
-                                  key={columnId}
-                                  className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
-                                    isRowHighlighted ? 'bg-gray-50' : 'bg-white'
-                                  }`}
-                                >
-                                  <input
-                                    ref={(el) => {
-                                      if (el) {
-                                        cellInputRefs.current.set(cellKey, el);
-                                      } else {
-                                        cellInputRefs.current.delete(cellKey);
-                                      }
-                                    }}
-                                    key={`${tableId}-${rowId}-${columnId}`}
-                                    type="text"
-                                    className={`w-full h-8 pl-3 pr-2 bg-transparent outline-none table-cell-input ${
-                                      isEditing
-                                        ? 'bg-blue-50'
-                                        : isActive
-                                          ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
-                                          : 'focus:bg-blue-50'
-                                    }`}
-                                    value={isEditing ? editValue : cellValue}
-                                    onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
-                                    onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
-                                    onBlur={() => {
-                                      if (committingCellKeyRef.current === cellKey) return;
-                                      if (isEditing) {
-                                        void handleCellSave(rowId, columnId, false);
-                                      }
-                                    }}
-                                    onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
-                                    aria-busy={isSaving ? 'true' : 'false'}
-                                    readOnly={!isEditing || isCommitting}
-                                  />
-                                </td>
-                              );
-                            })}
-
-                            {/* Add column cell */}
-                            <td 
-                              className="w-28 h-8 border-0 bg-transparent"
-                              onMouseEnter={(e) => {
-                                e.stopPropagation();
-                                setHoveredRow(null);
-                              }}
-                            />
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {/* Add row button at the end */}
-                  {paddingBottom === 0 && (
-                    <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-                      <tbody>
-                        <tr
-                          className="cursor-pointer"
-                          onMouseEnter={() => setHoveredRow('add')}
-                          onMouseLeave={() => setHoveredRow(null)}
-                          onClick={() => handleCreateRow()}
-                          title="Insert new record in grid"
-                        >
+                        const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === colIdx;
+                        const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
+                        
+                        return (
                           <td
-                            colSpan={tableMeta.columns.length - 1}
-                            className={`h-8 border-r border-b border-gray-200 p-0 ${
-                              hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                                  key={columnId}
+                            className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
+                              isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                             }`}
                           >
-                            <div className="h-8" />
+                            <input
+                              ref={(el) => {
+                                if (el) {
+                                  cellInputRefs.current.set(cellKey, el);
+                                } else {
+                                  cellInputRefs.current.delete(cellKey);
+                                }
+                              }}
+                                    key={`${tableId}-${rowId}-${columnId}`}
+                              type="text"
+                              className={`w-full h-8 pl-3 pr-2 bg-transparent outline-none table-cell-input ${
+                                isEditing
+                                  ? 'bg-blue-50'
+                                  : isActive
+                                    ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                    : 'focus:bg-blue-50'
+                              }`}
+                              value={isEditing ? editValue : cellValue}
+                              onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
+                              onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
+                              onBlur={() => {
+                                if (committingCellKeyRef.current === cellKey) return;
+                                if (isEditing) {
+                                  void handleCellSave(rowId, columnId, false);
+                                }
+                              }}
+                              onKeyDown={(e) => handleCellKeyDown(e, rowId, columnId)}
+                              aria-busy={isSaving ? 'true' : 'false'}
+                              readOnly={!isEditing || isCommitting}
+                            />
                           </td>
-                          <td className="w-28 h-8 border-0 bg-transparent" />
-                        </tr>
-                      </tbody>
-                    </table>
-                  )}
+                        );
+                      })}
+
+                      {/* Add column cell */}
+                      <td 
+                        className="w-28 h-8 border-0 bg-transparent"
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
+                          setHoveredRow(null);
+                        }}
+                      />
+                    </tr>
+                  );
+                })}
+                    </tbody>
+                  </table>
+                  {/* Add row button at the end - always visible */}
+                  <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                    <tbody>
+                      <tr
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoveredRow('add')}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        onClick={() => handleCreateRow()}
+                        title="Insert new record in grid"
+                      >
+                        <td
+                          colSpan={tableMeta.columns.length - 1}
+                          className={`h-8 border-r border-b border-gray-200 p-0 ${
+                            hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                          }`}
+                        >
+                          <div className="h-8" />
+                        </td>
+                        <td className="w-28 h-8 border-0 bg-transparent" />
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
+          </div>
           </div>
         </div>
       </div>
