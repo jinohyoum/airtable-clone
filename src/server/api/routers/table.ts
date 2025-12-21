@@ -280,4 +280,89 @@ export const tableRouter = createTRPCRouter({
         },
       });
     }),
+
+  // Cursor-based paging for rows (infinite scroll)
+  getRows: protectedProcedure
+    .input(
+      z.object({
+        tableId: z.string(),
+        limit: z.number().min(1).max(500).default(200),
+        cursor: z.string().optional(), // Last row ID from previous page
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const { tableId, limit, cursor } = input;
+
+      // Get cursor row's order value if cursor is provided
+      let cursorRow: { order: number; id: string } | null = null;
+      if (cursor) {
+        cursorRow = await ctx.db.row.findUnique({
+          where: { id: cursor },
+          select: { order: true, id: true },
+        });
+      }
+
+      // Fetch rows with cursor-based pagination
+      // Using order + id for stable sorting (even if multiple rows have same order)
+      const rows = await ctx.db.row.findMany({
+        where: {
+          tableId,
+          // If cursor provided, fetch rows after that cursor
+          ...(cursorRow
+            ? {
+                OR: [
+                  {
+                    // Rows with order greater than cursor
+                    order: { gt: cursorRow.order },
+                  },
+                  {
+                    // Rows with same order but greater ID (stable sort)
+                    order: cursorRow.order,
+                    id: { gt: cursorRow.id },
+                  },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ order: "asc" }, { id: "asc" }],
+        take: limit + 1, // Fetch one extra to determine if there's a next page
+        include: {
+          cells: {
+            include: {
+              column: true,
+            },
+          },
+        },
+      });
+
+      // Determine if there are more pages
+      let nextCursor: string | undefined = undefined;
+      if (rows.length > limit) {
+        const nextItem = rows.pop(); // Remove the extra item
+        nextCursor = nextItem?.id;
+      }
+
+      return {
+        rows,
+        nextCursor,
+      };
+    }),
+
+  // Get table metadata (columns only, for use with getRows)
+  getTableMeta: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const table = await ctx.db.table.findUnique({
+        where: { id: input.tableId },
+        include: {
+          columns: {
+            orderBy: { order: "asc" },
+          },
+        },
+      });
+
+      if (!table) throw new Error("Table not found");
+
+      return table;
+    }),
 });

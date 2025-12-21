@@ -5290,6 +5290,7 @@ export namespace Prisma {
     updatedAt: Date | null
     tableId: string | null
     clientRowId: string | null
+    searchText: string | null
   }
 
   export type RowMaxAggregateOutputType = {
@@ -5299,6 +5300,7 @@ export namespace Prisma {
     updatedAt: Date | null
     tableId: string | null
     clientRowId: string | null
+    searchText: string | null
   }
 
   export type RowCountAggregateOutputType = {
@@ -5308,6 +5310,7 @@ export namespace Prisma {
     updatedAt: number
     tableId: number
     clientRowId: number
+    searchText: number
     _all: number
   }
 
@@ -5327,6 +5330,7 @@ export namespace Prisma {
     updatedAt?: true
     tableId?: true
     clientRowId?: true
+    searchText?: true
   }
 
   export type RowMaxAggregateInputType = {
@@ -5336,6 +5340,7 @@ export namespace Prisma {
     updatedAt?: true
     tableId?: true
     clientRowId?: true
+    searchText?: true
   }
 
   export type RowCountAggregateInputType = {
@@ -5345,6 +5350,7 @@ export namespace Prisma {
     updatedAt?: true
     tableId?: true
     clientRowId?: true
+    searchText?: true
     _all?: true
   }
 
@@ -5441,6 +5447,7 @@ export namespace Prisma {
     updatedAt: Date
     tableId: string
     clientRowId: string | null
+    searchText: string | null
     _count: RowCountAggregateOutputType | null
     _avg: RowAvgAggregateOutputType | null
     _sum: RowSumAggregateOutputType | null
@@ -5469,6 +5476,7 @@ export namespace Prisma {
     updatedAt?: boolean
     tableId?: boolean
     clientRowId?: boolean
+    searchText?: boolean
     cells?: boolean | Row$cellsArgs<ExtArgs>
     table?: boolean | TableDefaultArgs<ExtArgs>
     _count?: boolean | RowCountOutputTypeDefaultArgs<ExtArgs>
@@ -5481,6 +5489,7 @@ export namespace Prisma {
     updatedAt?: boolean
     tableId?: boolean
     clientRowId?: boolean
+    searchText?: boolean
     table?: boolean | TableDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["row"]>
 
@@ -5491,6 +5500,7 @@ export namespace Prisma {
     updatedAt?: boolean
     tableId?: boolean
     clientRowId?: boolean
+    searchText?: boolean
     table?: boolean | TableDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["row"]>
 
@@ -5501,9 +5511,10 @@ export namespace Prisma {
     updatedAt?: boolean
     tableId?: boolean
     clientRowId?: boolean
+    searchText?: boolean
   }
 
-  export type RowOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "order" | "createdAt" | "updatedAt" | "tableId" | "clientRowId", ExtArgs["result"]["row"]>
+  export type RowOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "order" | "createdAt" | "updatedAt" | "tableId" | "clientRowId" | "searchText", ExtArgs["result"]["row"]>
   export type RowInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     cells?: boolean | Row$cellsArgs<ExtArgs>
     table?: boolean | TableDefaultArgs<ExtArgs>
@@ -5529,6 +5540,7 @@ export namespace Prisma {
       updatedAt: Date
       tableId: string
       clientRowId: string | null
+      searchText: string | null
     }, ExtArgs["result"]["row"]>
     composites: {}
   }
@@ -5960,6 +5972,7 @@ export namespace Prisma {
     readonly updatedAt: FieldRef<"Row", 'DateTime'>
     readonly tableId: FieldRef<"Row", 'String'>
     readonly clientRowId: FieldRef<"Row", 'String'>
+    readonly searchText: FieldRef<"Row", 'String'>
   }
     
 
@@ -12944,7 +12957,8 @@ export namespace Prisma {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     tableId: 'tableId',
-    clientRowId: 'clientRowId'
+    clientRowId: 'clientRowId',
+    searchText: 'searchText'
   };
 
   export type RowScalarFieldEnum = (typeof RowScalarFieldEnum)[keyof typeof RowScalarFieldEnum]
@@ -13318,6 +13332,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Row"> | Date | string
     tableId?: StringFilter<"Row"> | string
     clientRowId?: StringNullableFilter<"Row"> | string | null
+    searchText?: StringNullableFilter<"Row"> | string | null
     cells?: CellListRelationFilter
     table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }
@@ -13329,6 +13344,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     tableId?: SortOrder
     clientRowId?: SortOrderInput | SortOrder
+    searchText?: SortOrderInput | SortOrder
     cells?: CellOrderByRelationAggregateInput
     table?: TableOrderByWithRelationInput
   }
@@ -13344,6 +13360,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Row"> | Date | string
     tableId?: StringFilter<"Row"> | string
     clientRowId?: StringNullableFilter<"Row"> | string | null
+    searchText?: StringNullableFilter<"Row"> | string | null
     cells?: CellListRelationFilter
     table?: XOR<TableScalarRelationFilter, TableWhereInput>
   }, "id" | "tableId_clientRowId">
@@ -13355,6 +13372,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     tableId?: SortOrder
     clientRowId?: SortOrderInput | SortOrder
+    searchText?: SortOrderInput | SortOrder
     _count?: RowCountOrderByAggregateInput
     _avg?: RowAvgOrderByAggregateInput
     _max?: RowMaxOrderByAggregateInput
@@ -13372,6 +13390,7 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"Row"> | Date | string
     tableId?: StringWithAggregatesFilter<"Row"> | string
     clientRowId?: StringNullableWithAggregatesFilter<"Row"> | string | null
+    searchText?: StringNullableWithAggregatesFilter<"Row"> | string | null
   }
 
   export type CellWhereInput = {
@@ -13962,6 +13981,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     clientRowId?: string | null
+    searchText?: string | null
     cells?: CellCreateNestedManyWithoutRowInput
     table: TableCreateNestedOneWithoutRowsInput
   }
@@ -13973,6 +13993,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     tableId: string
     clientRowId?: string | null
+    searchText?: string | null
     cells?: CellUncheckedCreateNestedManyWithoutRowInput
   }
 
@@ -13982,6 +14003,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUpdateManyWithoutRowNestedInput
     table?: TableUpdateOneRequiredWithoutRowsNestedInput
   }
@@ -13993,6 +14015,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUncheckedUpdateManyWithoutRowNestedInput
   }
 
@@ -14003,6 +14026,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     tableId: string
     clientRowId?: string | null
+    searchText?: string | null
   }
 
   export type RowUpdateManyMutationInput = {
@@ -14011,6 +14035,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type RowUncheckedUpdateManyInput = {
@@ -14020,6 +14045,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type CellCreateInput = {
@@ -14703,6 +14729,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     tableId?: SortOrder
     clientRowId?: SortOrder
+    searchText?: SortOrder
   }
 
   export type RowAvgOrderByAggregateInput = {
@@ -14716,6 +14743,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     tableId?: SortOrder
     clientRowId?: SortOrder
+    searchText?: SortOrder
   }
 
   export type RowMinOrderByAggregateInput = {
@@ -14725,6 +14753,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     tableId?: SortOrder
     clientRowId?: SortOrder
+    searchText?: SortOrder
   }
 
   export type RowSumOrderByAggregateInput = {
@@ -15888,6 +15917,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     clientRowId?: string | null
+    searchText?: string | null
     cells?: CellCreateNestedManyWithoutRowInput
   }
 
@@ -15897,6 +15927,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     clientRowId?: string | null
+    searchText?: string | null
     cells?: CellUncheckedCreateNestedManyWithoutRowInput
   }
 
@@ -16013,6 +16044,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Row"> | Date | string
     tableId?: StringFilter<"Row"> | string
     clientRowId?: StringNullableFilter<"Row"> | string | null
+    searchText?: StringNullableFilter<"Row"> | string | null
   }
 
   export type BaseUpsertWithoutTablesInput = {
@@ -16311,6 +16343,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     clientRowId?: string | null
+    searchText?: string | null
     table: TableCreateNestedOneWithoutRowsInput
   }
 
@@ -16321,6 +16354,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     tableId: string
     clientRowId?: string | null
+    searchText?: string | null
   }
 
   export type RowCreateOrConnectWithoutCellsInput = {
@@ -16378,6 +16412,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
     table?: TableUpdateOneRequiredWithoutRowsNestedInput
   }
 
@@ -16388,6 +16423,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tableId?: StringFieldUpdateOperationsInput | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type TableCreateWithoutViewsInput = {
@@ -16784,6 +16820,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     clientRowId?: string | null
+    searchText?: string | null
   }
 
   export type ViewCreateManyTableInput = {
@@ -16832,6 +16869,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUpdateManyWithoutRowNestedInput
   }
 
@@ -16841,6 +16879,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
     cells?: CellUncheckedUpdateManyWithoutRowNestedInput
   }
 
@@ -16850,6 +16889,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientRowId?: NullableStringFieldUpdateOperationsInput | string | null
+    searchText?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ViewUpdateWithoutTableInput = {
