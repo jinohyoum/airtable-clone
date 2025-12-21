@@ -75,11 +75,15 @@
 }
 
 .pr2 {
-  padding-right: 8px;
+  padding-right: 16px;
+}
+
+.pl2 {
+  padding-left: 16px;
 }
 
 .gap1 {
-  gap: 4px;
+  gap: 8px;
 }
 
 .align-items {
@@ -303,7 +307,7 @@
 }
 
 .colors-foreground-subtle {
-  color: rgba(0, 0, 0, 0.5);
+  color: rgb(97, 102, 112);
 }
 
 .rounded-huge {
@@ -623,7 +627,7 @@ li:hover .visually-hidden {
 }
 
 .colors-foreground-subtle {
-  color: rgba(0, 0, 0, 0.5);
+  color: rgb(97, 102, 112);
 }
 
 .quieter {
@@ -748,7 +752,7 @@ li:hover .visually-hidden {
 }
 
 .gap2 {
-  gap: 12px;
+  gap: 16px;
 }
 
 .px1 {
@@ -787,7 +791,10 @@ li:hover .visually-hidden {
 }
 
 .font-family-display-updated {
-  font-family: "Inter Display", -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family: "Inter Display", var(--font-inter), -apple-system, system-ui, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-font-smoothing: antialiased;
 }
 
 .colors-foreground-default-hover:hover {
