@@ -1002,3 +1002,22 @@ li:hover .visually-hidden {
   line-height: 18px;
   flex: 0 0 auto;
 }
+
+/* Collapsed state (may be used for UI state management) */
+.collapsed {
+  /* Empty class for state management */
+}
+
+/* Padding utilities */
+.py-half {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.pr1 {
+  padding-right: 8px;
+}
+
+.grow-1 {
+  flex-grow: 1;
+}
