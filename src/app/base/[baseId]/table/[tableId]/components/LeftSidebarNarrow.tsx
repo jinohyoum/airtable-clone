@@ -1,13 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { Loader, HelpCircle, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 export default function LeftSidebarNarrow() {
   return (
     <div className="w-14 bg-white border-r border-gray-200 flex flex-col items-center py-3 justify-between">
       {/* Top icons */}
-      <div className="flex flex-col items-center gap-2">
+      <div
+        className="flex flex-col items-center"
+        style={{
+          width: '39px',
+          height: '68px',
+          rowGap: '16px',
+          flexGrow: 0,
+          flexShrink: 0,
+          flexBasis: 'auto',
+        }}
+      >
         {/* Home icon (Airtable logo) */}
         <div className="flex items-center">
           <Link 
@@ -46,26 +56,186 @@ export default function LeftSidebarNarrow() {
           </Link>
         </div>
 
-        {/* Spinner/Loading icon */}
-        <button className="w-10 h-10 flex items-center justify-center rounded hover:bg-gray-100">
-          <Loader className="w-5 h-5 text-gray-400" />
+        {/* Omni logo */}
+        <button
+          tabIndex={0}
+          role="button"
+          aria-label="Open Omni"
+          className="flex items-center justify-center rounded hover:bg-gray-100"
+          style={{
+            width: '28px',
+            height: '28px',
+            background: 'transparent',
+            padding: 0,
+          }}
+        >
+          <img
+            src="/brand/omni-logo.png"
+            alt="Omni"
+            width={36}
+            height={36}
+            style={{
+              display: 'block',
+              width: '36px',
+              height: '36px',
+              transform: 'translate(0px, 2px)',
+            }}
+          />
         </button>
       </div>
 
       {/* Bottom icons */}
-      <div className="flex flex-col items-center gap-2">
+      <div
+        className="flex flex-col items-center"
+        style={{
+          width: '39px',
+          flexGrow: 1,
+          flexShrink: 1,
+          flexBasis: 'auto',
+          justifyContent: 'flex-end',
+          rowGap: '6px', // gap-1.5 equivalent
+        }}
+      >
         {/* Help icon */}
-        <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">
-          <HelpCircle className="w-5 h-5 text-gray-600" />
+        <button
+          className="flex items-center justify-center rounded-full hover:bg-gray-100"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '28px',
+            height: '28px',
+            flexDirection: 'row-reverse',
+            cursor: 'pointer',
+            color: 'rgb(29, 31, 37)',
+            fontFamily:
+              'apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+            fontSize: '13px',
+            lineHeight: '18px',
+            fontWeight: 400,
+            padding: 0,
+            margin: 0,
+            border: 'none',
+            background: 'transparent',
+            position: 'relative',
+            top: '-15px',
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            className="flex-none"
+            aria-hidden="true"
+            style={{
+              shapeRendering: 'geometricPrecision',
+              display: 'block',
+              color: 'rgb(29, 31, 37)',
+            }}
+          >
+            <use fill="currentColor" href="/icons/icon_definitions.svg#Question" />
+          </svg>
         </button>
 
         {/* Notification icon */}
-        <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">
-          <Bell className="w-5 h-5 text-gray-600" />
+        <button
+          className="flex items-center justify-center rounded-full hover:bg-gray-100"
+          style={{
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: 'rgb(29, 31, 37)',
+            fontFamily:
+              'apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+            fontSize: '13px',
+            lineHeight: '18px',
+            fontWeight: 400,
+            padding: 0,
+            margin: 0,
+            border: 'none',
+            background: 'transparent',
+            borderRadius: '9999px',
+            position: 'relative',
+            flexShrink: 0,
+          }}
+          aria-label="Notifications"
+        >
+          <span
+            style={{
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+            }}
+          >
+            <span
+              style={{
+                position: 'relative',
+                top: '-7px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  display: 'block',
+                  color: 'rgb(29, 31, 37)',
+                  shapeRendering: 'geometricPrecision',
+                  cursor: 'pointer',
+                  flexBasis: 'auto',
+                  flexGrow: 0,
+                  flexShrink: 0,
+                  fontFamily:
+                    'apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+                  fontSize: '13px',
+                  fontWeight: 400,
+                  lineHeight: '18px',
+                  overflow: 'hidden',
+                }}
+              >
+                <use fill="currentColor" href="/icons/icon_definitions.svg#Bell" />
+              </svg>
+            </span>
+          </span>
         </button>
 
         {/* Profile picture */}
-        <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#D97A3A] text-white font-semibold text-sm">
+        <button
+          className="flex items-center justify-center rounded-full"
+          style={{
+            width: '28px',
+            height: '28px',
+            background: '#D97A3A',
+            color: 'rgb(255, 255, 255)',
+            fontFamily:
+              'apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+            fontSize: '13px',
+            lineHeight: '18px',
+            fontWeight: 400,
+            textAlign: 'center',
+            padding: 0,
+            margin: 0,
+            cursor: 'pointer',
+            border: 'none',
+          }}
+          aria-label="Account"
+        >
           J
         </button>
       </div>
