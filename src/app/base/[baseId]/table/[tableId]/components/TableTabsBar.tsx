@@ -201,7 +201,7 @@ export default function TableTabsBar() {
         });
 
         // Update optimistic table state if it matches
-        if (optimisticTable && optimisticTable.id === id) {
+        if (optimisticTable?.id === id) {
           setOptimisticTable({ id, name });
         }
       }
@@ -214,7 +214,7 @@ export default function TableTabsBar() {
         utils.table.list.setData({ baseId }, context.previous);
       }
       const msg =
-        (error as unknown as { message?: string })?.message?.trim() ||
+        (error as unknown as { message?: string })?.message?.trim() ??
         'Failed to update table name. Please try again.';
       alert(msg);
     },
@@ -255,7 +255,7 @@ export default function TableTabsBar() {
       deleteNavRef.current = null;
 
       const msg =
-        (error as unknown as { message?: string })?.message?.trim() ||
+        (error as unknown as { message?: string })?.message?.trim() ??
         'Failed to delete table. Please try again.';
       alert(msg);
     },
@@ -275,7 +275,7 @@ export default function TableTabsBar() {
     // `tablesData` is ordered by createdAt asc in the backend router.
     const realTables = utils.table.list.getData({ baseId }) ?? tablesData ?? [];
     const leftMostRemainingTableId =
-      realTables.filter((t) => t.id !== tableIdToDelete)[0]?.id ?? null;
+      realTables.find((t) => t.id !== tableIdToDelete)?.id ?? null;
 
     try {
       // If we just deleted the active table, optimistically move somewhere valid immediately.
