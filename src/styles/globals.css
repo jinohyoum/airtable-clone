@@ -1021,3 +1021,55 @@ li:hover .visually-hidden {
 .grow-1 {
   flex-grow: 1;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Search Bar Styles                                                          */
+/* -------------------------------------------------------------------------- */
+
+.hideOnGridViewDrag {
+  /* Hide on grid view drag */
+}
+
+.findInView {
+  /* Find in view container */
+}
+
+.colors-border-default {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.rounded-big-bottom {
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.css-1uw7fyx {
+  /* Search input specific styles */
+}
+
+.colors-background-inset-control-hover:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.button-size-xsmall {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 20px;
+}
+
+.mx-quarter {
+  margin-left: 4px;
+  margin-right: 4px;
+}
+
+.css-13jexyk {
+  /* Ask Omni button specific styles */
+}
+
+/* Hide antiscroll scrollbars when search is open */
+.search-open .antiscroll-scrollbar {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}

@@ -14,7 +14,7 @@ import { api } from '~/trpc/react';
 
 type CellData = Record<string, string>;
 
-export default function MainContent() {
+export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: boolean }) {
   const params = useParams();
   const tableId = params.tableId as string;
   const isCreatingTable = tableId.startsWith('__creating__');
@@ -1111,7 +1111,7 @@ export default function MainContent() {
           <div
             ref={middleHeaderScrollRef}
             onScroll={syncFromHeader}
-            className="flex-1 min-w-0 overflow-x-auto hide-scrollbar"
+            className={`flex-1 min-w-0 ${isSearchOpen ? 'overflow-x-hidden' : 'overflow-x-auto'} hide-scrollbar`}
           >
             <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
@@ -1295,7 +1295,7 @@ export default function MainContent() {
           <div
             ref={middleScrollRef}
             onScroll={syncFromMiddle}
-            className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar"
+            className={`flex-1 min-w-0 ${isSearchOpen ? 'overflow-x-hidden' : 'overflow-x-auto'} overflow-y-hidden hide-scrollbar`}
           >
             <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <tbody>
@@ -1454,7 +1454,7 @@ export default function MainContent() {
       <div
         ref={bottomScrollRef}
         onScroll={syncFromBottom}
-        className="h-4 overflow-x-auto overflow-y-hidden bg-gray-50 border-t border-gray-200 flex-shrink-0"
+        className={`h-4 ${isSearchOpen ? 'overflow-x-hidden' : 'overflow-x-auto'} overflow-y-hidden bg-gray-50 border-t border-gray-200 flex-shrink-0`}
       >
         <div style={{ width: bottomSpacerWidth, height: 1 }} />
       </div>
