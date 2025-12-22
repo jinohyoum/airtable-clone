@@ -57,14 +57,14 @@ model Row {
   updatedAt   DateTime @updatedAt
   tableId     String
   clientRowId String?  // Client-generated UUID for idempotency
-  searchText  String?  @db.Text // Denormalized search text (concatenated cell values)
+  searchText  String   @default("") @db.Text // Denormalized search text (concatenated cell values)
   values      Json     @default("{}") // jsonb - stores cell values keyed by columnId
   cells       Cell[]
   table       Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   @@unique([tableId, clientRowId])
   @@index([tableId])
-  @@index([tableId, order])
+  @@index([tableId, order, id])
   @@index([tableId, searchText])
 }
 

@@ -45,9 +45,21 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
     api.createClient({
       links: [
         loggerLink({
-          enabled: (op) =>
-            process.env.NODE_ENV === "development" ||
-            (op.direction === "down" && op.result instanceof Error),
+          enabled: () => process.env.NODE_ENV === "development",
+          // Next.js dev overlay treats console.error as a hard error and shows a huge stack.
+          // We still log, but never via console.error to avoid noisy "red error spam" on page load.
+          // (Network/terminal still shows the real root cause.)
+          logger: (opts) => {
+            if (opts.direction === "down") {
+              const isDownError = opts.result instanceof Error;
+              const fn = isDownError ? console.warn : console.log;
+              fn(`[tRPC] down ${opts.path}`, opts.input ?? "", opts.result);
+              return;
+            }
+
+            // "up" operations don't include a `result` on the logger options type.
+            console.log(`[tRPC] up ${opts.path}`, opts.input ?? "");
+          },
         }),
         httpBatchStreamLink({
           transformer: SuperJSON,

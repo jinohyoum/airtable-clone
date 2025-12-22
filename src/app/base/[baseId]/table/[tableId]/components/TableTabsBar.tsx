@@ -23,8 +23,10 @@ type MenuEntry =
 export default function TableTabsBar() {
   const params = useParams();
   const router = useRouter();
-  const baseId = params.baseId as string;
-  const currentTableId = params.tableId as string;
+  const baseId = ((params?.baseId as string | undefined) ?? '').toString();
+  const currentTableId = ((params?.tableId as string | undefined) ?? '').toString();
+  const hasBaseId = baseId.length > 0;
+  const hasCurrentTableId = currentTableId.length > 0;
   
   const popoverId = useId();
   const buttonRef = useRef<HTMLDivElement | null>(null);
@@ -45,7 +47,10 @@ export default function TableTabsBar() {
   );
   const queuedRenameRef = useRef<{ name: string; recordTerm: string } | null>(null);
   // Fetch real tables from database
-  const { data: tablesData } = api.table.list.useQuery({ baseId });
+  const { data: tablesData } = api.table.list.useQuery(
+    { baseId: baseId ?? "" },
+    { enabled: hasBaseId },
+  );
   
   // Get utils for invalidating queries
   const utils = api.useUtils();
@@ -56,7 +61,7 @@ export default function TableTabsBar() {
       const urlParams = new URLSearchParams(window.location.search);
       const shouldShowRename = urlParams.get('showRename') === 'true';
       
-      if (shouldShowRename && tablesData) {
+      if (shouldShowRename && tablesData && hasCurrentTableId) {
         // Remove the parameter from URL immediately
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
@@ -77,7 +82,7 @@ export default function TableTabsBar() {
         }, 50);
       }
     }
-  }, [tablesData, currentTableId]);
+  }, [tablesData, currentTableId, hasCurrentTableId]);
 
   // Clear the active override once the URL has caught up
   useEffect(() => {
@@ -157,7 +162,7 @@ export default function TableTabsBar() {
     },
   });
   
-  const activeTableId = activeOverrideTableId ?? currentTableId;
+  const activeTableId = activeOverrideTableId ?? currentTableId ?? '';
 
   // Transform database tables to UI format
   const tables = (tablesData ?? []).map((table) => ({
@@ -790,6 +795,7 @@ export default function TableTabsBar() {
           onSave={async (name: string, recordTerm: string) => {
             const activeId = activeOverrideTableId ?? currentTableId;
             const currentTable = tabs.find((t) => t.id === activeId);
+            if (!activeId) return;
 
             // If we're still creating (temp id), queue the rename and close.
             if (activeId.startsWith('__creating__')) {

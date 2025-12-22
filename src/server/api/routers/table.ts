@@ -1,7 +1,34 @@
 import { z } from "zod";
 import { faker } from "@faker-js/faker";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { Prisma } from "../../../generated/prisma";
+import { Prisma } from "../../../../generated/prisma";
+
+function computeSearchText(values: Record<string, unknown>) {
+  const toSearchString = (v: unknown): string => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean" || typeof v === "bigint")
+      return String(v);
+    if (v instanceof Date) return v.toISOString();
+    if (Array.isArray(v)) return v.map(toSearchString).filter(Boolean).join(" ");
+    if (typeof v === "object") {
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  };
+
+  const parts: string[] = [];
+  for (const v of Object.values(values)) {
+    const s = toSearchString(v);
+    if (!s) continue;
+    parts.push(s);
+  }
+  return parts.join(" ").toLowerCase().replace(/\s+/g, " ").trim();
+}
 
 export const tableRouter = createTRPCRouter({
   list: protectedProcedure
@@ -92,6 +119,7 @@ export const tableRouter = createTRPCRouter({
             tableId: table.id,
             order: i,
             values: values,
+            searchText: computeSearchText(values),
           },
         });
       }
@@ -222,6 +250,7 @@ export const tableRouter = createTRPCRouter({
             order: orderToUse,
             clientRowId: input.clientRowId,
             values: values,
+            searchText: computeSearchText(values),
           },
         });
       });
@@ -297,11 +326,14 @@ export const tableRouter = createTRPCRouter({
         [input.columnId]: input.value,
       };
 
+      const searchText = computeSearchText(updatedValues);
+
       // Update the row's values JSONB column using $executeRaw for reliability
       // This works even if Prisma client hasn't regenerated
       await ctx.db.$executeRaw`
         UPDATE "Row" 
         SET "values" = ${JSON.stringify(updatedValues)}::jsonb,
+            "searchText" = ${searchText},
             "updatedAt" = NOW()
         WHERE "id" = ${input.rowId}
       `;
@@ -320,11 +352,19 @@ export const tableRouter = createTRPCRouter({
       z.object({
         tableId: z.string(),
         limit: z.number().min(1).max(500).default(200),
-        cursor: z.string().optional(), // Last row ID from previous page
+        cursor: z
+          .object({
+            order: z.number(),
+            id: z.string(),
+          })
+          .optional(), // Last row from previous page (stable cursor)
+        search: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
       const { tableId, limit, cursor } = input;
+      const q = input.search?.trim();
+      const search = q && q.length > 0 ? q : undefined;
 
       // Get columns to transform JSONB values to cells
       const table = await ctx.db.table.findUnique({
@@ -338,54 +378,67 @@ export const tableRouter = createTRPCRouter({
 
       if (!table) throw new Error("Table not found");
 
-      // Get cursor row's order value if cursor is provided
-      let cursorRow: { order: number; id: string } | null = null;
-      if (cursor) {
-        cursorRow = await ctx.db.row.findUnique({
-          where: { id: cursor },
-          select: { order: true, id: true },
-        });
-      }
+      const cursorSql = cursor
+        ? Prisma.sql`AND (r."order" > ${cursor.order} OR (r."order" = ${cursor.order} AND r."id" > ${cursor.id}))`
+        : Prisma.empty;
 
-      // Fetch rows with cursor-based pagination
-      // Using order + id for stable sorting (even if multiple rows have same order)
-      const rowsData = await ctx.db.row.findMany({
-        where: {
-          tableId,
-          // If cursor provided, fetch rows after that cursor
-          ...(cursorRow
-            ? {
-                OR: [
-                  {
-                    // Rows with order greater than cursor
-                    order: { gt: cursorRow.order },
-                  },
-                  {
-                    // Rows with same order but greater ID (stable sort)
-                    order: cursorRow.order,
-                    id: { gt: cursorRow.id },
-                  },
-                ],
-              }
-            : {}),
-        },
-        orderBy: [{ order: "asc" }, { id: "asc" }],
-        take: limit + 1, // Fetch one extra to determine if there's a next page
-      });
+      // Search behavior (take-home spec): case-insensitive "contains" across ALL cell values.
+      // We do this directly against the JSONB `values` column so search works even if `searchText`
+      // is stale/empty for older data.
+      const searchSql = search
+        ? Prisma.sql`AND EXISTS (
+            SELECT 1
+            FROM jsonb_each_text(r."values") AS kv(key, value)
+            WHERE kv.value ILIKE '%' || ${search} || '%'
+          )`
+        : Prisma.empty;
+
+      // Fetch rows with cursor-based pagination (stable order: order + id).
+      // Note: we use raw SQL here for JSONB searching.
+      const rowsQuery = Prisma.sql`
+        SELECT r."id", r."order", r."createdAt", r."updatedAt", r."tableId", r."clientRowId", r."searchText", r."values"
+        FROM "Row" r
+        WHERE r."tableId" = ${tableId}
+        ${searchSql}
+        ${cursorSql}
+        ORDER BY r."order" ASC, r."id" ASC
+        LIMIT ${limit + 1}
+      `;
+      const rowsData = await ctx.db.$queryRaw<
+        Array<{
+          id: string;
+          order: number;
+          createdAt: Date;
+          updatedAt: Date;
+          tableId: string;
+          clientRowId: string | null;
+          searchText: string;
+          values: unknown;
+        }>
+      >(rowsQuery);
 
       // Determine if there are more pages
-      let nextCursor: string | undefined = undefined;
-      let rows = rowsData;
+      let nextCursor: { order: number; id: string } | undefined = undefined;
+      const rows = [...rowsData];
       if (rows.length > limit) {
         const nextItem = rows.pop(); // Remove the extra item
-        nextCursor = nextItem?.id;
+        if (nextItem) {
+          nextCursor = { order: nextItem.order, id: nextItem.id };
+        }
       }
 
-      // Get total count for virtualizer (only on first page for performance)
-      // We return it on every page so the client always has the latest count
-      const totalCount = await ctx.db.row.count({
-        where: { tableId },
-      });
+      // Total count for the virtualizer should ignore the cursor (it represents total matching rows).
+      // We return it on every page so the client always has the latest count.
+      const countQuery = Prisma.sql`
+        SELECT COUNT(*) AS count
+        FROM "Row" r
+        WHERE r."tableId" = ${tableId}
+        ${searchSql}
+      `;
+      const totalCountResult = await ctx.db.$queryRaw<Array<{ count: bigint }>>(
+        countQuery,
+      );
+      const totalCount = Number(totalCountResult?.[0]?.count ?? 0n);
 
       // Transform JSONB values to cells array for backward compatibility
       const rowsWithCells = rows.map((row) => {
@@ -394,10 +447,10 @@ export const tableRouter = createTRPCRouter({
           const cellValue = values[column.id];
           return {
             id: `${row.id}-${column.id}`, // Synthetic ID
-            value: (cellValue !== null && cellValue !== undefined ? cellValue : "") as string,
+            value: cellValue ?? "",
             rowId: row.id,
             columnId: column.id,
-            column: column,
+            column,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
           };
@@ -436,13 +489,28 @@ export const tableRouter = createTRPCRouter({
 
   // Get total row count for a table
   getRowCount: protectedProcedure
-    .input(z.object({ tableId: z.string() }))
+    .input(z.object({ tableId: z.string(), search: z.string().optional() }))
     .query(async ({ ctx, input }) => {
-      const count = await ctx.db.row.count({
-        where: { tableId: input.tableId },
-      });
+      const q = input.search?.trim();
+      const search = q && q.length > 0 ? q : undefined;
 
-      return { count };
+      const searchSql = search
+        ? Prisma.sql`AND EXISTS (
+            SELECT 1
+            FROM jsonb_each_text(r."values") AS kv(key, value)
+            WHERE kv.value ILIKE '%' || ${search} || '%'
+          )`
+        : Prisma.empty;
+
+      const countQuery = Prisma.sql`
+        SELECT COUNT(*) AS count
+        FROM "Row" r
+        WHERE r."tableId" = ${input.tableId}
+        ${searchSql}
+      `;
+      const result = await ctx.db.$queryRaw<Array<{ count: bigint }>>(countQuery);
+
+      return { count: Number(result?.[0]?.count ?? 0n) };
     }),
 
   // Bulk insert rows - OPTIMIZED for 100k+ rows using DB-side generation
@@ -522,6 +590,7 @@ export const tableRouter = createTRPCRouter({
                 tableId: input.tableId,
                 order: startOrder + i,
                 values: values, // Only populated fields, empty object {} for other columns
+                searchText: computeSearchText(values),
               });
             }
 
@@ -546,14 +615,14 @@ export const tableRouter = createTRPCRouter({
             const orderStart = startOrder + numRowsWithFaker;
             
             // Use Prisma.sql for proper parameterization (safe from SQL injection)
-            const result = await tx.$executeRaw`
+            await tx.$executeRaw`
               INSERT INTO "Row" ("id", "tableId", "order", "values", "searchText", "createdAt", "updatedAt")
               SELECT
                 gen_random_uuid(),
                 ${input.tableId}::text,
                 ${orderStart} + s.i,
                 '{}'::jsonb,
-                NULL,
+                '',
                 NOW(),
                 NOW()
               FROM generate_series(0, ${emptyRowCount - 1}) AS s(i)

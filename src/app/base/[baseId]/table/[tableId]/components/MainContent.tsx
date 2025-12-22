@@ -14,10 +14,17 @@ import { api } from '~/trpc/react';
 
 type CellData = Record<string, string>;
 
-export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: boolean }) {
+export default function MainContent({
+  isSearchOpen = false,
+  search,
+}: {
+  isSearchOpen?: boolean;
+  search?: string;
+}) {
   const params = useParams();
-  const tableId = params.tableId as string;
-  const isCreatingTable = tableId.startsWith('__creating__');
+  const tableId = ((params.tableId as string | undefined) ?? '').toString();
+  const hasTableId = tableId.length > 0;
+  const isCreatingTable = hasTableId ? tableId.startsWith('__creating__') : false;
   
   const rootRef = useRef<HTMLDivElement | null>(null);
   const middleHeaderScrollRef = useRef<HTMLDivElement | null>(null);
@@ -108,18 +115,18 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
   
   // Fetch table metadata (columns) separately
   const { data: tableMeta } = api.table.getTableMeta.useQuery(
-    { tableId },
+    { tableId: tableId ?? "" },
     { 
-      enabled: !isCreatingTable,
+      enabled: hasTableId && !isCreatingTable,
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 30,
     },
   );
 
   // Fetch total row count from database (for accurate record count display)
-  const { data: rowCountData } = api.table.getRowCount.useQuery(
-    { tableId },
-    { enabled: !isCreatingTable },
+  const { data: rowCountData, error: rowCountError } = api.table.getRowCount.useQuery(
+    { tableId: tableId ?? "", search },
+    { enabled: hasTableId && !isCreatingTable },
   );
   
   // Infinite query for rows with cursor-based paging
@@ -129,13 +136,15 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     hasNextPage,
     isFetchingNextPage,
     isLoading: isLoadingRows,
+    error: rowsError,
   } = api.table.getRows.useInfiniteQuery(
     { 
-      tableId,
+      tableId: tableId ?? "",
       limit: 500, // Fetch 500 rows per page for smoother scrolling
+      search,
     },
     {
-      enabled: !isCreatingTable,
+      enabled: hasTableId && !isCreatingTable,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
       staleTime: 30_000, // 30 seconds
       gcTime: 1000 * 60 * 30,
@@ -168,6 +177,15 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       console.log('rowPages changed:', totalRows, 'total rows across', rowPages.pages.length, 'pages');
     }
   }, [rowPages]);
+
+  // When search changes, reset selection and scroll to the top so infinite paging + virtual rows start from row 0.
+  useEffect(() => {
+    setEditingCell(null);
+    setActiveCell(null);
+    setIsKeyboardNav(false);
+    pendingRowFocusRef.current = null;
+    rootRef.current?.scrollTo({ top: 0 });
+  }, [search, tableId]);
 
   // Fallback: Focus pending row cell if it wasn't focused in onMutate
   // This only runs if the direct focus in onMutate didn't work (e.g., row not rendered yet)
@@ -213,22 +231,25 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     onMutate: async ({ clientRowId, afterRowId }) => {
       console.log('onMutate called:', { clientRowId, afterRowId });
       
+      const hasSearchFilter = Boolean(search && search.trim().length > 0);
+
       // Cancel outgoing refetches - must match the query key exactly
-      await utils.table.getRows.cancel({ tableId, limit: 500 });
+      await utils.table.getRows.cancel({ tableId, limit: 500, search });
       
       // Get the cached data - must match the query key exactly including limit
-      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
-      const currentCount = utils.table.getRowCount.getData({ tableId });
+      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500, search });
+      const currentCount = utils.table.getRowCount.getData({ tableId, search });
       
       console.log('previousPages:', previousPages ? `exists with ${previousPages.pages.length} pages` : 'null');
       console.log('tableMeta:', tableMeta ? 'exists' : 'null');
       
       // Optimistically update the row count immediately (before server responds)
-      if (currentCount) {
-        utils.table.getRowCount.setData({ tableId }, { count: currentCount.count + 1 });
+      if (!hasSearchFilter && currentCount) {
+        utils.table.getRowCount.setData({ tableId, search }, { count: currentCount.count + 1 });
       }
       
-      if (!previousPages || !tableMeta) {
+      // If a search filter is active, a new empty row likely won't match; skip optimistic insertion.
+      if (hasSearchFilter || !previousPages || !tableMeta) {
         console.warn('Cannot do optimistic update - missing data');
         return { previousPages: undefined, clientRowId, previousCount: currentCount };
       }
@@ -239,7 +260,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
         order: 0, // Will be calculated properly by server
         tableId,
         clientRowId,
-        searchText: null,
+        searchText: '',
         values: {} as Record<string, string>,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -275,7 +296,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       // Insert the temp row optimistically
       // We MUST use the updater function form to ensure React Query detects the change
       // Must match the query key exactly including limit
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
         if (!oldData) {
           console.warn('No oldData in setInfiniteData for row creation');
           return oldData;
@@ -368,16 +389,23 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     },
     onSuccess: (newRow, variables, context) => {
       if (!context) return;
+
+      // If we skipped optimistic insertion (e.g. search filter active), just refetch.
+      if (!context.previousPages) {
+        void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+        void utils.table.getRowCount.invalidate({ tableId, search });
+        return;
+      }
       
       // Find the current active cell to maintain focus after replacing temp row
       const currentActiveCell = activeCell;
       const wasOnNewRow = currentActiveCell && 
-        utils.table.getRows.getInfiniteData({ tableId, limit: 500 })?.pages
+        utils.table.getRows.getInfiniteData({ tableId, limit: 500, search })?.pages
           .flatMap(p => p.rows)
           .some((r, idx) => r.id === `__temp__${context.clientRowId}` && idx === currentActiveCell.rowIdx);
       
       // Replace optimistic temp row with real row from server
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
         if (!oldData) return oldData;
         
         return {
@@ -403,15 +431,15 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
                 
                   // Preserve temp cell's value if it was edited
                 const tempCell = row.cells.find(c => c.columnId === newCell.columnId);
-                const cellValue = (newCell.value !== null && newCell.value !== undefined ? newCell.value : "") as string;
-                if (tempCell && tempCell.value && !cellValue) {
+                const cellValue = newCell.value ?? "";
+                if (tempCell?.value && !cellValue) {
                   return { ...newCell, value: tempCell.value };
                 }
                 
                 return { ...newCell, value: cellValue };
               });
               
-              return { ...newRow, cells: mergedCells };
+              return { ...newRow, searchText: newRow.searchText ?? '', cells: mergedCells };
             }
             return row;
           }),
@@ -424,7 +452,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       // The row index should stay the same, just the row ID changes
       if (currentActiveCell && wasOnNewRow) {
         // Update the pending focus ref to use the real row ID
-        if (pendingRowFocusRef.current && pendingRowFocusRef.current.rowId === `__temp__${context.clientRowId}`) {
+        if (pendingRowFocusRef.current?.rowId === `__temp__${context.clientRowId}`) {
           pendingRowFocusRef.current = {
             rowId: newRow.id,
             colIdx: currentActiveCell.colIdx,
@@ -463,11 +491,11 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       
       // Rollback optimistic count update on error
       if (context.previousCount) {
-        utils.table.getRowCount.setData({ tableId }, context.previousCount);
+        utils.table.getRowCount.setData({ tableId, search }, context.previousCount);
       }
       
-      void utils.table.getRows.invalidate({ tableId, limit: 500 });
-      void utils.table.getRowCount.invalidate({ tableId });
+      void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+      void utils.table.getRowCount.invalidate({ tableId, search });
     },
     onSettled: (_data, _error, variables) => {
       setRowCreatesInFlight(prev => {
@@ -492,7 +520,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     onSuccess: (_updatedCell, variables) => {
       // Update the cache with the new cell value
       // The mutation returns a simple object, so we update the cache directly
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
         if (!oldData) return oldData;
         const newData = {
           pages: oldData.pages.map(page => ({
@@ -533,22 +561,28 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     },
     onError: (error) => {
       console.error('Failed to save cell:', error);
-      void utils.table.getRows.invalidate({ tableId, limit: 500 });
+      void utils.table.getRows.invalidate({ tableId, limit: 500, search });
     },
   });
 
   const deleteRowMutation = api.table.deleteRow.useMutation({
     onMutate: async ({ rowId }) => {
-      // Cancel outgoing refetches for rows so we can optimistically update
-      await utils.table.getRows.cancel({ tableId, limit: 500 });
+      const hasSearchFilter = Boolean(search && search.trim().length > 0);
 
-      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
-      const currentCount = utils.table.getRowCount.getData({ tableId });
+      // Cancel outgoing refetches for rows so we can optimistically update
+      await utils.table.getRows.cancel({ tableId, limit: 500, search });
+
+      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500, search });
+      const currentCount = utils.table.getRowCount.getData({ tableId, search });
+
+      const rowExistsInCache = Boolean(
+        previousPages?.pages?.some((p) => p.rows.some((r) => r.id === rowId)),
+      );
 
       // Optimistically update the row count immediately (before server responds)
-      if (currentCount) {
+      if (currentCount && (!hasSearchFilter || rowExistsInCache)) {
         utils.table.getRowCount.setData(
-          { tableId },
+          { tableId, search },
           { count: Math.max(0, currentCount.count - 1) },
         );
       }
@@ -558,7 +592,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       }
 
       // Optimistically remove the row from the infinite query cache
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
         if (!oldData) return oldData;
 
         const newPages = oldData.pages.map((page, pageIdx) => {
@@ -596,12 +630,12 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       console.error('Row delete error:', error);
       if (context?.previousPages) {
         utils.table.getRows.setInfiniteData(
-          { tableId, limit: 500 },
+          { tableId, limit: 500, search },
           context.previousPages,
         );
       }
       if (context?.previousCount) {
-        utils.table.getRowCount.setData({ tableId }, context.previousCount);
+        utils.table.getRowCount.setData({ tableId, search }, context.previousCount);
       }
     },
     onSettled: (_data, _error, variables) => {
@@ -700,7 +734,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
           }
         } catch (error) {
           console.error('Failed to autosave cell:', error);
-          void utils.table.getRows.invalidate({ tableId, limit: 500 });
+          void utils.table.getRows.invalidate({ tableId, limit: 500, search });
         } finally {
           setSavingCells((prev) => {
             const next = new Set(prev);
@@ -712,7 +746,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     }, 500);
 
     autosaveTimersRef.current.set(cellKey, t);
-  }, [updateCellMutation, utils, tableId]);
+  }, [updateCellMutation, utils, tableId, search]);
   
   const handleCellChange = useCallback((rowId: string, columnId: string, newValue: string) => {
     const cellKey = `${rowId}-${columnId}`;
@@ -727,7 +761,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     setEditValue(newValue);
     
     // Update cache immediately - ensure we always return the full structure
-    utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+    utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
       if (!oldData) return oldData;
       
       return {
@@ -750,7 +784,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     });
 
     scheduleAutosave(rowId, columnId, newValue);
-  }, [utils, tableId, scheduleAutosave]);
+  }, [utils, tableId, search, scheduleAutosave]);
   
   const handleCellSave = useCallback(async (rowId: string, columnId: string, maintainFocus = true) => {
     if (editingCell?.rowId !== rowId || editingCell?.columnId !== columnId) return;
@@ -786,7 +820,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     setActiveCell({ rowIdx: currentRowIdx, colIdx: currentColIdx });
     
     // Update cache - ensure we always return the full structure
-    utils.table.getRows.setInfiniteData({ tableId }, (oldData) => {
+    utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
       if (!oldData) return oldData;
       return {
         pages: oldData.pages.map(page => ({
@@ -824,7 +858,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
         // The local draft will be cleared on next successful refetch or after a delay
       } catch (error) {
         console.error('Failed to save cell:', error);
-        void utils.table.getRows.invalidate({ tableId, limit: 500 });
+        void utils.table.getRows.invalidate({ tableId, limit: 500, search });
       } finally {
         setCommittingCells(prev => {
           const next = new Set(prev);
@@ -1009,10 +1043,10 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     }
     invalidateTimerRef.current = window.setTimeout(() => {
       invalidateTimerRef.current = null;
-      void utils.table.getRows.invalidate({ tableId, limit: 500 });
-      void utils.table.getRowCount.invalidate({ tableId });
+      void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+      void utils.table.getRowCount.invalidate({ tableId, search });
     }, 150);
-  }, [utils, tableId]);
+  }, [utils, tableId, search]);
 
   // Keep DOM focus in sync with the current activeCell selection, without spamming smooth scroll.
   useEffect(() => {
@@ -1352,6 +1386,10 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     );
   }
 
+  const loadError = rowsError ?? rowCountError;
+  const loadErrorMessage =
+    loadError instanceof Error ? loadError.message : "Unknown error";
+
   const virtualItems = rowVirtualizer.getVirtualItems();
   const totalHeight = rowVirtualizer.getTotalSize();
   const paddingTop = virtualItems.length > 0 ? virtualItems[0]?.start ?? 0 : 0;
@@ -1367,6 +1405,12 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       className="flex-1 min-h-0 flex flex-col overflow-hidden"
       style={{ backgroundColor: '#f6f8fc' }}
     >
+      {loadError ? (
+        <div className="px-3 py-2 text-sm border-b border-red-200 bg-red-50 text-red-700">
+          Failed to load rows. Check your database connection (DATABASE_URL).{" "}
+          <span className="font-mono text-xs">{loadErrorMessage}</span>
+        </div>
+      ) : null}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Fixed Header Row */}
         <div className="flex flex-shrink-0">

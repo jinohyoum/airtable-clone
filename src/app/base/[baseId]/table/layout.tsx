@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 import BulkInsertButton from './[tableId]/components/BulkInsertButton';
 import { useParams } from 'next/navigation';
-import { useState, useRef, useEffect } from 'react';
+import { useDeferredValue, useMemo, useState, useRef, useEffect } from 'react';
 import { api } from '~/trpc/react';
 import LeftSidebarNarrow from './[tableId]/components/LeftSidebarNarrow';
 import MainContent from './[tableId]/components/MainContent';
@@ -20,6 +20,12 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [isInserting, setIsInserting] = useState(false);
   const bulkInsertMutation = api.table.bulkInsertRows.useMutation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const deferredSearchInput = useDeferredValue(searchInput);
+  const search = useMemo(() => {
+    const q = deferredSearchInput.trim();
+    return q.length > 0 ? q : undefined;
+  }, [deferredSearchInput]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
@@ -90,9 +96,9 @@ export default function TableLayout({ children }: { children: ReactNode }) {
         count: totalRows,
       });
 
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, undefined);
-      await utils.table.getRows.invalidate({ tableId, limit: 500 });
-      void utils.table.getRowCount.invalidate({ tableId });
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, undefined);
+      await utils.table.getRows.invalidate({ tableId, limit: 500, search });
+      void utils.table.getRowCount.invalidate({ tableId, search });
     } catch (error) {
       console.error('Bulk insert error:', error);
       alert(`Failed to insert rows: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -683,7 +689,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                 className="p1 flex-auto css-1uw7fyx"
                 placeholder="Find in view..."
                 autoComplete="off"
-                defaultValue=""
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 style={{
                   border: '2px solid transparent',
                   background: 'transparent',
@@ -836,7 +843,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <Sidebar />
-          <MainContent isSearchOpen={isSearchOpen} />
+          <MainContent isSearchOpen={isSearchOpen} search={search} />
           {/* Keep children mounted for route completeness */}
           {children}
         </div>
