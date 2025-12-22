@@ -1,7 +1,33 @@
 'use client';
 
-import { Plus, Grid3x3, Search, MoreHorizontal, GripVertical } from 'lucide-react';
+import { Plus, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
+
+function SpriteIcon({
+  name,
+  width,
+  height,
+  className,
+}: {
+  name: string;
+  width: number;
+  height: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 16 16"
+      className={className ?? ''}
+      style={{ shapeRendering: 'geometricPrecision' }}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <use fill="currentColor" href={`/icons/icon_definitions.svg#${name}`} />
+    </svg>
+  );
+}
 
 export default function Sidebar() {
   const [width, setWidth] = useState(280);
@@ -35,7 +61,16 @@ export default function Sidebar() {
       style={{ 
         width: `${width}px`,
         transition: isResizing ? 'none' : 'width 200ms ease-in',
-        backgroundColor: 'white'
+        backgroundColor: 'white',
+        borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+        boxSizing: 'border-box',
+        color: 'rgb(29, 31, 37)',
+        fontFamily:
+          '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+        fontSize: '13px',
+        fontWeight: 400,
+        lineHeight: '18px',
+        userSelect: 'none',
       }}
     >
       <div 
@@ -66,26 +101,66 @@ export default function Sidebar() {
                 <div className="flex items-center relative">
                   <input
                     type="text"
-                    className="ignore-baymax-defaults width-full sidebar-search-input sidebar-text"
+                    className="ignore-baymax-defaults width-full stroked-blue-inset-outset-focus sidebar-search-input sidebar-text"
                     placeholder="Find a view"
                     aria-label="Find a view"
                     defaultValue=""
                     style={{
-                      paddingLeft: '32px',
-                      paddingRight: '8px',
+                      width: '100%',
+                      height: '32px',
+                      paddingLeft: '36px',
+                      paddingRight: '30px',
                       paddingTop: '6px',
                       paddingBottom: '6px',
-                      border: 'none',
-                      borderRadius: '6px',
+                      border: '1px solid transparent',
+                      borderRadius: '4px',
                       fontSize: '13px',
+                      lineHeight: '18px',
                       outline: 'none',
-                      backgroundColor: 'white',
+                      backgroundColor: 'rgb(255, 255, 255)',
+                      boxShadow: 'none',
                     }}
                   />
-                  <Search 
-                    className="w-3.5 h-3.5 flex-none absolute text-gray-500" 
-                    style={{ left: '8px' }}
-                  />
+                  {/* Exact-ish Airtable placement: icon at left, cog at right */}
+                  <div
+                    className="absolute"
+                    style={{
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: 'rgb(29, 31, 37)',
+                      opacity: 0.65,
+                    }}
+                  >
+                    <SpriteIcon name="MagnifyingGlass" width={14} height={14} className="icon" />
+                  </div>
+
+                  <div
+                    className="absolute flex items-center"
+                    style={{
+                      right: '4px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                    }}
+                  >
+                    <div
+                      tabIndex={0}
+                      role="button"
+                      className="flex items-center justify-center focus-visible cursor-pointer"
+                      aria-label="View list options"
+                      aria-haspopup="true"
+                      aria-expanded="false"
+                      aria-pressed="false"
+                      style={{
+                        width: '28px',
+                        height: '16px',
+                        color: 'rgb(29, 31, 37)',
+                      }}
+                    >
+                      <SpriteIcon name="Cog" width={16} height={16} className="flex-none icon" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -103,18 +178,23 @@ export default function Sidebar() {
                     <li
                       role="option"
                       aria-selected="true"
-                      className="rounded pointer flex relative justify-center flex-col pt1 pb1 px1-and-half sidebar-view-item-selected"
+                      className="pointer flex relative justify-center flex-col pt1 pb1 px1-and-half width-full sidebar-view-item-selected"
                       style={{
-                        backgroundColor: 'rgb(242, 244, 248)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                        borderRadius: '3px',
+                        boxSizing: 'border-box',
+                        height: '32.25px',
                       }}
                     >
                       <div className="flex items-center">
                         <div className="flex-auto flex items-center">
                           <span className="flex-inline flex-none items-center mr1">
-                            <Grid3x3 
-                              className="w-4 h-4 flex-none icon" 
-                              style={{ color: 'rgb(22, 110, 225)' }}
-                            />
+                            <span
+                              className="flex-none icon"
+                              style={{ color: 'rgb(22, 110, 225)', display: 'flex' }}
+                            >
+                              <SpriteIcon name="GridFeature" width={16} height={16} className="flex-none icon" />
+                            </span>
                           </span>
                           <span className="font-family-default text-size-default line-height-3 font-weight-strong truncate sidebar-text" style={{ color: 'rgb(29, 31, 37)' }}>
                             Grid view
@@ -137,7 +217,7 @@ export default function Sidebar() {
                           className="visually-hidden solid dragHandle flex items-center flex-none focus-visible quieter link-unquiet"
                           style={{ marginRight: '4px' }}
                         >
-                          <GripVertical className="w-4 h-4 flex-none icon" />
+                          <SpriteIcon name="DotsSixVertical" width={16} height={16} className="flex-none icon" />
                         </div>
                       </div>
                       <span
