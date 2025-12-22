@@ -243,6 +243,36 @@ export const tableRouter = createTRPCRouter({
       };
     }),
 
+  deleteRow: protectedProcedure
+    .input(
+      z.object({
+        rowId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Find the row so we can return minimal info (and validate it exists)
+      const row = await ctx.db.row.findUnique({
+        where: { id: input.rowId },
+        select: {
+          id: true,
+          tableId: true,
+        },
+      });
+
+      if (!row) {
+        throw new Error("Row not found");
+      }
+
+      await ctx.db.row.delete({
+        where: { id: input.rowId },
+      });
+
+      return {
+        id: row.id,
+        tableId: row.tableId,
+      };
+    }),
+
   updateCell: protectedProcedure
     .input(
       z.object({

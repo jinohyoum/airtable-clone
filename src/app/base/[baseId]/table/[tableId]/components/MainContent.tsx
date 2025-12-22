@@ -47,6 +47,8 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
   const [committingCells, setCommittingCells] = useState<Set<string>>(new Set());
   // Track row creation inflight by clientRowId so global "Saving…" reflects row inserts too (supports rapid clicks).
   const [rowCreatesInFlight, setRowCreatesInFlight] = useState<Set<string>>(new Set());
+  // Track row deletions inflight so global "Saving…" reflects deletes as well.
+  const [rowDeletesInFlight, setRowDeletesInFlight] = useState<Set<string>>(new Set());
   // Track the most recent row creation that needs focus (using ref to avoid stale closures)
   const pendingRowFocusRef = useRef<{ rowId: string; colIdx: number; rowIdx: number } | null>(null);
 
@@ -79,7 +81,10 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
   useEffect(() => {
     if (typeof window === 'undefined') return;
     // Include non-cell mutations (like row creation) so the global indicator matches Airtable-like UX.
-    const count = new Set<string>([...pendingCells, ...savingCells]).size + rowCreatesInFlight.size;
+    const count =
+      new Set<string>([...pendingCells, ...savingCells]).size +
+      rowCreatesInFlight.size +
+      rowDeletesInFlight.size;
     window.dispatchEvent(
       new CustomEvent('grid:saving', { detail: { count } }),
     );
@@ -87,7 +92,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       // Clear on unmount so we don't leave a stale indicator visible after route changes.
       window.dispatchEvent(new CustomEvent('grid:saving', { detail: { count: 0 } }));
     };
-  }, [pendingCells, savingCells, rowCreatesInFlight]);
+  }, [pendingCells, savingCells, rowCreatesInFlight, rowDeletesInFlight]);
 
   // Cleanup any pending autosave timers on unmount / table switch.
   useEffect(() => {
@@ -469,6 +474,34 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     },
   });
   
+  // Navigate to a specific cell by row/column index
+  const navigateToCell = useCallback((rowIdx: number, colIdx: number) => {
+    const targetRow = allRows[rowIdx];
+    if (!targetRow || !tableMeta) return;
+    
+    const targetColumn = tableMeta.columns[colIdx];
+    if (!targetColumn) return;
+    
+    const rowId = targetRow.id;
+    const columnId = targetColumn.id;
+    
+    setActiveCell({ rowIdx, colIdx });
+    
+    const cellKey = `${rowId}-${columnId}`;
+    const inputRef = cellInputRefs.current.get(cellKey);
+    if (inputRef) {
+      inputRef.focus();
+      try {
+        const len = inputRef.value?.length ?? 0;
+        inputRef.setSelectionRange(len, len);
+      } catch {
+        // Ignore
+      }
+      
+      inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }, [allRows, tableMeta]);
+
   // Cell update mutation
   const updateCellMutation = api.table.updateCell.useMutation({
     onSuccess: (_updatedCell, variables) => {
@@ -518,6 +551,87 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       void utils.table.getRows.invalidate({ tableId, limit: 500 });
     },
   });
+
+  const deleteRowMutation = api.table.deleteRow.useMutation({
+    onMutate: async ({ rowId }) => {
+      // Cancel outgoing refetches for rows so we can optimistically update
+      await utils.table.getRows.cancel({ tableId, limit: 500 });
+
+      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
+      const currentCount = utils.table.getRowCount.getData({ tableId });
+
+      // Optimistically update the row count immediately (before server responds)
+      if (currentCount) {
+        utils.table.getRowCount.setData(
+          { tableId },
+          { count: Math.max(0, currentCount.count - 1) },
+        );
+      }
+
+      if (!previousPages) {
+        return { previousPages: undefined, previousCount: currentCount };
+      }
+
+      // Optimistically remove the row from the infinite query cache
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+        if (!oldData) return oldData;
+
+        const newPages = oldData.pages.map((page, pageIdx) => {
+          const newRows = page.rows.filter((r) => r.id !== rowId);
+          const currentTotal = page.totalCount ?? 0;
+
+          return {
+            ...page,
+            rows: newRows,
+            // Keep totalCount in sync on the first page so virtualizer + footer stay accurate
+            totalCount: pageIdx === 0 ? Math.max(0, currentTotal - 1) : page.totalCount,
+          };
+        });
+
+        return {
+          pages: newPages,
+          pageParams: oldData.pageParams ? [...oldData.pageParams] : [],
+        };
+      });
+
+      // Clear any local drafts for this row so we don't leak stale entries
+      setLocalDrafts((prev) => {
+        const next = new Map(prev);
+        for (const key of prev.keys()) {
+          if (key.startsWith(`${rowId}-`)) {
+            next.delete(key);
+          }
+        }
+        return next;
+      });
+
+      return { previousPages, previousCount: currentCount };
+    },
+    onError: (error, _variables, context) => {
+      console.error('Row delete error:', error);
+      if (context?.previousPages) {
+        utils.table.getRows.setInfiniteData(
+          { tableId, limit: 500 },
+          context.previousPages,
+        );
+      }
+      if (context?.previousCount) {
+        utils.table.getRowCount.setData({ tableId }, context.previousCount);
+      }
+    },
+    onSettled: (_data, _error, variables) => {
+      if (variables?.rowId) {
+        setRowDeletesInFlight((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.rowId);
+          return next;
+        });
+      }
+
+      void utils.table.getRows.invalidate({ tableId, limit: 500 });
+      void utils.table.getRowCount.invalidate({ tableId });
+    },
+  });
   
   const handleCreateRow = useCallback((opts?: { afterRowId?: string }) => {
     if (isCreatingTable) return;
@@ -527,6 +641,45 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     
     createRowMutation.mutate({ tableId, clientRowId, afterRowId: opts?.afterRowId });
   }, [isCreatingTable, tableId, createRowMutation]);
+
+  const handleDeleteRow = useCallback(
+    (rowId: string, rowIdx: number, colIdx: number) => {
+      if (!rowId) return;
+      // For now, only send deletes for persisted rows; temporary (optimistic) rows will
+      // naturally disappear once their create completes or the view is refreshed.
+      if (rowId.startsWith('__temp__')) return;
+
+      // Prevent duplicate deletes for the same row while one is in flight.
+      if (rowDeletesInFlight.has(rowId)) return;
+
+      setRowDeletesInFlight((prev) => {
+        const next = new Set(prev);
+        next.add(rowId);
+        return next;
+      });
+
+      // Decide which row to move selection/focus to after this row is removed.
+      const hasMoreThanOneRow = allRows.length > 1;
+      if (hasMoreThanOneRow) {
+        const nextRowIdx = rowIdx > 0 ? rowIdx - 1 : 0;
+        setActiveCell({ rowIdx: nextRowIdx, colIdx });
+
+        // After React/virtualizer update, move actual DOM focus to the next cell.
+        requestAnimationFrame(() => {
+          navigateToCell(nextRowIdx, colIdx);
+        });
+      } else {
+        // No rows left after delete → clear active cell and keep focus inside grid.
+        setActiveCell(null);
+        requestAnimationFrame(() => {
+          rootRef.current?.focus();
+        });
+      }
+
+      deleteRowMutation.mutate({ rowId });
+    },
+    [allRows.length, deleteRowMutation, navigateToCell, rowDeletesInFlight],
+  );
   
   // Handle cell editing with local draft state
   const handleCellClick = useCallback((rowId: string, columnId: string, currentValue: string, rowIdx: number, colIdx: number) => {
@@ -872,34 +1025,6 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     }
   }, [allRows, tableMeta, editingCell, committingCells, utils, tableId, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow]);
   
-  // Navigate to a specific cell by row/column index
-  const navigateToCell = useCallback((rowIdx: number, colIdx: number) => {
-    const targetRow = allRows[rowIdx];
-    if (!targetRow || !tableMeta) return;
-    
-    const targetColumn = tableMeta.columns[colIdx];
-    if (!targetColumn) return;
-    
-    const rowId = targetRow.id;
-    const columnId = targetColumn.id;
-    
-    setActiveCell({ rowIdx, colIdx });
-    
-    const cellKey = `${rowId}-${columnId}`;
-    const inputRef = cellInputRefs.current.get(cellKey);
-    if (inputRef) {
-      inputRef.focus();
-      try {
-        const len = inputRef.value?.length ?? 0;
-        inputRef.setSelectionRange(len, len);
-      } catch {
-        // Ignore
-      }
-      
-      inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-    }
-  }, [allRows, tableMeta]);
-  
   // Show transition mask on table switch
   useEffect(() => {
     if (prevTableIdRef.current !== tableId && !isCreatingTable) {
@@ -1009,6 +1134,18 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
           handleCreateRow({ afterRowId: currentRowId });
         }
         return; // Prevent further processing for Shift+Enter
+      }
+
+      // Ctrl+Backspace → delete the currently active row (optimistic)
+      if (key === 'Backspace' && e.ctrlKey) {
+        e.preventDefault();
+        const currentRowIdx = activeCell.rowIdx;
+        const current = allRows[currentRowIdx];
+        const currentRowId = current?.id;
+        if (currentRowId) {
+          handleDeleteRow(currentRowId, currentRowIdx, activeCell.colIdx);
+        }
+        return;
       }
 
       if (key === 'Tab') {
@@ -1171,6 +1308,8 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
   return (
     <div
       ref={rootRef}
+      tabIndex={0}
+      onMouseDown={() => rootRef.current?.focus()}
       className="flex-1 min-h-0 flex flex-col overflow-hidden"
       style={{ backgroundColor: '#f6f8fc' }}
     >

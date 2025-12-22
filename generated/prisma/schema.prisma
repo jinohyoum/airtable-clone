@@ -79,7 +79,7 @@ model Row {
 }
 
 model Cell {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid())Control backspace doesnt work to delete cells. make sure its optimized  and is optimistic
   value     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
