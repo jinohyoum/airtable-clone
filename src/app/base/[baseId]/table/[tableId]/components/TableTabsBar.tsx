@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -380,7 +380,19 @@ export default function TableTabsBar() {
         ),
         right: (
           <div className="css-1l4uiyf css-1pi0isa pill px1 flex-inline items-center flex-none text-size-small ml1">
-            <Plus className="flex-none mr-half" style={{ width: 12, height: 12 }} />
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              className="flex-none mr-half"
+              style={{ shapeRendering: 'geometricPrecision' }}
+              aria-hidden="true"
+            >
+              <use
+                fill="currentColor"
+                href="/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66#Plus"
+              />
+            </svg>
             Business
           </div>
         ),
@@ -628,29 +640,49 @@ export default function TableTabsBar() {
         ))}
 
         {/* Add or import button */}
-        <div
-          ref={buttonRef}
-          tabIndex={0}
-          role="button"
-          className="pointer flex items-center flex-none focus-visible-opaque rounded px1-and-half top-bar-text-dark top-bar-text-dark-hover focus-visible"
-          id="addTableButton"
-          aria-expanded={isOpen}
-          aria-haspopup="true"
-          aria-label="Add or import table"
-          data-tutorial-selector-id="addTableButton"
-          style={{ height: '32px' }}
-          onClick={() => {
-            setIsOpen((v) => {
-              const next = !v;
-              if (next) setActiveItemIndex(0);
-              return next;
-            });
-          }}
-        >
-          <Plus className="w-4 h-4 flex-none my-half" />
-          <p className="table-tab-text ml1">
-            Add or import
-          </p>
+        <div className="flex-none flex relative css-11vhnav">
+          <div
+            ref={buttonRef}
+            tabIndex={0}
+            role="button"
+            className="pointer flex items-center flex-none focus-visible-opaque rounded px1-and-half top-bar-text-dark focus-visible"
+            id="id_aef449bbafea42dc34427b2eed027b76"
+            aria-expanded={isOpen}
+            aria-haspopup="true"
+            aria-label="Add or import table"
+            data-tutorial-selector-id="addTableButton"
+            style={{ height: 32 }}
+            aria-description={
+              tabs.length >= 3 ? 'Tooltip: Add or import table' : undefined
+            }
+            onClick={() => {
+              setIsOpen((v) => {
+                const next = !v;
+                if (next) setActiveItemIndex(0);
+                return next;
+              });
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              className="flex-none flex-none my-half"
+              style={{ shapeRendering: 'geometricPrecision' }}
+            >
+              <use
+                fill="currentColor"
+                href="/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66#Plus"
+              />
+            </svg>
+            {tabs.length < 3 && (
+              <p
+                className="font-family-default text-size-default line-height-3 font-weight-default ml1"
+              >
+                Add or import
+              </p>
+            )}
+          </div>
         </div>
       </nav>
 

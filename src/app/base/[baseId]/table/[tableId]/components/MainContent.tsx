@@ -977,14 +977,10 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       if (e.shiftKey) {
         if (currentColIdx > 0) {
           navigateToCell(currentRowIdx, currentColIdx - 1);
-        } else if (currentRowIdx > 0) {
-          navigateToCell(currentRowIdx - 1, allColumns.length - 1);
         }
       } else {
         if (currentColIdx < allColumns.length - 1) {
           navigateToCell(currentRowIdx, currentColIdx + 1);
-        } else if (currentRowIdx < allRows.length - 1) {
-          navigateToCell(currentRowIdx + 1, 0);
         }
       }
     } else if (e.key === 'Enter' && e.shiftKey) {
@@ -1218,12 +1214,8 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
 
         if (e.shiftKey) {
           if (activeCell.colIdx > 0) navigateToCell(activeCell.rowIdx, activeCell.colIdx - 1);
-          else if (activeCell.rowIdx > 0) {
-            navigateToCell(activeCell.rowIdx - 1, maxCol);
-          }
         } else {
           if (activeCell.colIdx < maxCol) navigateToCell(activeCell.rowIdx, activeCell.colIdx + 1);
-          else if (activeCell.rowIdx < allRows.length - 1) navigateToCell(activeCell.rowIdx + 1, 0);
         }
         return;
       }
@@ -1566,16 +1558,31 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
                         title="Insert new record in grid"
                       >
                         <td
-                          colSpan={2}
-                          className={`h-8 border-b border-gray-200 p-0 align-middle ${
+                          className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
                             hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                           }`}
                         >
-                          <div className={`h-8 flex items-center px-3 ${
-                            hoveredRow === 'add' ? 'text-gray-600' : 'text-gray-400'
-                          }`}>
-                            <Plus className="w-4 h-4" />
+                          <div className="h-8 flex items-center justify-center text-gray-500">
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 16 16"
+                              className="flex-none icon"
+                              style={{ shapeRendering: 'geometricPrecision' }}
+                            >
+                              <use
+                                fill="currentColor"
+                                href="/icons/icon_definitions.svg#Plus"
+                              />
+                            </svg>
                           </div>
+                        </td>
+                        <td
+                          className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
+                            hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                          }`}
+                        >
+                          <div className="h-8" />
                         </td>
                       </tr>
                     </tbody>
@@ -1714,14 +1721,16 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
                         onClick={() => handleCreateRow()}
                         title="Insert new record in grid"
                       >
-                        <td
-                          colSpan={tableMeta.columns.length - 1}
-                          className={`h-8 border-r border-b border-gray-200 p-0 ${
-                            hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
-                          }`}
-                        >
-                          <div className="h-8" />
-                        </td>
+                        {tableMeta.columns.slice(1).map((col) => (
+                          <td
+                            key={col.id}
+                            className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
+                              hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                            }`}
+                          >
+                            <div className="h-8 pl-3 pr-2" />
+                          </td>
+                        ))}
                         <td className="w-28 h-8 border-0 bg-transparent" />
                       </tr>
                     </tbody>
