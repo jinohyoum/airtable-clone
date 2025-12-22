@@ -1333,7 +1333,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
                               ? 'bg-blue-50'
                               : isActive
                                 ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
-                                : 'focus:bg-blue-50'
+                                : ''
                           }`}
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
@@ -1471,7 +1471,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
                                   ? 'bg-blue-50'
                                   : isActive
                                     ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
-                                    : 'focus:bg-blue-50'
+                                    : ''
                               }`}
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
