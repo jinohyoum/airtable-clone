@@ -7,6 +7,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { api } from '~/trpc/react';
 import TableCreationDropdown from './TableCreationDropdown';
 
+const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
+
 type MenuEntry =
   | { kind: 'heading'; label: string }
   | { kind: 'divider' }
@@ -33,11 +35,21 @@ export default function TableTabsBar() {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLUListElement | null>(null);
 
+  const tableMenuId = useId();
+  const tableMenuButtonRef = useRef<HTMLDivElement | null>(null);
+  const tableMenuPopoverRef = useRef<HTMLDivElement | null>(null);
+  const tableMenuRef = useRef<HTMLUListElement | null>(null);
+
   const [isOpen, setIsOpen] = useState(false);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number; maxH: number } | null>(
     null,
   );
+
+  const [isTableMenuOpen, setIsTableMenuOpen] = useState(false);
+  const [tableMenuPos, setTableMenuPos] = useState<
+    { x: number; y: number; maxH: number; maxW: number } | null
+  >(null);
   const [showRenameForm, setShowRenameForm] = useState(false);
   const [renameFormPos, setRenameFormPos] = useState<{ x: number; y: number } | null>(null);
   const [activeOverrideTableId, setActiveOverrideTableId] = useState<string | null>(null);
@@ -494,6 +506,28 @@ export default function TableTabsBar() {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isTableMenuOpen) return;
+
+    const tabEl = document.getElementById(`tableTab-${activeTableId}`);
+    const rect = tabEl?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Align popover's LEFT edge to the active table tab's LEFT edge.
+    const width = 330;
+    const rawX = Math.round(rect.left);
+    const x = Math.max(8, Math.min(rawX, window.innerWidth - width - 8));
+    const y = Math.round(rect.bottom + 8);
+    const maxH = Math.max(240, Math.min(670, window.innerHeight - y - 16));
+    const maxW = Math.max(width, Math.min(window.innerWidth - 16, 1295.88));
+    setTableMenuPos({ x, y, maxH, maxW });
+  }, [isTableMenuOpen, activeTableId]);
+
+  // If the active table changes, close the menu (matches Airtable behavior).
+  useEffect(() => {
+    setIsTableMenuOpen(false);
+  }, [activeTableId]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     // Focus the menu container so arrow keys work immediately.
@@ -501,6 +535,14 @@ export default function TableTabsBar() {
       menuRef.current?.focus();
     });
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isTableMenuOpen) return;
+
+    queueMicrotask(() => {
+      tableMenuRef.current?.focus();
+    });
+  }, [isTableMenuOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -528,6 +570,33 @@ export default function TableTabsBar() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isTableMenuOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const pop = tableMenuPopoverRef.current;
+      const btn = tableMenuButtonRef.current;
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (pop?.contains(t)) return;
+      if (btn?.contains(t)) return;
+      setIsTableMenuOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsTableMenuOpen(false);
+      tableMenuButtonRef.current?.focus();
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isTableMenuOpen]);
 
   const onMenuKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
@@ -612,12 +681,20 @@ export default function TableTabsBar() {
                       }
                     }}
                     style={{
-                      paddingRight: table.isActive ? '32px' : '12px',
+                      paddingRight: table.isActive ? '40px' : '12px',
                       outlineOffset: '-5px',
                       color: 'inherit',
                     }}
                   >
-                    <span className="truncate-pre" aria-description={`Tooltip: ${table.name}`}>
+                    <span
+                      className={table.isActive ? 'truncate-pre strong' : 'truncate-pre'}
+                      aria-description={`Tooltip: ${table.name}`}
+                      style={
+                        table.isActive
+                          ? { fontWeight: 500, color: 'rgb(29, 31, 37)', lineHeight: '18px' }
+                          : undefined
+                      }
+                    >
                       {table.name}
                     </span>
                   </a>
@@ -627,11 +704,29 @@ export default function TableTabsBar() {
                   >
                     {table.isActive && !table.isOptimistic && (
                       <div
+                        ref={tableMenuButtonRef}
                         tabIndex={0}
                         role="button"
-                        className="pointer flex-none focus-visible focus-visible-opaque ml1 flex items-center colors-foreground-subtle colors-foreground-default-parent-hover"
+                        className="pointer flex-none focus-visible focus-visible-opaque ml1 flex items-center colors-foreground-subtle colors-foreground-default-parent-hover table-tab-menu-trigger"
                         aria-label={`${table.name} table options`}
                         data-tutorial-selector-id="openTableMenuButton"
+                        aria-haspopup="true"
+                        aria-expanded={isTableMenuOpen}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Close "Add/import" if open.
+                          setIsOpen(false);
+                          setIsTableMenuOpen((v) => !v);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsOpen(false);
+                            setIsTableMenuOpen((v) => !v);
+                          }
+                        }}
                       >
                         <ChevronDown className="w-4 h-4 flex-none icon" />
                       </div>
@@ -784,6 +879,278 @@ export default function TableTabsBar() {
                 </li>
               );
             })}
+          </ul>
+        </div>
+      )}
+
+      {isTableMenuOpen && tableMenuPos && (
+        <div
+          ref={tableMenuPopoverRef}
+          role="dialog"
+          tabIndex={-1}
+          className="baymax rounded-big focus-visible shadow-elevation-high colors-background-raised-popover light-scrollbar"
+          data-element-owned-by={`tableTab-${activeTableId}`}
+          style={{
+            position: 'fixed',
+            inset: '0px auto auto 0px',
+            width: 330,
+            zIndex: 5,
+            transform: `translate3d(${tableMenuPos.x}px, ${tableMenuPos.y}px, 0px)`,
+            maxHeight: tableMenuPos.maxH,
+            maxWidth: tableMenuPos.maxW,
+            overflowY: 'auto',
+            fontFamily:
+              '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+            fontSize: 13,
+            fontWeight: 400,
+            lineHeight: '18px',
+            color: 'rgb(29, 31, 37)',
+          }}
+        >
+          <ul
+            id={`${tableMenuId}-menu`}
+            ref={tableMenuRef}
+            role="menu"
+            tabIndex={-1}
+            className="p1-and-half"
+          >
+            <li role="presentation">
+              <div
+                id={`${tableMenuId}-importData`}
+                role="menuitem"
+                tabIndex={-1}
+                className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+                aria-haspopup="true"
+                aria-expanded="false"
+                onClick={() => {
+                  // UI parity only for now; submenu not implemented yet.
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  className="flex-none flex-none mr1 colors-foreground-default"
+                  aria-hidden="true"
+                  style={{ shapeRendering: 'geometricPrecision' }}
+                >
+                  <use fill="currentColor" href={`${ICON_SPRITE}#ArrowCircleUp`} />
+                </svg>
+                <span className="truncate flex-auto no-user-select">Import data</span>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  className="flex-none flex-none ml1 colors-foreground-default"
+                  style={{ shapeRendering: 'geometricPrecision', transform: 'rotate(-90deg)' }}
+                  aria-hidden="true"
+                >
+                  <use fill="currentColor" href={`${ICON_SPRITE}#ChevronDown`} />
+                </svg>
+              </div>
+            </li>
+
+            <li role="presentation" className="m1 colors-background-selected" style={{ height: 1 }} />
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-renameTable"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              aria-disabled="false"
+              onClick={() => {
+                // Optional: wire real rename flow later.
+                setIsTableMenuOpen(false);
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#PencilSimple`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">Rename table</span>
+            </li>
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-setTableIsHiddenFromSwitcher"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              aria-disabled="false"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#EyeSlash`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">Hide table</span>
+            </li>
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#FadersHorizontal`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">
+                <div className="flex items-center justify-between">Manage fields</div>
+              </span>
+            </li>
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-duplicateTable"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              aria-disabled="false"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#Copy`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">Duplicate table</span>
+            </li>
+
+            <li role="presentation" className="m1 colors-background-selected" style={{ height: 1 }} />
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-dateDependencySettings"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#Gantt`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">
+                <div className="flex items-center justify-between">Configure date dependencies</div>
+              </span>
+            </li>
+
+            <li role="presentation" className="m1 colors-background-selected" style={{ height: 1 }} />
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-editTableDescription"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              aria-disabled="false"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#Info`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">Edit table description</span>
+            </li>
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-editTablePermissions"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#Lock`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">
+                <div className="flex items-center justify-between">Edit table permissions</div>
+              </span>
+            </li>
+
+            <li role="presentation" className="m1 colors-background-selected" style={{ height: 1 }} />
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-clearAllTableData"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              aria-disabled="false"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#X`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">Clear data</span>
+            </li>
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              data-tutorial-selector-id="tableMenuItem-deleteTable"
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
+              aria-disabled="false"
+              onClick={() => setIsTableMenuOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none flex-none mr1 colors-foreground-default"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#Trash`} />
+              </svg>
+              <span className="truncate flex-auto no-user-select">Delete table</span>
+            </li>
           </ul>
         </div>
       )}
