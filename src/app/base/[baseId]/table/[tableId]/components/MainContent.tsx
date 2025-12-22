@@ -47,6 +47,8 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
   const [committingCells, setCommittingCells] = useState<Set<string>>(new Set());
   // Track row creation inflight by clientRowId so global "Saving…" reflects row inserts too (supports rapid clicks).
   const [rowCreatesInFlight, setRowCreatesInFlight] = useState<Set<string>>(new Set());
+  // Track the most recent row creation that needs focus (using ref to avoid stale closures)
+  const pendingRowFocusRef = useRef<{ rowId: string; colIdx: number; rowIdx: number } | null>(null);
 
   // Prevent double-saves: saving a focused input temporarily disables it, which triggers blur.
   // That blur should NOT trigger another save (otherwise focus restoration gets lost).
@@ -158,6 +160,41 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     }
   }, [rowPages]);
 
+  // Fallback: Focus pending row cell if it wasn't focused in onMutate
+  // This only runs if the direct focus in onMutate didn't work (e.g., row not rendered yet)
+  useEffect(() => {
+    const pending = pendingRowFocusRef.current;
+    if (!pending || !tableMeta || !activeCell) return;
+    
+    // Only focus if the activeCell matches the pending row index (ensures we focus the correct row)
+    if (activeCell.rowIdx !== pending.rowIdx) return;
+    
+    const targetColumn = tableMeta.columns[pending.colIdx];
+    if (!targetColumn) return;
+    
+    const cellKey = `${pending.rowId}-${targetColumn.id}`;
+    
+    // Use queueMicrotask + requestAnimationFrame to ensure this runs after render
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        const inputRef = cellInputRefs.current.get(cellKey);
+        
+        // Only focus if ref exists and we haven't already focused (check if still pending)
+        if (inputRef && pendingRowFocusRef.current?.rowId === pending.rowId) {
+          inputRef.focus();
+          try {
+            const len = inputRef.value?.length ?? 0;
+            inputRef.setSelectionRange(len, len);
+          } catch {
+            // Ignore
+          }
+          inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+          pendingRowFocusRef.current = null; // Clear after successful focus
+        }
+      });
+    });
+  }, [allRows, activeCell, tableMeta]); // Only run when allRows changes (row actually appears)
+
   // Determine if we're loading (first load)
   const isLoading = isLoadingRows && allRows.length === 0;
   
@@ -235,6 +272,9 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
           return oldData;
         }
         
+        // Get current totalCount from first page
+        const currentTotalCount = oldData.pages[0]?.totalCount ?? 0;
+        
         // Create completely new arrays at every level to ensure React Query detects changes
         const newPages = oldData.pages.map((page, pIdx) => {
           if (pIdx !== insertPageIdx) {
@@ -250,12 +290,14 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
             ...page,
             rows: newRows,
             nextCursor: page.nextCursor,
+            // Update totalCount on first page to reflect new row
+            totalCount: pIdx === 0 ? currentTotalCount + 1 : page.totalCount,
           };
         });
         
         const result = {
           pages: newPages,
-          pageParams: [...(oldData.pageParams ?? [])],
+          pageParams: oldData.pageParams ? [...oldData.pageParams] : [],
         };
         
         console.log('Row creation optimistic update:', {
@@ -263,53 +305,67 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
           newRowCount: newPages.reduce((sum, p) => sum + p.rows.length, 0),
           insertPageIdx,
           insertRowIdx,
+          totalCount: newPages[0]?.totalCount,
         });
         
+        // Return new object to ensure React Query detects the change
         return result;
       });
       
-      console.log('setInfiniteData called, checking if rowPages updated...');
-      // Force a check after a brief delay
-      setTimeout(() => {
-        const updated = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
-        if (updated) {
-          const totalRows = updated.pages.reduce((sum, p) => sum + p.rows.length, 0);
-          console.log('Cache after update has', totalRows, 'rows');
-        }
-      }, 100);
+      
 
-      // We need to update the selection AFTER the cache update
-      // Use setTimeout to ensure the cache update has propagated
+      // Update the selection to the new row immediately after cache update
+      // Since we're inserting after the current row, the new row is at activeCell.rowIdx + 1
       if (afterRowId && activeCell) {
-        setTimeout(() => {
-          // Re-read the data after update to get the correct index
-          const updatedData = utils.table.getRows.getInfiniteData({ tableId, limit: 500 });
-          if (!updatedData) return;
+        // The new row is inserted right after the current row, so its index is current + 1
+        const newRowIdx = activeCell.rowIdx + 1;
+        const targetColIdx = activeCell.colIdx;
+        const tempRowId = `__temp__${clientRowId}`;
+        
+        // Update active cell immediately - this ensures the row is highlighted correctly
+        setActiveCell({ rowIdx: newRowIdx, colIdx: targetColIdx });
+        setIsKeyboardNav(true);
+        
+        // Set pending focus ref with the exact row index to ensure we focus the correct row
+        // Using ref ensures we track the most recent row creation even if multiple happen quickly
+        pendingRowFocusRef.current = { rowId: tempRowId, colIdx: targetColIdx, rowIdx: newRowIdx };
+        
+        // Try to focus after render completes - use queueMicrotask to avoid flushSync issues
+        const targetColumn = tableMeta?.columns[targetColIdx];
+        if (targetColumn) {
+          const cellKey = `${tempRowId}-${targetColumn.id}`;
           
-          // Find the temp row to get its index
-          let globalRowIdx = 0;
-          for (let pIdx = 0; pIdx < updatedData.pages.length; pIdx++) {
-            const page = updatedData.pages[pIdx];
-            if (!page) continue;
-            const tempRowIdx = page.rows.findIndex(r => r.id === `__temp__${clientRowId}`);
-            if (tempRowIdx >= 0) {
-              globalRowIdx += tempRowIdx;
-              break;
-            }
-            globalRowIdx += page.rows.length;
-          }
-          
-          const targetColIdx = activeCell.colIdx;
-          setActiveCell({ rowIdx: globalRowIdx, colIdx: targetColIdx });
-          setIsKeyboardNav(true);
-          navigateToCell(globalRowIdx, targetColIdx);
-        }, 0);
+          // Use queueMicrotask to ensure this runs after the current render cycle
+          queueMicrotask(() => {
+            requestAnimationFrame(() => {
+              const inputRef = cellInputRefs.current.get(cellKey);
+              if (inputRef && pendingRowFocusRef.current?.rowId === tempRowId) {
+                inputRef.focus();
+                try {
+                  const len = inputRef.value?.length ?? 0;
+                  inputRef.setSelectionRange(len, len);
+                } catch {
+                  // Ignore
+                }
+                inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                pendingRowFocusRef.current = null; // Clear after successful focus
+              }
+            });
+          });
+        }
       }
       
       return { previousPages, clientRowId, previousCount: currentCount };
     },
     onSuccess: (newRow, variables, context) => {
       if (!context) return;
+      
+      // Find the current active cell to maintain focus after replacing temp row
+      const currentActiveCell = activeCell;
+      const wasOnNewRow = currentActiveCell && 
+        utils.table.getRows.getInfiniteData({ tableId, limit: 500 })?.pages
+          .flatMap(p => p.rows)
+          .some((r, idx) => r.id === `__temp__${context.clientRowId}` && idx === currentActiveCell.rowIdx);
       
       // Replace optimistic temp row with real row from server
       utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
@@ -355,8 +411,42 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
         };
       });
       
-      // Count was already optimistically updated in onMutate, so no need to invalidate here
-      // The server has confirmed the row was created, so our optimistic update was correct
+      // Maintain focus on the new row after replacing temp row with real row
+      // The row index should stay the same, just the row ID changes
+      if (currentActiveCell && wasOnNewRow) {
+        // Update the pending focus ref to use the real row ID
+        if (pendingRowFocusRef.current && pendingRowFocusRef.current.rowId === `__temp__${context.clientRowId}`) {
+          pendingRowFocusRef.current = {
+            rowId: newRow.id,
+            colIdx: currentActiveCell.colIdx,
+            rowIdx: currentActiveCell.rowIdx,
+          };
+        }
+        
+        // Use queueMicrotask to ensure this runs after render cycle
+        queueMicrotask(() => {
+          requestAnimationFrame(() => {
+            const targetColumn = tableMeta?.columns[currentActiveCell.colIdx];
+            if (targetColumn) {
+              const cellKey = `${newRow.id}-${targetColumn.id}`;
+              const inputRef = cellInputRefs.current.get(cellKey);
+              
+              if (inputRef) {
+                inputRef.focus();
+                try {
+                  const len = inputRef.value?.length ?? 0;
+                  inputRef.setSelectionRange(len, len);
+                } catch {
+                  // Ignore
+                }
+              }
+            }
+          });
+        });
+      }
+      
+      // Don't invalidate here - the optimistic update should make it appear immediately
+      // Only invalidate if there's a mismatch (which shouldn't happen with proper optimistic updates)
     },
     onError: (error, _variables, context) => {
       if (!context) return;
