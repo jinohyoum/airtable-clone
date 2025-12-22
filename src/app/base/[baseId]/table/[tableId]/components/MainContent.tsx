@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback, useReducer } from 'react';
 import { useParams } from 'next/navigation';
 import {
   useReactTable,
@@ -93,6 +93,10 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       window.dispatchEvent(new CustomEvent('grid:saving', { detail: { count: 0 } }));
     };
   }, [pendingCells, savingCells, rowCreatesInFlight, rowDeletesInFlight]);
+
+  // Simple force-update hook used by the virtualizer's onChange scheduler to avoid flushSync.
+  const forceUpdate = useReducer((x) => x + 1, 0)[1] as () => void;
+  const virtualizerRafIdRef = useRef<number | null>(null);
 
   // Cleanup any pending autosave timers on unmount / table switch.
   useEffect(() => {
@@ -474,32 +478,13 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     },
   });
   
-  // Navigate to a specific cell by row/column index
+  // Navigate to a specific cell by row/column index (updates activeCell; focus is synced in an effect)
   const navigateToCell = useCallback((rowIdx: number, colIdx: number) => {
     const targetRow = allRows[rowIdx];
     if (!targetRow || !tableMeta) return;
-    
     const targetColumn = tableMeta.columns[colIdx];
     if (!targetColumn) return;
-    
-    const rowId = targetRow.id;
-    const columnId = targetColumn.id;
-    
     setActiveCell({ rowIdx, colIdx });
-    
-    const cellKey = `${rowId}-${columnId}`;
-    const inputRef = cellInputRefs.current.get(cellKey);
-    if (inputRef) {
-      inputRef.focus();
-      try {
-        const len = inputRef.value?.length ?? 0;
-        inputRef.setSelectionRange(len, len);
-      } catch {
-        // Ignore
-      }
-      
-      inputRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-    }
   }, [allRows, tableMeta]);
 
   // Cell update mutation
@@ -628,8 +613,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
         });
       }
 
-      void utils.table.getRows.invalidate({ tableId, limit: 500 });
-      void utils.table.getRowCount.invalidate({ tableId });
+      scheduleInvalidate();
     },
   });
   
@@ -659,16 +643,11 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
       });
 
       // Decide which row to move selection/focus to after this row is removed.
-      const hasMoreThanOneRow = allRows.length > 1;
-      if (hasMoreThanOneRow) {
-        const nextRowIdx = rowIdx > 0 ? rowIdx - 1 : 0;
-        setActiveCell({ rowIdx: nextRowIdx, colIdx });
-
-        // After React/virtualizer update, move actual DOM focus to the next cell.
-        requestAnimationFrame(() => {
-          navigateToCell(nextRowIdx, colIdx);
-        });
-      } else {
+    const hasMoreThanOneRow = allRows.length > 1;
+    if (hasMoreThanOneRow) {
+      const nextRowIdx = rowIdx > 0 ? rowIdx - 1 : 0;
+      setActiveCell({ rowIdx: nextRowIdx, colIdx });
+    } else {
         // No rows left after delete → clear active cell and keep focus inside grid.
         setActiveCell(null);
         requestAnimationFrame(() => {
@@ -678,7 +657,7 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
 
       deleteRowMutation.mutate({ rowId });
     },
-    [allRows.length, deleteRowMutation, navigateToCell, rowDeletesInFlight],
+    [allRows.length, deleteRowMutation, rowDeletesInFlight],
   );
   
   // Handle cell editing with local draft state
@@ -1025,6 +1004,63 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
     }
   }, [allRows, tableMeta, editingCell, committingCells, utils, tableId, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow]);
   
+  const focusRafRef = useRef<number | null>(null);
+  const invalidateTimerRef = useRef<number | null>(null);
+
+  const scheduleInvalidate = useCallback(() => {
+    if (invalidateTimerRef.current != null) {
+      window.clearTimeout(invalidateTimerRef.current);
+    }
+    invalidateTimerRef.current = window.setTimeout(() => {
+      invalidateTimerRef.current = null;
+      void utils.table.getRows.invalidate({ tableId, limit: 500 });
+      void utils.table.getRowCount.invalidate({ tableId });
+    }, 150);
+  }, [utils, tableId]);
+
+  // Keep DOM focus in sync with the current activeCell selection, without spamming smooth scroll.
+  useEffect(() => {
+    if (!activeCell) return;
+    const { rowIdx, colIdx } = activeCell;
+    const targetRow = allRows[rowIdx];
+    if (!targetRow || !tableMeta) return;
+
+    const targetColumn = tableMeta.columns[colIdx];
+    if (!targetColumn) return;
+
+    const rowId = targetRow.id;
+    const columnId = targetColumn.id;
+    const cellKey = `${rowId}-${columnId}`;
+
+    if (focusRafRef.current != null) {
+      cancelAnimationFrame(focusRafRef.current);
+    }
+
+    // Defer focus until after the DOM has been updated for this render.
+    focusRafRef.current = requestAnimationFrame(() => {
+      focusRafRef.current = null;
+      const inputRef = cellInputRefs.current.get(cellKey);
+      if (!inputRef) return;
+      inputRef.focus();
+      try {
+        const len = inputRef.value?.length ?? 0;
+        inputRef.setSelectionRange(len, len);
+      } catch {
+        // Ignore selection errors for non-text inputs.
+      }
+
+      // Keep scrolling cheap and synchronous to avoid virtualizer/flushSync issues.
+      inputRef.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+    });
+
+    return () => {
+      if (focusRafRef.current != null) {
+        cancelAnimationFrame(focusRafRef.current);
+        focusRafRef.current = null;
+      }
+    };
+  }, [activeCell, allRows, tableMeta]);
+  
   // Show transition mask on table switch
   useEffect(() => {
     if (prevTableIdRef.current !== tableId && !isCreatingTable) {
@@ -1073,12 +1109,38 @@ export default function MainContent({ isSearchOpen = false }: { isSearchOpen?: b
   // Reference to the scrollable body container for virtualization
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Clean up any pending virtualizer animation frame on unmount.
+  useEffect(() => {
+    return () => {
+      if (virtualizerRafIdRef.current != null) {
+        cancelAnimationFrame(virtualizerRafIdRef.current);
+        virtualizerRafIdRef.current = null;
+      }
+    };
+  }, []);
+
   // Set up row virtualizer with totalCount (not just loaded rows)
   const rowVirtualizer = useVirtualizer({
     count: totalCount || allRows.length, // Use totalCount if available, fallback to loaded count
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 32, // 32px = h-8 (fixed height for smoother scrolling)
     overscan: 30, // Render 30 extra rows above/below viewport for smoother scrolling
+    onChange: (_instance, sync) => {
+      // Avoid React 18 "flushSync during render" by scheduling updates.
+      if (sync) {
+        if (virtualizerRafIdRef.current != null) {
+          cancelAnimationFrame(virtualizerRafIdRef.current);
+        }
+        virtualizerRafIdRef.current = requestAnimationFrame(() => {
+          virtualizerRafIdRef.current = null;
+          forceUpdate();
+        });
+      } else {
+        queueMicrotask(() => {
+          forceUpdate();
+        });
+      }
+    },
   });
 
   // Prefetch next page when user scrolls close to the loaded edge
