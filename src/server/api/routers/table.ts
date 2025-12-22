@@ -143,6 +143,28 @@ export const tableRouter = createTRPCRouter({
       });
     }),
 
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Ensure it exists (gives a nicer error than a generic Prisma error)
+      const table = await ctx.db.table.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+
+      if (!table) {
+        throw new Error("Table not found");
+      }
+
+      // Relations are configured with onDelete: Cascade in Prisma schema,
+      // so columns/rows/cells/views are removed automatically.
+      await ctx.db.table.delete({
+        where: { id: input.id },
+      });
+
+      return { id: input.id };
+    }),
+
   getData: protectedProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }) => {

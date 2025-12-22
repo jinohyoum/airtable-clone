@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 
 export default function TopNav() {
   const [savingCount, setSavingCount] = useState(0);
+  const [tablesSavingCount, setTablesSavingCount] = useState(0);
   const [showSaved, setShowSaved] = useState(false);
   const savedTimerRef = useRef<number | null>(null);
   const params = useParams<{ baseId?: string; tableId?: string }>();
@@ -23,10 +24,22 @@ export default function TopNav() {
     return () => window.removeEventListener('grid:saving', onSaving as EventListener);
   }, []);
 
+  useEffect(() => {
+    const onTablesSaving = (e: Event) => {
+      const ce = e as CustomEvent<{ count?: number }>;
+      const next = ce.detail?.count ?? 0;
+      setTablesSavingCount(next);
+    };
+    window.addEventListener('tables:saving', onTablesSaving as EventListener);
+    return () => window.removeEventListener('tables:saving', onTablesSaving as EventListener);
+  }, []);
+
+  const effectiveSavingCount = savingCount + tablesSavingCount;
+
   // When saving finishes, show "All changes saved" briefly (Airtable-like).
   useEffect(() => {
     // If saving resumed, hide the saved indicator and clear any pending timer.
-    if (savingCount > 0) {
+    if (effectiveSavingCount > 0) {
       setShowSaved(false);
       if (savedTimerRef.current) {
         window.clearTimeout(savedTimerRef.current);
@@ -35,7 +48,7 @@ export default function TopNav() {
       return;
     }
 
-    // savingCount === 0 → show "saved" for ~4.5s
+    // effectiveSavingCount === 0 → show "saved" for ~4.5s
     setShowSaved(true);
     if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
     savedTimerRef.current = window.setTimeout(() => {
@@ -49,7 +62,7 @@ export default function TopNav() {
         savedTimerRef.current = null;
       }
     };
-  }, [savingCount]);
+  }, [effectiveSavingCount]);
 
   return (
     <header
@@ -229,7 +242,7 @@ export default function TopNav() {
 
         {/* Right column (456px) */}
         <div className="flex flex-none h-full w-[456px] items-center justify-end pr2 colors-background-default overflow-hidden">
-        {savingCount > 0 && (
+        {effectiveSavingCount > 0 && (
           <div
             className="global-status-indicator ignore-visual-diff"
             data-testid="globalStatusIndicator"
@@ -271,7 +284,7 @@ export default function TopNav() {
           </div>
         )}
 
-        {savingCount === 0 && showSaved && (
+        {effectiveSavingCount === 0 && showSaved && (
           <div
             className="global-status-indicator ignore-visual-diff"
             data-testid="globalStatusIndicator"

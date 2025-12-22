@@ -58,6 +58,12 @@ export default function TableTabsBar() {
     null,
   );
   const queuedRenameRef = useRef<{ name: string; recordTerm: string } | null>(null);
+  const deleteNavRef = useRef<{ fromTableId: string; toTableId: string | null } | null>(null);
+
+  const setTablesSaving = (count: number) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('tables:saving', { detail: { count } }));
+  };
   // Fetch real tables from database
   const { data: tablesData } = api.table.list.useQuery(
     { baseId: baseId ?? "" },
@@ -95,6 +101,16 @@ export default function TableTabsBar() {
       }
     }
   }, [tablesData, currentTableId, hasCurrentTableId]);
+
+  // Allow other UI surfaces (like the empty-state) to open the "Add or import" dropdown.
+  useEffect(() => {
+    const onOpen = () => {
+      setIsOpen(true);
+      setActiveItemIndex(0);
+    };
+    window.addEventListener('tables:openAddImport', onOpen as EventListener);
+    return () => window.removeEventListener('tables:openAddImport', onOpen as EventListener);
+  }, []);
 
   // Clear the active override once the URL has caught up
   useEffect(() => {
@@ -171,6 +187,47 @@ export default function TableTabsBar() {
     onSuccess: () => {
       void utils.table.list.invalidate({ baseId });
       setShowRenameForm(false);
+    },
+  });
+
+  const deleteTableMutation = api.table.delete.useMutation({
+    onMutate: async ({ id }) => {
+      setTablesSaving(1);
+      await utils.table.list.cancel({ baseId });
+      const previous = utils.table.list.getData({ baseId });
+
+      utils.table.list.setData({ baseId }, (old) => {
+        if (!old) return old;
+        return old.filter((t) => t.id !== id);
+      });
+
+      return { previous };
+    },
+    onError: (error, _variables, context) => {
+      console.error('Failed to delete table:', error);
+      if (context?.previous) {
+        utils.table.list.setData({ baseId }, context.previous);
+      }
+
+      // If we optimistically navigated away from the deleted table, bring the user back.
+      const nav = deleteNavRef.current;
+      if (nav?.fromTableId) {
+        setActiveOverrideTableId(null);
+        void router.replace(`/base/${baseId}/table/${nav.fromTableId}`);
+      }
+      deleteNavRef.current = null;
+
+      const msg =
+        (error as unknown as { message?: string })?.message?.trim() ||
+        'Failed to delete table. Please try again.';
+      alert(msg);
+    },
+    onSuccess: () => {
+      void utils.table.list.invalidate({ baseId });
+    },
+    onSettled: () => {
+      setTablesSaving(0);
+      deleteNavRef.current = null;
     },
   });
   
@@ -1137,7 +1194,51 @@ export default function TableTabsBar() {
               data-tutorial-selector-id="tableMenuItem-deleteTable"
               className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
               aria-disabled="false"
-              onClick={() => setIsTableMenuOpen(false)}
+              onClick={async () => {
+                const tableIdToDelete = activeOverrideTableId ?? currentTableId;
+                const tableName =
+                  tabs.find((t) => t.id === tableIdToDelete)?.name ?? 'this table';
+
+                // Close the menu immediately for snappy UX
+                setIsTableMenuOpen(false);
+
+                // Basic confirm (matches "delete" expectation, avoids accidental clicks)
+                if (!window.confirm(`Delete "${tableName}"? This cannot be undone.`)) {
+                  return;
+                }
+
+                if (!tableIdToDelete || deleteTableMutation.isPending) return;
+
+                // After deletion, always navigate to the LEFT-MOST remaining table.
+                // `tablesData` is ordered by createdAt asc in the backend router.
+                const realTables = utils.table.list.getData({ baseId }) ?? tablesData ?? [];
+                const leftMostRemainingTableId =
+                  realTables.filter((t) => t.id !== tableIdToDelete)[0]?.id ?? null;
+
+                try {
+                  // If we just deleted the active table, optimistically move somewhere valid immediately.
+                  if (currentTableId === tableIdToDelete) {
+                    deleteNavRef.current = {
+                      fromTableId: tableIdToDelete,
+                      toTableId: leftMostRemainingTableId,
+                    };
+
+                    setOptimisticTable(null);
+                    setActiveOverrideTableId(leftMostRemainingTableId);
+
+                    if (leftMostRemainingTableId) {
+                      void router.replace(`/base/${baseId}/table/${leftMostRemainingTableId}`);
+                    } else {
+                      void router.replace(`/base/${baseId}/table`);
+                    }
+                  }
+
+                  deleteTableMutation.mutate({ id: tableIdToDelete });
+
+                } catch {
+                  // handled in onError
+                }
+              }}
             >
               <svg
                 width="16"
