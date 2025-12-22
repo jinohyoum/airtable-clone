@@ -1,13 +1,7 @@
 import { z } from "zod";
 import { faker } from "@faker-js/faker";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-
-// Simple cuid generator compatible with Prisma's format
-function generateCuid(): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 15);
-  return `c${timestamp}${random}`.substring(0, 25);
-}
+import { Prisma } from "../../../generated/prisma";
 
 export const tableRouter = createTRPCRouter({
   list: protectedProcedure
@@ -421,7 +415,7 @@ export const tableRouter = createTRPCRouter({
       return { count };
     }),
 
-  // Bulk insert rows - HIGHLY OPTIMIZED for 100k+ rows
+  // Bulk insert rows - OPTIMIZED for 100k+ rows using DB-side generation
   bulkInsertRows: protectedProcedure
     .input(
       z.object({
@@ -430,121 +424,125 @@ export const tableRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const startTime = Date.now();
+      
       try {
-        // Get table with columns
-        const table = await ctx.db.table.findUnique({
-          where: { id: input.tableId },
-          include: {
-            columns: {
-              orderBy: { order: "asc" },
+        // Wrap everything in a transaction for atomicity
+        return await ctx.db.$transaction(async (tx) => {
+          // Get table with columns
+          const table = await tx.table.findUnique({
+            where: { id: input.tableId },
+            include: {
+              columns: {
+                orderBy: { order: "asc" },
+              },
             },
-          },
-        });
+          });
 
-        if (!table) throw new Error("Table not found");
+          if (!table) throw new Error("Table not found");
 
-        // Use aggregate _max for faster order calculation
-        const maxOrder = await ctx.db.row.aggregate({
-          where: { tableId: input.tableId },
-          _max: { order: true },
-        });
-        const startOrder = (maxOrder._max.order ?? -1) + 1;
+          // Use advisory lock to prevent race conditions on order calculation
+          // This ensures concurrent bulk inserts don't collide on order values
+          await tx.$executeRaw`
+            SELECT pg_advisory_xact_lock(hashtext(${input.tableId}))
+          `;
 
-        // Find columns for faker data
-        const nameColumn = table.columns.find((c) => c.name === "Name");
-        const notesColumn = table.columns.find((c) => c.name === "Notes");
-        const assigneeColumn = table.columns.find((c) => c.name === "Assignee");
-        const statusColumn = table.columns.find((c) => c.name === "Status");
-        const statusChoices = ["Todo", "In Progress", "Done"];
+          // Use aggregate _max for faster order calculation
+          const maxOrder = await tx.row.aggregate({
+            where: { tableId: input.tableId },
+            _max: { order: true },
+          });
+          const startOrder = (maxOrder._max.order ?? -1) + 1;
 
-        const numRowsWithFaker = 1000; // First 1000 rows get faker data
-        const totalRows = input.count;
-        let totalInserted = 0;
+          // Find columns for faker data
+          const nameColumn = table.columns.find((c) => c.name === "Name");
+          const notesColumn = table.columns.find((c) => c.name === "Notes");
+          const assigneeColumn = table.columns.find((c) => c.name === "Assignee");
+          const statusColumn = table.columns.find((c) => c.name === "Status");
+          const statusChoices = ["Todo", "In Progress", "Done"];
 
-        // OPTIMIZATION 1: Insert first 1000 rows with faker data via createMany
-        // Only include populated fields in JSONB (no empty strings)
-        if (totalRows > 0 && numRowsWithFaker > 0) {
-          const fakerRows = [];
-          const fakerCount = Math.min(numRowsWithFaker, totalRows);
+          const numRowsWithFaker = 1000; // First 1000 rows get faker data
+          const totalRows = input.count;
+          let totalInserted = 0;
 
-          for (let i = 0; i < fakerCount; i++) {
-            const values: Record<string, string> = {};
-            
-            // Only include populated fields (no empty strings for other columns)
-            if (nameColumn) {
-              values[nameColumn.id] = faker.person.fullName();
+          // PHASE 1: Insert first 1000 rows with faker data via createMany
+          // Only include populated fields in JSONB (no empty strings)
+          if (totalRows > 0 && numRowsWithFaker > 0) {
+            const fakerRows = [];
+            const fakerCount = Math.min(numRowsWithFaker, totalRows);
+
+            for (let i = 0; i < fakerCount; i++) {
+              const values: Record<string, string> = {};
+              
+              // Only include populated fields (no empty strings for other columns)
+              if (nameColumn) {
+                values[nameColumn.id] = faker.person.fullName();
+              }
+              if (notesColumn) {
+                values[notesColumn.id] = faker.lorem.sentence();
+              }
+              if (assigneeColumn) {
+                values[assigneeColumn.id] = faker.person.firstName();
+              }
+              if (statusColumn) {
+                values[statusColumn.id] = faker.helpers.arrayElement(statusChoices);
+              }
+
+              fakerRows.push({
+                tableId: input.tableId,
+                order: startOrder + i,
+                values: values, // Only populated fields, empty object {} for other columns
+              });
             }
-            if (notesColumn) {
-              values[notesColumn.id] = faker.lorem.sentence();
-            }
-            if (assigneeColumn) {
-              values[assigneeColumn.id] = faker.person.firstName();
-            }
-            if (statusColumn) {
-              values[statusColumn.id] = faker.helpers.arrayElement(statusChoices);
-            }
 
-            fakerRows.push({
-              tableId: input.tableId,
-              order: startOrder + i,
-              values: values, // Only populated fields, empty object {} for other columns
-            });
+            if (fakerRows.length > 0) {
+              const result = await tx.row.createMany({
+                data: fakerRows,
+              });
+              totalInserted += result.count;
+            }
           }
 
-          if (fakerRows.length > 0) {
-            const result = await ctx.db.row.createMany({
-              data: fakerRows,
-            });
-            totalInserted += result.count;
-          }
-        }
-
-        // OPTIMIZATION 2: Insert remaining empty rows using raw SQL with generate_series
-        // This is MUCH faster than creating JSON objects for 99k rows
-        const emptyRowCount = totalRows - numRowsWithFaker;
-        if (emptyRowCount > 0) {
-          // Generate cuids in batches for raw SQL insert
-          // We'll insert in chunks of 10k to avoid huge SQL statements
-          const sqlChunkSize = 10000;
-          const sqlChunks = Math.ceil(emptyRowCount / sqlChunkSize);
-
-          for (let chunk = 0; chunk < sqlChunks; chunk++) {
-            const chunkStart = chunk * sqlChunkSize;
-            const chunkEnd = Math.min(chunkStart + sqlChunkSize, emptyRowCount);
-            const chunkSizeActual = chunkEnd - chunkStart;
-
-            // Generate cuids for this chunk
-            const ids = Array.from({ length: chunkSizeActual }, () => generateCuid());
+          // PHASE 2: Insert remaining empty rows using generate_series (DB-side generation)
+          // This is MUCH faster than building VALUES clauses or generating IDs in JS
+          const emptyRowCount = totalRows - numRowsWithFaker;
+          if (emptyRowCount > 0) {
+            // Use generate_series to let PostgreSQL generate rows internally
+            // This avoids:
+            // - Generating 99k IDs in Node.js
+            // - Building giant VALUES clauses
+            // - Large payloads over DB connection
+            // gen_random_uuid() is built-in PostgreSQL function (no extension needed)
+            const orderStart = startOrder + numRowsWithFaker;
             
-            // Build VALUES clause for raw SQL
-            // Escape IDs and tableId to prevent SQL injection
-            const orderStart = startOrder + numRowsWithFaker + chunkStart;
-            const escapedTableId = input.tableId.replace(/'/g, "''");
-            
-            const valuesParts: string[] = [];
-            for (let i = 0; i < chunkSizeActual; i++) {
-              const order = orderStart + i;
-              // Escape single quotes in IDs for SQL safety
-              const escapedId = ids[i]!.replace(/'/g, "''");
-              valuesParts.push(`('${escapedId}', '${escapedTableId}', ${order}, '{}'::jsonb, NULL, NOW(), NOW())`);
-            }
-
-            // Insert via raw SQL - MUCH faster than createMany for empty rows
-            // Note: tableId is validated by Zod and IDs are generated in JS, so escaping is sufficient
-            await ctx.db.$executeRawUnsafe(`
+            // Use Prisma.sql for proper parameterization (safe from SQL injection)
+            const result = await tx.$executeRaw`
               INSERT INTO "Row" ("id", "tableId", "order", "values", "searchText", "createdAt", "updatedAt")
-              VALUES ${valuesParts.join(', ')}
-            `);
-
-            totalInserted += chunkSizeActual;
+              SELECT
+                gen_random_uuid(),
+                ${input.tableId}::text,
+                ${orderStart} + s.i,
+                '{}'::jsonb,
+                NULL,
+                NOW(),
+                NOW()
+              FROM generate_series(0, ${emptyRowCount - 1}) AS s(i)
+            `;
+            
+            totalInserted += emptyRowCount;
           }
-        }
 
-        return {
-          success: true,
-          inserted: totalInserted,
-          expected: totalRows,
-        };
+          const duration = Date.now() - startTime;
+
+          return {
+            success: true,
+            inserted: totalInserted,
+            expected: totalRows,
+            durationMs: duration,
+          };
+        }, {
+          timeout: 60000, // 60 seconds - enough for 100k+ row inserts
+        });
       } catch (error) {
         console.error("Bulk insert error:", error);
         throw new Error(`Failed to insert rows: ${error instanceof Error ? error.message : "Unknown error"}`);

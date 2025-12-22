@@ -25,10 +25,16 @@ export default function BulkInsertButton() {
 
     try {
       // Single optimized server call - server handles all chunking internally
-      await bulkInsertMutation.mutateAsync({
+      const result = await bulkInsertMutation.mutateAsync({
         tableId,
         count: totalRows,
       });
+
+      // Show success message with timing
+      const durationSeconds = (result.durationMs / 1000).toFixed(2);
+      const message = `Inserted ${result.inserted.toLocaleString()} rows in ${durationSeconds}s`;
+      console.log(message);
+      // You could also show a toast notification here if you have a toast library
 
       // Reset the infinite query cache completely so it starts fresh with new data
       // This clears all cached pages so the query will rebuild from scratch
