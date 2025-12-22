@@ -184,9 +184,42 @@ export default function TableTabsBar() {
   
   // tRPC mutation for updating table name
   const updateTableMutation = api.table.update.useMutation({
+    onMutate: async ({ id, name }) => {
+      setTablesSaving(1);
+      await utils.table.list.cancel({ baseId });
+      const previous = utils.table.list.getData({ baseId });
+
+      // Optimistically update the table name (only if name is provided)
+      if (name) {
+        utils.table.list.setData({ baseId }, (old) => {
+          if (!old) return old;
+          return old.map((t) => (t.id === id ? { ...t, name } : t));
+        });
+
+        // Update optimistic table state if it matches
+        if (optimisticTable && optimisticTable.id === id) {
+          setOptimisticTable({ id, name });
+        }
+      }
+
+      return { previous };
+    },
+    onError: (error, _variables, context) => {
+      console.error('Failed to update table:', error);
+      if (context?.previous) {
+        utils.table.list.setData({ baseId }, context.previous);
+      }
+      const msg =
+        (error as unknown as { message?: string })?.message?.trim() ||
+        'Failed to update table name. Please try again.';
+      alert(msg);
+    },
     onSuccess: () => {
       void utils.table.list.invalidate({ baseId });
       setShowRenameForm(false);
+    },
+    onSettled: () => {
+      setTablesSaving(0);
     },
   });
 
@@ -1016,8 +1049,20 @@ export default function TableTabsBar() {
               className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
               aria-disabled="false"
               onClick={() => {
-                // Optional: wire real rename flow later.
                 setIsTableMenuOpen(false);
+                // Show the rename form using the same dropdown as table creation
+                setTimeout(() => {
+                  const activeTab = document.querySelector('.activeTab');
+                  if (activeTab) {
+                    const rect = activeTab.getBoundingClientRect();
+                    const dropdownWidth = 299;
+                    setRenameFormPos({
+                      x: rect.right - dropdownWidth / 2,
+                      y: rect.bottom,
+                    });
+                    setShowRenameForm(true);
+                  }
+                }, 50);
               }}
             >
               <svg
@@ -1260,7 +1305,7 @@ export default function TableTabsBar() {
       {showRenameForm && renameFormPos && (
         <TableCreationDropdown
           tableName={tabs.find((t) => t.id === (activeOverrideTableId ?? currentTableId))?.name ?? 'Table'}
-          onSave={async (name: string, recordTerm: string) => {
+          onSave={(name: string, recordTerm: string) => {
             const activeId = activeOverrideTableId ?? currentTableId;
             const currentTable = tabs.find((t) => t.id === activeId);
             if (!activeId) return;
@@ -1274,15 +1319,10 @@ export default function TableTabsBar() {
 
             // Only update if name changed
             if (currentTable && name !== currentTable.name) {
-              try {
-                await updateTableMutation.mutateAsync({
-                  id: activeId,
-                  name,
-                });
-              } catch (error) {
-                console.error('Failed to update table:', error);
-                alert('Failed to update table name. Please try again.');
-              }
+              updateTableMutation.mutate({
+                id: activeId,
+                name,
+              });
             } else {
               // Just close the form
               setShowRenameForm(false);
