@@ -959,11 +959,14 @@ export default function TableTabsBar() {
         </div>
       </nav>
 
-      <div className="ml-auto flex items-center gap-2 px-4">
+      <div className="ml-auto flex items-center gap-2 pl-4 pr-1">
         {/* Tools (moved up from view bar) */}
-        <button className="flex items-center gap-1.5 px-2 py-1 hover:bg-white/50 rounded text-sm text-gray-700">
-          <span>Tools</span>
-          <ChevronDown className="w-4 h-4 text-gray-500" />
+        <button
+          type="button"
+          className="inline-flex h-8 cursor-pointer select-none items-center box-border rounded-[6px] bg-transparent px-3 py-0 font-family-default text-[13px] font-normal leading-[18px] text-[rgba(0,0,0,0.65)] hover:bg-black/[0.06]"
+        >
+          <span className="block pr-1">Tools</span>
+          <ChevronDown className="block h-4 w-4 flex-none text-[rgba(0,0,0,0.65)]" />
         </button>
       </div>
 
