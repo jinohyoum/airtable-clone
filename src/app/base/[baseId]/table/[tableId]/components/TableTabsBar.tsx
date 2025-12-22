@@ -54,6 +54,10 @@ export default function TableTabsBar() {
   const [renameFormPos, setRenameFormPos] = useState<{ x: number; y: number } | null>(null);
   const [activeOverrideTableId, setActiveOverrideTableId] = useState<string | null>(null);
   const [optimisticTable, setOptimisticTable] = useState<{ id: string; name: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmPos, setDeleteConfirmPos] = useState<{ x: number; y: number } | null>(null);
+  const [tableToDelete, setTableToDelete] = useState<{ id: string; name: string } | null>(null);
+  const deleteConfirmRef = useRef<HTMLDivElement | null>(null);
   const pendingCreateRef = useRef<{ tempId: string; defaultName: string; prevTableId: string } | null>(
     null,
   );
@@ -263,6 +267,40 @@ export default function TableTabsBar() {
       deleteNavRef.current = null;
     },
   });
+
+  const handleDeleteTable = (tableIdToDelete: string) => {
+    if (!tableIdToDelete || deleteTableMutation.isPending) return;
+
+    // After deletion, always navigate to the LEFT-MOST remaining table.
+    // `tablesData` is ordered by createdAt asc in the backend router.
+    const realTables = utils.table.list.getData({ baseId }) ?? tablesData ?? [];
+    const leftMostRemainingTableId =
+      realTables.filter((t) => t.id !== tableIdToDelete)[0]?.id ?? null;
+
+    try {
+      // If we just deleted the active table, optimistically move somewhere valid immediately.
+      if (currentTableId === tableIdToDelete) {
+        deleteNavRef.current = {
+          fromTableId: tableIdToDelete,
+          toTableId: leftMostRemainingTableId,
+        };
+
+        setOptimisticTable(null);
+        setActiveOverrideTableId(leftMostRemainingTableId);
+
+        if (leftMostRemainingTableId) {
+          void router.replace(`/base/${baseId}/table/${leftMostRemainingTableId}`);
+        } else {
+          void router.replace(`/base/${baseId}/table`);
+        }
+      }
+
+      deleteTableMutation.mutate({ id: tableIdToDelete });
+
+    } catch {
+      // handled in onError
+    }
+  };
   
   const activeTableId = activeOverrideTableId ?? currentTableId ?? '';
 
@@ -687,6 +725,51 @@ export default function TableTabsBar() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isTableMenuOpen]);
+
+  // Keep the delete confirmation dialog positioned under the active table tab
+  useEffect(() => {
+    if (!showDeleteConfirm || !tableToDelete) return;
+
+    const tabEl = document.getElementById(`tableTab-${tableToDelete.id}`);
+    const rect = tabEl?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = Math.round(rect.left);
+    const y = Math.round(rect.bottom);
+    setDeleteConfirmPos({ x, y });
+  }, [showDeleteConfirm, tableToDelete, activeTableId, currentTableId]);
+
+  useEffect(() => {
+    if (!showDeleteConfirm) return;
+
+    // Focus the Delete button when dialog opens
+    queueMicrotask(() => {
+      const deleteButton = deleteConfirmRef.current?.querySelector('.focusFirstInModal') as HTMLButtonElement | null;
+      deleteButton?.focus();
+    });
+
+    const onPointerDown = (e: PointerEvent) => {
+      const dialog = deleteConfirmRef.current;
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (dialog?.contains(t)) return;
+      setShowDeleteConfirm(false);
+      setTableToDelete(null);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setShowDeleteConfirm(false);
+      setTableToDelete(null);
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showDeleteConfirm]);
 
   const onMenuKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
@@ -1239,50 +1322,29 @@ export default function TableTabsBar() {
               data-tutorial-selector-id="tableMenuItem-deleteTable"
               className="rounded py1 px1 text-size-default items-center pointer width-full flex table-tab-menuitem"
               aria-disabled="false"
-              onClick={async () => {
+              onClick={() => {
                 const tableIdToDelete = activeOverrideTableId ?? currentTableId;
                 const tableName =
                   tabs.find((t) => t.id === tableIdToDelete)?.name ?? 'this table';
 
+                if (!tableIdToDelete) return;
+
                 // Close the menu immediately for snappy UX
                 setIsTableMenuOpen(false);
 
-                // Basic confirm (matches "delete" expectation, avoids accidental clicks)
-                if (!window.confirm(`Delete "${tableName}"? This cannot be undone.`)) {
-                  return;
-                }
+                // Position the dialog relative to the active table tab (same as table menu)
+                setTimeout(() => {
+                  const tabEl = document.getElementById(`tableTab-${tableIdToDelete}`);
+                  const rect = tabEl?.getBoundingClientRect();
+                  if (!rect) return;
 
-                if (!tableIdToDelete || deleteTableMutation.isPending) return;
-
-                // After deletion, always navigate to the LEFT-MOST remaining table.
-                // `tablesData` is ordered by createdAt asc in the backend router.
-                const realTables = utils.table.list.getData({ baseId }) ?? tablesData ?? [];
-                const leftMostRemainingTableId =
-                  realTables.filter((t) => t.id !== tableIdToDelete)[0]?.id ?? null;
-
-                try {
-                  // If we just deleted the active table, optimistically move somewhere valid immediately.
-                  if (currentTableId === tableIdToDelete) {
-                    deleteNavRef.current = {
-                      fromTableId: tableIdToDelete,
-                      toTableId: leftMostRemainingTableId,
-                    };
-
-                    setOptimisticTable(null);
-                    setActiveOverrideTableId(leftMostRemainingTableId);
-
-                    if (leftMostRemainingTableId) {
-                      void router.replace(`/base/${baseId}/table/${leftMostRemainingTableId}`);
-                    } else {
-                      void router.replace(`/base/${baseId}/table`);
-                    }
-                  }
-
-                  deleteTableMutation.mutate({ id: tableIdToDelete });
-
-                } catch {
-                  // handled in onError
-                }
+                  // Align dialog's LEFT edge to the active table tab's LEFT edge, touching the bottom
+                  const x = Math.round(rect.left);
+                  const y = Math.round(rect.bottom);
+                  setDeleteConfirmPos({ x, y });
+                  setTableToDelete({ id: tableIdToDelete, name: tableName });
+                  setShowDeleteConfirm(true);
+                }, 10);
               }}
             >
               <svg
@@ -1298,6 +1360,111 @@ export default function TableTabsBar() {
               <span className="truncate flex-auto no-user-select">Delete table</span>
             </li>
           </ul>
+        </div>
+      )}
+
+      {/* Delete Table Confirmation Dialog */}
+      {showDeleteConfirm && deleteConfirmPos && tableToDelete && (
+        <div
+          ref={deleteConfirmRef}
+          className="baymax rounded-big shadow-elevation-high strong absolute"
+          style={{
+            position: 'fixed',
+            backgroundColor: 'rgb(255, 255, 255)',
+            minWidth: '200px',
+            width: 'min-content',
+            maxWidth: '400px',
+            top: `${deleteConfirmPos.y}px`,
+            left: `${deleteConfirmPos.x}px`,
+            padding: '16px',
+            fontFamily:
+              '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+            fontSize: '13px',
+            fontWeight: 500,
+            lineHeight: '18px',
+            color: 'rgb(29, 31, 37)',
+            zIndex: 100,
+          }}
+        >
+          <div
+            className="mb1 strong big line-height-4"
+            style={{
+              marginBottom: '8px',
+              fontSize: '14.4px',
+              fontWeight: 500,
+              lineHeight: '21.6px',
+            }}
+          >
+            Are you sure you want to delete this table?
+          </div>
+          <div
+            className="mb2 quiet"
+            style={{
+              marginBottom: '16px',
+              opacity: 0.75,
+              fontSize: '13px',
+              lineHeight: '18px',
+            }}
+          >
+            Recently deleted tables can be restored from trash.
+            <span className="flex-inline ml-half flex items-center quiet colors-foreground-subtle" style={{ marginLeft: '4px', display: 'inline-flex', verticalAlign: 'middle', pointerEvents: 'none' }}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                className="flex-none icon"
+                aria-hidden="true"
+                style={{ shapeRendering: 'geometricPrecision', color: 'rgb(97, 102, 112)' }}
+              >
+                <use fill="currentColor" href={`${ICON_SPRITE}#Question`} />
+              </svg>
+            </span>
+          </div>
+          <div className="flex items-center justify-end">
+            <button
+              className="pointer items-center justify-center border-box text-decoration-none print-color-exact focus-visible rounded-big ignore-baymax-defaults border-none colors-foreground-default background-transparent colors-background-selected-hover px1-and-half button-size-default flex-inline mr1 truncate"
+              type="button"
+              aria-disabled="false"
+              style={{
+                maxWidth: '192px',
+                height: '32px',
+                paddingLeft: '12px',
+                paddingRight: '12px',
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowDeleteConfirm(false);
+                setTableToDelete(null);
+              }}
+            >
+              <span className="truncate noevents button-text-label no-user-select">Cancel</span>
+            </button>
+            <button
+              className="pointer items-center justify-center border-box text-decoration-none print-color-exact focus-visible rounded-big ignore-baymax-defaults border-none text-white red shadow-elevation-low shadow-elevation-low-hover px1-and-half button-size-default flex-inline truncate focusFirstInModal"
+              type="button"
+              aria-disabled="false"
+              style={{
+                maxWidth: '192px',
+                height: '32px',
+                paddingLeft: '12px',
+                paddingRight: '12px',
+                boxShadow:
+                  'rgba(0, 0, 0, 0.32) 0px 0px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 2px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px',
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowDeleteConfirm(false);
+                if (tableToDelete) {
+                  handleDeleteTable(tableToDelete.id);
+                }
+                setTableToDelete(null);
+              }}
+            >
+              <span className="truncate noevents button-text-label no-user-select">Delete</span>
+            </button>
+          </div>
         </div>
       )}
 

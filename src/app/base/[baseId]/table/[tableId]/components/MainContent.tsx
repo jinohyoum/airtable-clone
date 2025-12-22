@@ -227,6 +227,8 @@ export default function MainContent({
   
   // Row creation with optimistic updates (Option B: allow rapid clicks)
   const utils = api.useUtils();
+  const cancelledCreateClientRowIdsRef = useRef<Set<string>>(new Set());
+  const skipDeleteOptimisticRowIdsRef = useRef<Set<string>>(new Set());
   const createRowMutation = api.table.createRow.useMutation({
     onMutate: async ({ clientRowId, afterRowId }) => {
       console.log('onMutate called:', { clientRowId, afterRowId });
@@ -390,6 +392,16 @@ export default function MainContent({
     onSuccess: (newRow, variables, context) => {
       if (!context) return;
 
+      // If the user deleted/cancelled the optimistic temp row before the server responded,
+      // don't resurrect it. Instead, delete the newly-created server row.
+      if (cancelledCreateClientRowIdsRef.current.has(context.clientRowId)) {
+        cancelledCreateClientRowIdsRef.current.delete(context.clientRowId);
+        // Skip optimistic delete bookkeeping for this server row (we already adjusted UI when cancelling).
+        skipDeleteOptimisticRowIdsRef.current.add(newRow.id);
+        deleteRowMutation.mutate({ rowId: newRow.id });
+        return;
+      }
+
       // If we skipped optimistic insertion (e.g. search filter active), just refetch.
       if (!context.previousPages) {
         void utils.table.getRows.invalidate({ tableId, limit: 500, search });
@@ -503,6 +515,9 @@ export default function MainContent({
         if (variables?.clientRowId) next.delete(variables.clientRowId);
         return next;
       });
+      if (variables?.clientRowId) {
+        cancelledCreateClientRowIdsRef.current.delete(variables.clientRowId);
+      }
     },
   });
   
@@ -567,10 +582,18 @@ export default function MainContent({
 
   const deleteRowMutation = api.table.deleteRow.useMutation({
     onMutate: async ({ rowId }) => {
+      const skipOptimistic = skipDeleteOptimisticRowIdsRef.current.has(rowId);
+      if (skipOptimistic) {
+        // Consume the flag so it doesn't leak to future deletes.
+        skipDeleteOptimisticRowIdsRef.current.delete(rowId);
+      }
+
       const hasSearchFilter = Boolean(search && search.trim().length > 0);
 
       // Cancel outgoing refetches for rows so we can optimistically update
-      await utils.table.getRows.cancel({ tableId, limit: 500, search });
+      if (!skipOptimistic) {
+        await utils.table.getRows.cancel({ tableId, limit: 500, search });
+      }
 
       const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500, search });
       const currentCount = utils.table.getRowCount.getData({ tableId, search });
@@ -580,7 +603,7 @@ export default function MainContent({
       );
 
       // Optimistically update the row count immediately (before server responds)
-      if (currentCount && (!hasSearchFilter || rowExistsInCache)) {
+      if (!skipOptimistic && currentCount && (!hasSearchFilter || rowExistsInCache)) {
         utils.table.getRowCount.setData(
           { tableId, search },
           { count: Math.max(0, currentCount.count - 1) },
@@ -592,37 +615,41 @@ export default function MainContent({
       }
 
       // Optimistically remove the row from the infinite query cache
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
-        if (!oldData) return oldData;
+      if (!skipOptimistic) {
+        utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+          if (!oldData) return oldData;
 
-        const newPages = oldData.pages.map((page, pageIdx) => {
-          const newRows = page.rows.filter((r) => r.id !== rowId);
-          const currentTotal = page.totalCount ?? 0;
+          const newPages = oldData.pages.map((page, pageIdx) => {
+            const newRows = page.rows.filter((r) => r.id !== rowId);
+            const currentTotal = page.totalCount ?? 0;
+
+            return {
+              ...page,
+              rows: newRows,
+              // Keep totalCount in sync on the first page so virtualizer + footer stay accurate
+              totalCount: pageIdx === 0 ? Math.max(0, currentTotal - 1) : page.totalCount,
+            };
+          });
 
           return {
-            ...page,
-            rows: newRows,
-            // Keep totalCount in sync on the first page so virtualizer + footer stay accurate
-            totalCount: pageIdx === 0 ? Math.max(0, currentTotal - 1) : page.totalCount,
+            pages: newPages,
+            pageParams: oldData.pageParams ? [...oldData.pageParams] : [],
           };
         });
-
-        return {
-          pages: newPages,
-          pageParams: oldData.pageParams ? [...oldData.pageParams] : [],
-        };
-      });
+      }
 
       // Clear any local drafts for this row so we don't leak stale entries
-      setLocalDrafts((prev) => {
-        const next = new Map(prev);
-        for (const key of prev.keys()) {
-          if (key.startsWith(`${rowId}-`)) {
-            next.delete(key);
+      if (!skipOptimistic) {
+        setLocalDrafts((prev) => {
+          const next = new Map(prev);
+          for (const key of prev.keys()) {
+            if (key.startsWith(`${rowId}-`)) {
+              next.delete(key);
+            }
           }
-        }
-        return next;
-      });
+          return next;
+        });
+      }
 
       return { previousPages, previousCount: currentCount };
     },
@@ -663,9 +690,75 @@ export default function MainContent({
   const handleDeleteRow = useCallback(
     (rowId: string, rowIdx: number, colIdx: number) => {
       if (!rowId) return;
-      // For now, only send deletes for persisted rows; temporary (optimistic) rows will
-      // naturally disappear once their create completes or the view is refreshed.
-      if (rowId.startsWith('__temp__')) return;
+      // If this is an optimistic temp row (created via Shift+Enter), delete it client-side
+      // and cancel the pending create by deleting the server row when it arrives.
+      if (rowId.startsWith('__temp__')) {
+        const clientRowId = rowId.slice('__temp__'.length);
+        cancelledCreateClientRowIdsRef.current.add(clientRowId);
+        setRowCreatesInFlight((prev) => {
+          const next = new Set(prev);
+          next.delete(clientRowId);
+          return next;
+        });
+
+        // Remove from cache (and keep totalCount + rowCount consistent).
+        const hasSearchFilter = Boolean(search && search.trim().length > 0);
+        const currentCount = utils.table.getRowCount.getData({ tableId, search });
+        if (!hasSearchFilter && currentCount) {
+          utils.table.getRowCount.setData(
+            { tableId, search },
+            { count: Math.max(0, currentCount.count - 1) },
+          );
+        }
+
+        utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+          if (!oldData) return oldData;
+          const currentTotal = oldData.pages[0]?.totalCount ?? 0;
+
+          // Only decrement totalCount if the row actually existed in cached rows.
+          const existed = oldData.pages.some((p) => p.rows.some((r) => r.id === rowId));
+
+          return {
+            pages: oldData.pages.map((page, pageIdx) => ({
+              ...page,
+              rows: page.rows.filter((r) => r.id !== rowId),
+              totalCount:
+                pageIdx === 0
+                  ? Math.max(0, (page.totalCount ?? currentTotal) - (existed ? 1 : 0))
+                  : page.totalCount,
+            })),
+            pageParams: oldData.pageParams ? [...oldData.pageParams] : [],
+          };
+        });
+
+        // Clear drafts for the temp row.
+        setLocalDrafts((prev) => {
+          const next = new Map(prev);
+          for (const key of prev.keys()) {
+            if (key.startsWith(`${rowId}-`)) next.delete(key);
+          }
+          return next;
+        });
+
+        // Clear pending focus if it was pointing at this temp row.
+        if (pendingRowFocusRef.current?.rowId === rowId) {
+          pendingRowFocusRef.current = null;
+        }
+
+        // Move selection/focus to a stable row.
+        const hasMoreThanOneRow = allRows.length > 1;
+        if (hasMoreThanOneRow) {
+          const nextRowIdx = rowIdx > 0 ? rowIdx - 1 : 0;
+          setActiveCell({ rowIdx: nextRowIdx, colIdx });
+        } else {
+          setActiveCell(null);
+          requestAnimationFrame(() => {
+            rootRef.current?.focus();
+          });
+        }
+
+        return;
+      }
 
       // Prevent duplicate deletes for the same row while one is in flight.
       if (rowDeletesInFlight.has(rowId)) return;
@@ -691,7 +784,7 @@ export default function MainContent({
 
       deleteRowMutation.mutate({ rowId });
     },
-    [allRows.length, deleteRowMutation, rowDeletesInFlight],
+    [allRows.length, deleteRowMutation, rowDeletesInFlight, search, tableId, utils],
   );
   
   // Handle cell editing with local draft state
@@ -1229,7 +1322,7 @@ export default function MainContent({
       }
 
       // Ctrl+Backspace → delete the currently active row (optimistic)
-      if (key === 'Backspace' && e.ctrlKey) {
+      if ((key === 'Backspace' || key === 'Delete') && e.ctrlKey) {
         e.preventDefault();
         const currentRowIdx = activeCell.rowIdx;
         const current = allRows[currentRowIdx];
