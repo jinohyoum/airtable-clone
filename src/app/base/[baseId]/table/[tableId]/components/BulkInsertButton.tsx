@@ -58,7 +58,7 @@ export default function BulkInsertButton() {
     <button
       onClick={handleClick}
       disabled={isInserting}
-      className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50"
     >
       {isInserting ? (
         <>

@@ -9,8 +9,26 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Plus, Type } from 'lucide-react';
 import { api } from '~/trpc/react';
+
+const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
+
+// Map column types to icon names from the sprite
+function getColumnIconName(columnType: string): string {
+  switch (columnType) {
+    case 'longText':
+      return 'Paragraph';
+    case 'user':
+      return 'User';
+    case 'singleSelect':
+      return 'CaretCircleDown';
+    case 'attachment':
+      return 'File';
+    case 'singleLineText':
+    default:
+      return 'TextAlt';
+  }
+}
 
 type CellData = Record<string, string>;
 
@@ -1519,8 +1537,26 @@ export default function MainContent({
                   </th>
                   <th className="w-[180px] h-8 bg-white border-b border-gray-200 p-0 text-left align-middle">
                     <div className="h-8 px-2 flex items-center gap-2">
-                      <Type className="w-3.5 h-3.5 text-gray-500" />
-                      <span className="text-xs font-semibold text-gray-700">Name</span>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        style={{ shapeRendering: 'geometricPrecision' }}
+                        className="flex-none primaryDisplayTypeIcon"
+                      >
+                        <use fill="currentColor" href={`${ICON_SPRITE}#TextAlt`} />
+                      </svg>
+                      <span 
+                        className="text-xs font-semibold leading-4"
+                        style={{ 
+                          color: 'lab(27.1134 -0.956401 -12.3224)',
+                          height: '16px',
+                          lineHeight: '16px',
+                          fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
+                        }}
+                      >
+                        Name
+                      </span>
                     </div>
                   </th>
                 </tr>
@@ -1542,8 +1578,24 @@ export default function MainContent({
                       className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
                     >
                       <div className="h-8 px-2 flex items-center gap-2">
-                        <Type className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="text-xs font-semibold text-gray-700">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          style={{ shapeRendering: 'geometricPrecision' }}
+                          className="flex-none primaryDisplayTypeIcon"
+                        >
+                          <use fill="currentColor" href={`${ICON_SPRITE}#${getColumnIconName(col.type)}`} />
+                        </svg>
+                        <span 
+                          className="text-xs font-semibold leading-4"
+                          style={{ 
+                            color: 'lab(27.1134 -0.956401 -12.3224)',
+                            height: '16px',
+                            lineHeight: '16px',
+                            fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
+                          }}
+                        >
                           {col.name}
                         </span>
                       </div>
@@ -1552,7 +1604,15 @@ export default function MainContent({
                   {/* Add column button */}
                   <th className="w-28 h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
                     <button className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500">
-                      <Plus className="w-4 h-4" />
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        style={{ shapeRendering: 'geometricPrecision' }}
+                        className="flex-none icon"
+                      >
+                        <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
+                      </svg>
                     </button>
                   </th>
                 </tr>
@@ -1709,7 +1769,7 @@ export default function MainContent({
                             >
                               <use
                                 fill="currentColor"
-                                href="/icons/icon_definitions.svg#Plus"
+                                href={`${ICON_SPRITE}#Plus`}
                               />
                             </svg>
                           </div>
