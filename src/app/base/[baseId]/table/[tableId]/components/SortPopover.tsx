@@ -1,5 +1,23 @@
 'use client';
 
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { CSSProperties } from 'react';
 import { forwardRef, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api } from '~/trpc/react';
 import { getColumnIconName } from './columnIcons';
@@ -52,6 +70,130 @@ function SwitchPill({ on }: { on: boolean }) {
         data-testid={on ? 'switch-on' : 'switch-off'}
         style={{ width: 8, height: 8 }}
       />
+    </div>
+  );
+}
+
+function SortableSortRuleRow({
+  id,
+  rule,
+  col,
+  idx,
+  directionLabel,
+  showDragHandle,
+  onFieldClick,
+  onDirectionClick,
+  onRemove,
+}: {
+  id: string;
+  rule: { columnId: string; direction: SortDirection };
+  col: { id: string; name: string } | undefined;
+  idx: number;
+  directionLabel: string;
+  showDragHandle: boolean;
+  onFieldClick: () => void;
+  onDirectionClick: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id, disabled: !showDragHandle });
+
+  const style: CSSProperties = {
+    opacity: 1,
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} className="mx1 relative rounded flex justify-start mb-half" style={style}>
+      <div className="mr1-and-half" style={{ width: 240 }}>
+        <div className="flex flex-auto">
+          <div className="flex flex-auto relative baymax">
+            <div
+              data-testid="autocomplete-button"
+              className="flex items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover width-full border colors-border-default pointer"
+              role="button"
+              aria-expanded="false"
+              tabIndex={0}
+              style={{ height: 28 }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onFieldClick();
+              }}
+            >
+              <div className="flex-auto truncate left-align">{col?.name ?? 'Field'}</div>
+              <div className="flex-none flex items-center ml-half hide-print">
+                <SpriteIcon name="ChevronDown" className="flex-none icon" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mr1-and-half flex" style={{ width: 120, height: 28 }}>
+        <div className="flex flex-auto items-stretch selectMenu">
+          <span
+            role="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            className="flex flex-auto truncate left-align pointer focus-container selectMenuButton pointer"
+            tabIndex={0}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDirectionClick();
+            }}
+          >
+            <div
+              className="flex flex-auto items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover border colors-border-default"
+              data-testid="sort-direction-selector"
+            >
+              <div className="flex-auto textOverflowEllipsis">
+                <span className="sortOrderLabel">{directionLabel}</span>
+              </div>
+              <SpriteIcon name="ChevronDown" className="flex-none flex-none ml-half" />
+            </div>
+          </span>
+        </div>
+      </div>
+
+      <div
+        tabIndex={0}
+        role="button"
+        className="flex pointer link-unquiet-focusable text-blue-focus items-center quieter justify-center colors-background-selected-hover rounded focus-visible"
+        aria-label="Remove sort"
+        style={{ width: 28, opacity: 0.5 }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove();
+        }}
+      >
+        <SpriteIcon name="X" className="flex-none icon" />
+      </div>
+
+      {showDragHandle && (
+        <div
+          ref={setActivatorNodeRef}
+          className="dragHandle link-unquiet quieter flex items-center justify-center focus-visible rounded"
+          role="button"
+          tabIndex={0}
+          aria-disabled="false"
+          aria-roledescription="sortable"
+          {...attributes}
+          {...listeners}
+          style={{ width: 28 }}
+        >
+          <SpriteIcon name="DotsSixVertical" className="flex-none icon" />
+        </div>
+      )}
     </div>
   );
 }
@@ -153,6 +295,11 @@ const SortPopover = forwardRef<
   const NUDGE_UP_PX = 2;
 
   const columnsById = useMemo(() => new Map(columns.map((c) => [c.id, c] as const)), [columns]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const closePopover = () => {
     onRequestClose?.();
@@ -417,95 +564,68 @@ const SortPopover = forwardRef<
                           <ul className="pt1 flex flex-auto flex-column">
                             {draftRules.length === 0 ? null : (
                               <div className="pb1" style={{ opacity: 1 }}>
-                                {draftRules.map((rule, idx) => {
-                                  const col = columnsById.get(rule.columnId);
-                                  const directionLabel = rule.direction === 'asc' ? 'A → Z' : 'Z → A';
-                                  return (
-                                    <div key={`${rule.columnId}-${idx}`} className="mx1 relative rounded flex justify-start mb-half">
-                                      <div className="mr1-and-half" style={{ width: 240 }}>
-                                        <div className="flex flex-auto">
-                                          <div className="flex flex-auto relative baymax">
-                                            <div
-                                              data-testid="autocomplete-button"
-                                              className="flex items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover width-full border colors-border-default pointer"
-                                              role="button"
-                                              aria-expanded="false"
-                                              tabIndex={0}
-                                              style={{ height: 28 }}
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                // Reuse the choose-field panel to pick a different column for this row.
-                                                setEditingRuleIndex(idx);
-                                                setPanel('chooseField');
-                                                setQuery('');
-                                                queueMicrotask(() => inputRef.current?.focus());
-                                              }}
-                                            >
-                                              <div className="flex-auto truncate left-align">{col?.name ?? 'Field'}</div>
-                                              <div className="flex-none flex items-center ml-half hide-print">
-                                                <SpriteIcon name="ChevronDown" className="flex-none icon" />
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="mr1-and-half flex" style={{ width: 120, height: 28 }}>
-                                        <div className="flex flex-auto items-stretch selectMenu">
-                                          <span
-                                            role="button"
-                                            aria-haspopup="true"
-                                            aria-expanded="false"
-                                            className="flex flex-auto truncate left-align pointer focus-container selectMenuButton pointer"
-                                            tabIndex={0}
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              const next = [...draftRules];
-                                              const cur = next[idx];
-                                              if (!cur) return;
-                                              next[idx] = { ...cur, direction: cur.direction === 'asc' ? 'desc' : 'asc' };
-                                              setDraftRules(next);
-                                            }}
-                                          >
-                                            <div
-                                              className="flex flex-auto items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover border colors-border-default"
-                                              data-testid="sort-direction-selector"
-                                            >
-                                              <div className="flex-auto textOverflowEllipsis">
-                                                <span className="sortOrderLabel">{directionLabel}</span>
-                                              </div>
-                                              <SpriteIcon name="ChevronDown" className="flex-none flex-none ml-half" />
-                                            </div>
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      <div
-                                        tabIndex={0}
-                                        role="button"
-                                        className="flex pointer link-unquiet-focusable text-blue-focus items-center quieter justify-center colors-background-selected-hover rounded focus-visible"
-                                        aria-label="Remove sort"
-                                        style={{ width: 28, opacity: 0.5 }}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          const next = draftRules.filter((_, i) => i !== idx);
-                                          setDraftRules(next);
-                                          if (next.length === 0) {
-                                            // Mirror Airtable: removing last sort returns to choose-field.
-                                            // Also clear committed sortRules immediately so column highlighting disappears.
-                                            onChangeSortRules([]);
-                                            queueMicrotask(() => goToChooseField());
-                                          }
-                                        }}
-                                      >
-                                        <SpriteIcon name="X" className="flex-none icon" />
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                                <DndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCenter}
+                                  autoScroll={false}
+                                  modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                                  onDragEnd={(event) => {
+                                    const { active, over } = event;
+                                    if (!over) return;
+                                    if (active.id === over.id) return;
+                                    const oldIndex = draftRules.findIndex((_, i) => `${i}` === String(active.id));
+                                    const newIndex = draftRules.findIndex((_, i) => `${i}` === String(over.id));
+                                    if (oldIndex < 0 || newIndex < 0) return;
+                                    setDraftRules(arrayMove(draftRules, oldIndex, newIndex));
+                                  }}
+                                  onDragCancel={() => {
+                                    // no-op
+                                  }}
+                                >
+                                  <SortableContext
+                                    items={draftRules.map((_, idx) => `${idx}`)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {draftRules.map((rule, idx) => {
+                                      const col = columnsById.get(rule.columnId);
+                                      const directionLabel = rule.direction === 'asc' ? 'A → Z' : 'Z → A';
+                                      return (
+                                        <SortableSortRuleRow
+                                          key={`${rule.columnId}-${idx}`}
+                                          id={`${idx}`}
+                                          rule={rule}
+                                          idx={idx}
+                                          col={col}
+                                          directionLabel={directionLabel}
+                                          showDragHandle={draftRules.length > 1}
+                                          onFieldClick={() => {
+                                            setEditingRuleIndex(idx);
+                                            setPanel('chooseField');
+                                            setQuery('');
+                                            queueMicrotask(() => inputRef.current?.focus());
+                                          }}
+                                          onDirectionClick={() => {
+                                            const next = [...draftRules];
+                                            const cur = next[idx];
+                                            if (!cur) return;
+                                            next[idx] = { ...cur, direction: cur.direction === 'asc' ? 'desc' : 'asc' };
+                                            setDraftRules(next);
+                                          }}
+                                          onRemove={() => {
+                                            const next = draftRules.filter((_, i) => i !== idx);
+                                            setDraftRules(next);
+                                            if (next.length === 0) {
+                                              // Mirror Airtable: removing last sort returns to choose-field.
+                                              // Also clear committed sortRules immediately so column highlighting disappears.
+                                              onChangeSortRules([]);
+                                              queueMicrotask(() => goToChooseField());
+                                            }
+                                          }}
+                                        />
+                                      );
+                                    })}
+                                  </SortableContext>
+                                </DndContext>
                               </div>
                             )}
                           </ul>
