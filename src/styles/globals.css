@@ -5,6 +5,11 @@
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+:root {
+  /* Airtable palette tokens used by the DOM we're matching */
+  --palette-green-green: rgb(4, 138, 14);
+}
+
 /* Hide scrollbars (keep scroll functionality) */
 .hide-scrollbar {
   scrollbar-width: none; /* Firefox */
@@ -45,6 +50,14 @@
 /* -------------------------------------------------------------------------- */
 
 /* shared tiny utility classes used in Airtable DOM */
+.clearfix {
+  display: block;
+}
+
+.overflow-auto {
+  overflow: auto;
+}
+
 .flex-inline {
   display: inline-flex;
 }
@@ -59,8 +72,51 @@
   padding-left: 4px;
   padding-right: 4px;
 }
+
+.px2 {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.px0 {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.px-half {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
 .ml1 {
   margin-left: 4px;
+}
+
+.ml2 {
+  margin-left: 16px;
+}
+
+.mx2 {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+
+.mxn1 {
+  margin-left: -8px;
+  margin-right: -8px;
+}
+
+.my1 {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.mt1 {
+  margin-top: 8px;
+}
+
+.mb-half {
+  margin-bottom: 4px;
 }
 .mr-half {
   margin-right: 2px;
@@ -145,6 +201,10 @@
   padding-bottom: 1px;
 }
 
+.white {
+  background-color: rgb(255, 255, 255);
+}
+
 /* base pill style wrapper Airtable applies */
 .css-1l4uiyf {
   border: 1px solid transparent;
@@ -187,12 +247,28 @@
   border-radius: 8px;
 }
 
+.center {
+  text-align: center;
+}
+
+.block {
+  display: block;
+}
+
+.col-6 {
+  flex: 1 1 0;
+  width: 50%;
+}
+
 .max-width-1 {
   max-width: 100%;
 }
 
 .baymax {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  /* In Airtable DOM, `baymax` is used broadly; the actual popover shadow comes from
+     elevation classes (e.g. `shadow-elevation-high`). Keep this shadowless so rows
+     in lists don't get an unintended halo. */
+  box-shadow: none;
 }
 
 .flex {
@@ -1080,6 +1156,51 @@ li:hover .visually-hidden {
 
 .colors-border-default {
   border-color: rgba(0, 0, 0, 0.1);
+}
+
+.border-bottom-thick {
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hide fields footer buttons (match Airtable computed styles 1:1)            */
+/* -------------------------------------------------------------------------- */
+
+.hide-fields-footer-row {
+  box-sizing: border-box;
+  display: flex;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 11px;
+  font-weight: 500;
+  height: 26px;
+  line-height: 18px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 0;
+  padding-bottom: 0;
+  color: rgb(29, 31, 37);
+  white-space: nowrap;
+}
+
+.hide-fields-footer-button {
+  box-sizing: border-box;
+  display: block;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 11px;
+  font-weight: 500;
+  height: 26px;
+  line-height: 18px;
+  color: rgb(29, 31, 37);
+  opacity: 0.75;
+  border-radius: 3px; /* override generic .rounded (8px) just for this UI */
 }
 
 .rounded-big-bottom {

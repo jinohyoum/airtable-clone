@@ -10,6 +10,8 @@ import { api } from '~/trpc/react';
 import LeftSidebarNarrow from './[tableId]/components/LeftSidebarNarrow';
 import MainContent from './[tableId]/components/MainContent';
 import Sidebar from './[tableId]/components/Sidebar';
+import { ColumnsUiProvider } from './[tableId]/components/ColumnsUiContext';
+import HideFieldsPopover from './[tableId]/components/HideFieldsPopover';
 import TableTabsBar from './[tableId]/components/TableTabsBar';
 import TopNav from './[tableId]/components/TopNav';
 
@@ -29,6 +31,13 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   }, [deferredSearchInput]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
+
+  const [isHideFieldsOpen, setIsHideFieldsOpen] = useState(false);
+  const [hideFieldsPos, setHideFieldsPos] = useState<{ x: number; y: number; maxH: number } | null>(
+    null,
+  );
+  const hideFieldsButtonRef = useRef<HTMLDivElement | null>(null);
+  const hideFieldsPopoverRef = useRef<HTMLDivElement | null>(null);
 
   // Focus input when search bar opens
   useEffect(() => {
@@ -85,6 +94,53 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     };
   }, [isSearchOpen]);
 
+  // Close hide-fields popover when table changes
+  useEffect(() => {
+    setIsHideFieldsOpen(false);
+    setHideFieldsPos(null);
+  }, [tableId]);
+
+  // Position hide-fields popover under the button when opened
+  useEffect(() => {
+    if (!isHideFieldsOpen) return;
+    const btn = hideFieldsButtonRef.current;
+    if (!btn) return;
+
+    const rect = btn.getBoundingClientRect();
+    const width = 320; // 20rem
+    const rawX = Math.round(rect.left);
+    const x = Math.max(8, Math.min(rawX, window.innerWidth - width - 8));
+    const y = Math.round(rect.bottom + 8);
+    const maxH = Math.max(236, Math.min(670, window.innerHeight - y - 16));
+    setHideFieldsPos({ x, y, maxH });
+  }, [isHideFieldsOpen]);
+
+  // Close hide-fields popover on outside click / Escape
+  useEffect(() => {
+    if (!isHideFieldsOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (hideFieldsPopoverRef.current?.contains(t)) return;
+      if (hideFieldsButtonRef.current?.contains(t)) return;
+      setIsHideFieldsOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsHideFieldsOpen(false);
+      hideFieldsButtonRef.current?.focus();
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isHideFieldsOpen]);
+
   const handleBulkInsert = async () => {
     if (!tableId || tableId.startsWith('__creating__')) return;
     
@@ -115,7 +171,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
         <TopNav />
         <TableTabsBar />
         {hasTableId ? (
-          <>
+          <ColumnsUiProvider tableId={tableId ?? ''}>
             {/* View bar (spans to the narrow sidebar) */}
             <div
               className="flex flex-shrink-0 items-center border-b border-gray-200 bg-white relative"
@@ -320,12 +376,25 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                       <div className="flex flex-row mr1">
                         <div>
                           <div
+                            ref={hideFieldsButtonRef}
                             role="button"
                             aria-label="Hide fields"
                             aria-haspopup="true"
-                            aria-expanded="false"
+                            aria-expanded={isHideFieldsOpen}
                             className="focus-visible mr1"
                             tabIndex={0}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setIsHideFieldsOpen((v) => !v);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsHideFieldsOpen((v) => !v);
+                              }
+                            }}
                           >
                             <div
                               className="pointer flex items-center rounded colors-foreground-subtle"
@@ -361,6 +430,13 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           </div>
                         </div>
                       </div>
+
+                      <HideFieldsPopover
+                        ref={hideFieldsPopoverRef}
+                        tableId={tableId ?? ''}
+                        isOpen={isHideFieldsOpen}
+                        position={hideFieldsPos}
+                      />
 
                       {/* Filter button */}
                       <div
@@ -888,7 +964,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
               {/* Keep children mounted for route completeness */}
               {children}
             </div>
-          </>
+          </ColumnsUiProvider>
         ) : (
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <Sidebar />

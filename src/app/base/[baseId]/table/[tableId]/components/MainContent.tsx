@@ -10,25 +10,10 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { api } from '~/trpc/react';
+import { useColumnsUi } from './ColumnsUiContext';
+import { getColumnIconName } from './columnIcons';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
-
-// Map column types to icon names from the sprite
-function getColumnIconName(columnType: string): string {
-  switch (columnType) {
-    case 'longText':
-      return 'Paragraph';
-    case 'user':
-      return 'User';
-    case 'singleSelect':
-      return 'CaretCircleDown';
-    case 'attachment':
-      return 'File';
-    case 'singleLineText':
-    default:
-      return 'TextAlt';
-  }
-}
 
 type CellData = Record<string, string>;
 
@@ -141,6 +126,37 @@ export default function MainContent({
     },
   );
 
+  const { columnOrder, hiddenColumnIds, ensureColumnOrder } = useColumnsUi();
+
+  useEffect(() => {
+    if (!tableMeta) return;
+    ensureColumnOrder(tableMeta.columns.map((c) => c.id));
+  }, [tableMeta, ensureColumnOrder]);
+
+  const primaryColumnId = tableMeta?.columns?.[0]?.id ?? null;
+
+  const orderedColumnIds = useMemo(() => {
+    if (!tableMeta) return [];
+    const defaultIds = tableMeta.columns.map((c) => c.id);
+    const base = columnOrder ?? defaultIds;
+    const existing = new Set(defaultIds);
+    const normalized = base.filter((id) => existing.has(id));
+    for (const id of defaultIds) {
+      if (!normalized.includes(id)) normalized.push(id);
+    }
+    return normalized;
+  }, [tableMeta, columnOrder]);
+
+  const displayColumns = useMemo(() => {
+    if (!tableMeta) return [];
+    const byId = new Map(tableMeta.columns.map((c) => [c.id, c] as const));
+    const ordered = orderedColumnIds
+      .map((id) => byId.get(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c));
+    // Airtable behavior: primary field cannot be hidden; hide-all hides everything except primary.
+    return ordered.filter((c) => (primaryColumnId ? c.id === primaryColumnId : true) || !hiddenColumnIds.has(c.id));
+  }, [tableMeta, orderedColumnIds, hiddenColumnIds, primaryColumnId]);
+
   // Fetch total row count from database (for accurate record count display)
   const { data: rowCountData, error: rowCountError } = api.table.getRowCount.useQuery(
     { tableId: tableId ?? "", search },
@@ -214,7 +230,7 @@ export default function MainContent({
     // Only focus if the activeCell matches the pending row index (ensures we focus the correct row)
     if (activeCell.rowIdx !== pending.rowIdx) return;
     
-    const targetColumn = tableMeta.columns[pending.colIdx];
+    const targetColumn = displayColumns[pending.colIdx];
     if (!targetColumn) return;
     
     const cellKey = `${pending.rowId}-${targetColumn.id}`;
@@ -381,7 +397,7 @@ export default function MainContent({
         pendingRowFocusRef.current = { rowId: tempRowId, colIdx: targetColIdx, rowIdx: newRowIdx };
         
         // Try to focus after render completes - use queueMicrotask to avoid flushSync issues
-        const targetColumn = tableMeta?.columns[targetColIdx];
+        const targetColumn = displayColumns[targetColIdx];
         if (targetColumn) {
           const cellKey = `${tempRowId}-${targetColumn.id}`;
           
@@ -493,7 +509,7 @@ export default function MainContent({
         // Use queueMicrotask to ensure this runs after render cycle
         queueMicrotask(() => {
           requestAnimationFrame(() => {
-            const targetColumn = tableMeta?.columns[currentActiveCell.colIdx];
+            const targetColumn = displayColumns[currentActiveCell.colIdx];
             if (targetColumn) {
               const cellKey = `${newRow.id}-${targetColumn.id}`;
               const inputRef = cellInputRefs.current.get(cellKey);
@@ -543,10 +559,10 @@ export default function MainContent({
   const navigateToCell = useCallback((rowIdx: number, colIdx: number) => {
     const targetRow = allRows[rowIdx];
     if (!targetRow || !tableMeta) return;
-    const targetColumn = tableMeta.columns[colIdx];
+    const targetColumn = displayColumns[colIdx];
     if (!targetColumn) return;
     setActiveCell({ rowIdx, colIdx });
-  }, [allRows, tableMeta]);
+  }, [allRows, tableMeta, displayColumns]);
 
   // Cell update mutation
   const updateCellMutation = api.table.updateCell.useMutation({
@@ -917,7 +933,7 @@ export default function MainContent({
     let currentColIdx = 0;
     
     if (currentRow && tableMeta) {
-      const allColumns = tableMeta.columns;
+      const allColumns = displayColumns;
       currentColIdx = allColumns.findIndex(c => c.id === columnId);
     }
     
@@ -1044,7 +1060,7 @@ export default function MainContent({
     const currentRow = allRows[currentRowIdx];
     if (!currentRow || !tableMeta) return;
     
-    const allColumns = tableMeta.columns;
+    const allColumns = displayColumns;
     const currentColIdx = allColumns.findIndex(c => c.id === columnId);
     const isCurrentlyEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
     
@@ -1166,7 +1182,7 @@ export default function MainContent({
     const targetRow = allRows[rowIdx];
     if (!targetRow || !tableMeta) return;
 
-    const targetColumn = tableMeta.columns[colIdx];
+    const targetColumn = displayColumns[colIdx];
     if (!targetColumn) return;
 
     const rowId = targetRow.id;
@@ -1200,7 +1216,7 @@ export default function MainContent({
         focusRafRef.current = null;
       }
     };
-  }, [activeCell, allRows, tableMeta]);
+  }, [activeCell, allRows, tableMeta, displayColumns]);
   
   // Show transition mask on table switch
   useEffect(() => {
@@ -1221,7 +1237,7 @@ export default function MainContent({
   const columns = useMemo<ColumnDef<CellData>[]>(() => {
     if (!tableMeta) return [];
     
-    return tableMeta.columns.map((col) => ({
+    return displayColumns.map((col) => ({
       id: col.id,
       accessorKey: col.id,
       header: col.name,
@@ -1229,7 +1245,7 @@ export default function MainContent({
         type: col.type,
       },
     }));
-  }, [tableMeta]);
+  }, [tableMeta, displayColumns]);
   
   const data = useMemo<CellData[]>(() => {
     return allRows.map((row) => {
@@ -1331,7 +1347,10 @@ export default function MainContent({
         const currentRowId = current?.id;
         if (currentRowId) {
           // If currently editing, save the cell first before creating a new row
-          if (editingCell?.rowId === currentRowId && editingCell?.columnId === tableMeta?.columns[activeCell.colIdx]?.id) {
+          if (
+            editingCell?.rowId === currentRowId &&
+            editingCell?.columnId === displayColumns[activeCell.colIdx]?.id
+          ) {
             void handleCellSave(editingCell.rowId, editingCell.columnId, false); // Save without maintaining focus
           }
           handleCreateRow({ afterRowId: currentRowId });
@@ -1355,7 +1374,7 @@ export default function MainContent({
         e.preventDefault();
         setIsKeyboardNav(true);
 
-        const maxCol = (tableMeta?.columns.length ?? 1) - 1;
+        const maxCol = (displayColumns.length ?? 1) - 1;
 
         if (e.shiftKey) {
           if (activeCell.colIdx > 0) navigateToCell(activeCell.rowIdx, activeCell.colIdx - 1);
@@ -1381,7 +1400,7 @@ export default function MainContent({
         if (key === 'ArrowLeft') next.colIdx = Math.max(0, activeCell.colIdx - 1);
         if (key === 'ArrowRight') next.colIdx = activeCell.colIdx + 1;
 
-        const maxCol = (tableMeta?.columns.length ?? 1) - 1;
+        const maxCol = (displayColumns.length ?? 1) - 1;
         next.colIdx = Math.min(Math.max(0, next.colIdx), maxCol);
 
         navigateToCell(next.rowIdx, next.colIdx);
@@ -1544,7 +1563,10 @@ export default function MainContent({
                         style={{ shapeRendering: 'geometricPrecision' }}
                         className="flex-none primaryDisplayTypeIcon"
                       >
-                        <use fill="currentColor" href={`${ICON_SPRITE}#TextAlt`} />
+                        <use
+                          fill="currentColor"
+                          href={`${ICON_SPRITE}#${getColumnIconName(displayColumns[0]?.type ?? 'singleLineText')}`}
+                        />
                       </svg>
                       <span 
                         className="text-xs font-semibold leading-4"
@@ -1555,7 +1577,7 @@ export default function MainContent({
                           fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
                         }}
                       >
-                        Name
+                        {displayColumns[0]?.name ?? 'Name'}
                       </span>
                     </div>
                   </th>
@@ -1572,7 +1594,7 @@ export default function MainContent({
             <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
                 <tr className="bg-white h-8">
-                  {tableMeta.columns.slice(1).map((col) => (
+                  {displayColumns.slice(1).map((col) => (
                     <th
                       key={col.id}
                       className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
@@ -1645,7 +1667,7 @@ export default function MainContent({
                       {virtualItems.map((virtualRow) => {
                         const idx = virtualRow.index;
                         const row = rowByIndex(idx);
-                        const firstColumn = tableMeta.columns[0];
+                        const firstColumn = displayColumns[0];
                         if (!firstColumn) return null;
 
                         // Render placeholder if row not loaded yet
@@ -1805,7 +1827,7 @@ export default function MainContent({
                               key={`placeholder-${idx}`}
                               className="bg-white"
                             >
-                              {tableMeta.columns.slice(1).map((col) => (
+                              {displayColumns.slice(1).map((col) => (
                                 <td
                                   key={col.id}
                                   className="w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle bg-white"
@@ -1839,7 +1861,7 @@ export default function MainContent({
                       onMouseEnter={() => setHoveredRow(idx)}
                       onMouseLeave={() => setHoveredRow(null)}
                     >
-                            {tableMeta.columns.slice(1).map((col, cellIdx) => {
+                            {displayColumns.slice(1).map((col, cellIdx) => {
                               const columnId = col.id;
                         const cellKey = `${rowId}-${columnId}`;
                               
@@ -1918,7 +1940,7 @@ export default function MainContent({
                         onClick={() => handleCreateRow()}
                         title="Insert new record in grid"
                       >
-                        {tableMeta.columns.slice(1).map((col) => (
+                        {displayColumns.slice(1).map((col) => (
                           <td
                             key={col.id}
                             className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
