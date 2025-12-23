@@ -108,9 +108,10 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
     const rect = btn.getBoundingClientRect();
     const width = 320; // 20rem
-    const rawX = Math.round(rect.left);
-    const x = Math.max(8, Math.min(rawX, window.innerWidth - width - 8));
-    const y = Math.round(rect.bottom + 8);
+    const offsetRight = 12; // nudge to the right so the popover sits slightly past the button edge
+    const desiredX = Math.round(rect.right + offsetRight - width);
+    const x = Math.max(8, Math.min(desiredX, window.innerWidth - width - 8));
+    const y = Math.round(rect.bottom + 4); // slightly higher so it hugs the button more closely
     const maxH = Math.max(236, Math.min(670, window.innerHeight - y - 16));
     setHideFieldsPos({ x, y, maxH });
   }, [isHideFieldsOpen]);
@@ -317,7 +318,10 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                     className="flex items-center grow-1 justify-end"
                     style={{ paddingLeft: '8px', paddingRight: '8px' }}
                   >
-                    <div className="flex items-center">
+                    <div
+                      className="flex items-center"
+                      style={{ marginLeft: '-4px' }} // shift hide/filter/group/sort/color cluster slightly left
+                    >
                       {/* Bulk Insert Button */}
                       {tableId && !tableId.startsWith('__creating__') && (
                         <div
@@ -373,7 +377,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                       )}
 
                       {/* Hide fields button */}
-                      <div className="flex flex-row mr1">
+                      <div className="flex flex-row mr-half">
                         <div>
                           <div
                             ref={hideFieldsButtonRef}
@@ -495,7 +499,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           role="button"
                           aria-haspopup="true"
                           aria-expanded="false"
-                          className="collapsed focus-visible mr1"
+                          className="collapsed focus-visible mr-half"
                           tabIndex={0}
                         >
                           <div
@@ -539,7 +543,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           role="button"
                           aria-haspopup="true"
                           aria-expanded="false"
-                          className="focus-visible collapsed mr1"
+                          className="focus-visible collapsed mr-half"
                           tabIndex={0}
                         >
                           <div
@@ -581,7 +585,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                     <div
                       tabIndex={0}
                       role="button"
-                      className="collapsed focus-visible mr1"
+                      className="collapsed focus-visible mr-half"
                       id="viwbTwMqnWkLGzJTN-colorConfigButton"
                       aria-label="Row colors"
                     >
@@ -625,8 +629,9 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         role="button"
                         aria-haspopup="true"
                         aria-expanded="false"
-                        className="focus-visible mr1"
+                        className="focus-visible mr-half"
                         tabIndex={0}
+                        style={{ marginLeft: '8px' }} // shift row-height button slightly right between color and Share
                       >
                         <div
                           className="pointer flex items-center rounded colors-foreground-subtle"
@@ -718,6 +723,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                   aria-description="Tooltip: Find in viewctrlf"
                   style={{
                     padding: '4px',
+                    marginLeft: '6px', // bring magnifier slightly left
                   }}
                   onClick={() => {
                     setIsSearchOpen(!isSearchOpen);

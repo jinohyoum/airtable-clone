@@ -242,7 +242,11 @@ const HideFieldsPopover = forwardRef<
             className="flex-auto small px0 py1 background-transparent"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ border: 0 }}
+            style={{
+              border: 0,
+              outline: 'none',
+              boxShadow: 'none',
+            }}
           />
           <div
             tabIndex={0}
