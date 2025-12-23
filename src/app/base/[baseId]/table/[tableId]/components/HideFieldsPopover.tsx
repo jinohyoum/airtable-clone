@@ -215,7 +215,7 @@ const HideFieldsPopover = forwardRef<
       ref={ref}
       role="dialog"
       tabIndex={-1}
-      className="baymax rounded-big focus-visible shadow-elevation-high colors-background-raised-popover"
+      className="baymax focus-visible shadow-elevation-high colors-background-raised-popover"
       style={{
         position: 'fixed',
         inset: '0px auto auto 0px',
@@ -225,6 +225,7 @@ const HideFieldsPopover = forwardRef<
         width: '20rem',
         maxHeight: position.maxH,
         overflow: 'hidden',
+        borderRadius: 3,
         color: 'rgb(29, 31, 37)',
         fontFamily:
           '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',

@@ -382,6 +382,17 @@
   outline-offset: 2px;
 }
 
+/* Sort popover search input (Airtable-like) */
+.sort-popover-search-input {
+  outline: none;
+  box-shadow: none;
+}
+.sort-popover-search-input::placeholder {
+  /* Match Airtable's subtle gray used in the screenshot */
+  color: rgb(97, 102, 112);
+  opacity: 1;
+}
+
 .items-baseline {
   align-items: baseline;
 }

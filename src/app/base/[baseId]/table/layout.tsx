@@ -12,6 +12,7 @@ import MainContent from './[tableId]/components/MainContent';
 import Sidebar from './[tableId]/components/Sidebar';
 import { ColumnsUiProvider } from './[tableId]/components/ColumnsUiContext';
 import HideFieldsPopover from './[tableId]/components/HideFieldsPopover';
+import SortPopover from './[tableId]/components/SortPopover';
 import TableTabsBar from './[tableId]/components/TableTabsBar';
 import TopNav from './[tableId]/components/TopNav';
 
@@ -38,6 +39,11 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   );
   const hideFieldsButtonRef = useRef<HTMLDivElement | null>(null);
   const hideFieldsPopoverRef = useRef<HTMLDivElement | null>(null);
+
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [sortPos, setSortPos] = useState<{ x: number; y: number; maxH: number } | null>(null);
+  const sortButtonRef = useRef<HTMLDivElement | null>(null);
+  const sortPopoverRef = useRef<HTMLDivElement | null>(null);
 
   // Focus input when search bar opens
   useEffect(() => {
@@ -98,6 +104,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     setIsHideFieldsOpen(false);
     setHideFieldsPos(null);
+    setIsSortOpen(false);
+    setSortPos(null);
   }, [tableId]);
 
   // Position hide-fields popover under the button when opened
@@ -141,6 +149,48 @@ export default function TableLayout({ children }: { children: ReactNode }) {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isHideFieldsOpen]);
+
+  // Position sort popover under the button when opened
+  useEffect(() => {
+    if (!isSortOpen) return;
+    const btn = sortButtonRef.current;
+    if (!btn) return;
+
+    const rect = btn.getBoundingClientRect();
+    const width = 320;
+    const offsetRight = 0;
+    const desiredX = Math.round(rect.right + offsetRight - width);
+    const x = Math.max(8, Math.min(desiredX, window.innerWidth - width - 8));
+    const y = Math.round(rect.bottom + 4);
+    const maxH = Math.max(236, Math.min(670, window.innerHeight - y - 16));
+    setSortPos({ x, y, maxH });
+  }, [isSortOpen]);
+
+  // Close sort popover on outside click / Escape
+  useEffect(() => {
+    if (!isSortOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (sortPopoverRef.current?.contains(t)) return;
+      if (sortButtonRef.current?.contains(t)) return;
+      setIsSortOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsSortOpen(false);
+      sortButtonRef.current?.focus();
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isSortOpen]);
 
   const handleBulkInsert = async () => {
     if (!tableId || tableId.startsWith('__creating__')) return;
@@ -342,7 +392,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                               paddingTop: '4px',
                               paddingBottom: '4px',
                               opacity: isInserting ? 0.5 : 1,
-                              cursor: isInserting ? 'not-allowed' : 'pointer',
+                              cursor: 'pointer',
                             }}
                             onMouseEnter={(e) => {
                               if (!isInserting) {
@@ -542,9 +592,22 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           aria-label="Sort rows"
                           role="button"
                           aria-haspopup="true"
-                          aria-expanded="false"
+                          aria-expanded={isSortOpen}
                           className="focus-visible collapsed mr-half"
                           tabIndex={0}
+                          ref={sortButtonRef}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsSortOpen((v) => !v);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setIsSortOpen((v) => !v);
+                            }
+                          }}
                         >
                           <div
                             className="pointer flex items-center rounded colors-foreground-subtle"
@@ -579,6 +642,17 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           </div>
                         </div>
                       </div>
+
+                      <SortPopover
+                        ref={sortPopoverRef}
+                        tableId={tableId ?? ''}
+                        isOpen={isSortOpen}
+                        position={sortPos}
+                        onRequestClose={() => {
+                          setIsSortOpen(false);
+                          setSortPos(null);
+                        }}
+                      />
                     </div>
 
                     {/* Color button */}
