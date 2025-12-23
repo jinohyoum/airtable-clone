@@ -39,6 +39,13 @@ export default function MainContent({
 
   const sortSignature = useMemo(() => JSON.stringify(normalizedSortRules ?? []), [normalizedSortRules]);
 
+  // tRPC utils + rows query key are used throughout (including in early effects), so define them up-front.
+  const utils = api.useUtils();
+  const rowsQueryInput = useMemo(
+    () => ({ tableId, limit: 500 as const, search, sortRules: normalizedSortRules }),
+    [tableId, search, normalizedSortRules],
+  );
+
   // When the user applies Sort in the toolbar, we want to trigger the global "Saving…" UI
   // while the grid refetches rows for the new sort.
   const [sortSaving, setSortSaving] = useState<{ active: boolean; signature: string }>({
@@ -51,6 +58,10 @@ export default function MainContent({
     for (const r of normalizedSortRules ?? []) ids.add(r.columnId);
     return ids;
   }, [normalizedSortRules]);
+
+  // When creating a row while sort is active, we keep it visible where it was created
+  // (so the user's focus doesn't "teleport"), and only refetch to re-sort once focus leaves that row.
+  const pendingResortAfterCreateRef = useRef<{ rowId: string; sortSignature: string } | null>(null);
 
   const SORTED_HEADER_BG = 'rgb(255, 251, 249)';
   const SORTED_COLUMN_BG = 'rgb(255, 242, 235)';
@@ -250,6 +261,26 @@ export default function MainContent({
     console.log('allRows recalculated:', rows.length, 'rows');
     return rows;
   }, [rowPages]);
+
+  // If a row was created while sort is active, refetch after the user leaves that row
+  // so it can move to its correct sorted position.
+  // NOTE: this effect must appear *after* allRows is declared to avoid TDZ errors in the dep array.
+  useEffect(() => {
+    const pending = pendingResortAfterCreateRef.current;
+    if (!pending) return;
+    // If sorts changed since the create, drop the pending behavior.
+    if (pending.sortSignature !== sortSignature) {
+      pendingResortAfterCreateRef.current = null;
+      return;
+    }
+    const activeRowId = activeCell ? allRows[activeCell.rowIdx]?.id : null;
+    // Once focus leaves the created row (or focus is cleared), refetch and clear.
+    if (!activeRowId || activeRowId !== pending.rowId) {
+      // Reconcile with server ordering in the background (handles moving across page boundaries).
+      void utils.table.getRows.invalidate(rowsQueryInput);
+      pendingResortAfterCreateRef.current = null;
+    }
+  }, [activeCell, allRows, sortSignature, utils, rowsQueryInput]);
   
   // Helper to get row by index (returns null if not loaded yet)
   const rowByIndex = useCallback((index: number) => {
@@ -312,11 +343,6 @@ export default function MainContent({
   const isLoading = isLoadingRows && allRows.length === 0;
   
   // Row creation with optimistic updates (Option B: allow rapid clicks)
-  const utils = api.useUtils();
-  const rowsQueryInput = useMemo(
-    () => ({ tableId, limit: 500 as const, search, sortRules: normalizedSortRules }),
-    [tableId, search, normalizedSortRules],
-  );
   const cancelledCreateClientRowIdsRef = useRef<Set<string>>(new Set());
   const skipDeleteOptimisticRowIdsRef = useRef<Set<string>>(new Set());
   const createRowMutation = api.table.createRow.useMutation({
@@ -342,8 +368,9 @@ export default function MainContent({
       }
       
       // If a search filter is active, a new empty row likely won't match; skip optimistic insertion.
-      // If a sort is active, inserting into the correct sorted position is non-trivial; skip optimistic insertion.
-      if (hasSearchFilter || hasSort || !previousPages || !tableMeta) {
+      // We *do* allow optimistic insertion when sort is active so Shift+Enter feels instant.
+      // We'll immediately refetch after the server responds to place the row into its true sorted position.
+      if (hasSearchFilter || !previousPages || !tableMeta) {
         console.warn('Cannot do optimistic update - missing data');
         return { previousPages: undefined, clientRowId, previousCount: currentCount };
       }
@@ -586,8 +613,11 @@ export default function MainContent({
         });
       }
       
-      // Don't invalidate here - the optimistic update should make it appear immediately
-      // Only invalidate if there's a mismatch (which shouldn't happen with proper optimistic updates)
+      // When sort is active, defer re-sorting until focus leaves the created row
+      // (prevents the row from jumping away while the user is still interacting with it).
+      if (normalizedSortRules && normalizedSortRules.length > 0) {
+        pendingResortAfterCreateRef.current = { rowId: newRow.id, sortSignature };
+      }
     },
     onError: (error, _variables, context) => {
       if (!context) return;
@@ -1072,6 +1102,11 @@ export default function MainContent({
           committingCellKeyRef.current = null;
         }
       }
+
+      // If this column is part of the active sort, refetch so the row repositions after blur/commit.
+      if (sortedColumnIds.has(columnId)) {
+        void utils.table.getRows.invalidate(rowsQueryInput);
+      }
     } else {
       // For temp rows, keep the draft
       if (maintainFocus) {
@@ -1085,7 +1120,17 @@ export default function MainContent({
         committingCellKeyRef.current = null;
       }
     }
-  }, [editingCell, editValue, allRows, tableMeta, updateCellMutation, utils, tableId]);
+  }, [
+    editingCell,
+    editValue,
+    allRows,
+    tableMeta,
+    updateCellMutation,
+    utils,
+    tableId,
+    sortedColumnIds,
+    rowsQueryInput,
+  ]);
   
   const handleCellCancel = useCallback((rowId: string, columnId: string) => {
     const cellKey = `${rowId}-${columnId}`;
@@ -1874,9 +1919,6 @@ export default function MainContent({
                           className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
                             hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                           }`}
-                          style={{
-                            backgroundColor: sortedColumnIds.has(displayColumns[0]?.id ?? '') ? SORTED_COLUMN_BG : undefined,
-                          }}
                         >
                           <div className="h-8" />
                         </td>
@@ -2029,9 +2071,6 @@ export default function MainContent({
                             className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
                               hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                             }`}
-                            style={{
-                              backgroundColor: sortedColumnIds.has(col.id) ? SORTED_COLUMN_BG : undefined,
-                            }}
                           >
                             <div className="h-8 pl-3 pr-2" />
                           </td>

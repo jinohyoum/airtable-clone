@@ -495,6 +495,8 @@ const SortPopover = forwardRef<
                                           setDraftRules(next);
                                           if (next.length === 0) {
                                             // Mirror Airtable: removing last sort returns to choose-field.
+                                            // Also clear committed sortRules immediately so column highlighting disappears.
+                                            onChangeSortRules([]);
                                             queueMicrotask(() => goToChooseField());
                                           }
                                         }}

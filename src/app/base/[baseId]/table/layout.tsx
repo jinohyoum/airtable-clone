@@ -47,6 +47,9 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [sortRules, setSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
   const [draftSortRules, setDraftSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
 
+  const sortCountForButton = isSortOpen ? draftSortRules.length : sortRules.length;
+  const isSortActiveForButton = sortCountForButton > 0;
+
   const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
     setSortRules(next);
     // Trigger global "Saving…" UI while the grid refetches sorted rows.
@@ -626,10 +629,10 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         >
                           <div
                             className="pointer flex items-center rounded colors-foreground-subtle"
-                            data-isactive={(sortRules.length > 0 || draftSortRules.length > 0) ? 'true' : 'false'}
+                            data-isactive={isSortActiveForButton ? 'true' : 'false'}
                             aria-description={`Tooltip: ${
-                              (sortRules.length > 0 || draftSortRules.length > 0)
-                                ? `Sorted by ${(sortRules.length > 0 ? sortRules.length : draftSortRules.length)} field${(sortRules.length > 0 ? sortRules.length : draftSortRules.length) === 1 ? '' : 's'}`
+                              isSortActiveForButton
+                                ? `Sorted by ${sortCountForButton} field${sortCountForButton === 1 ? '' : 's'}`
                                 : 'Sort'
                             }`}
                             style={{
@@ -637,18 +640,18 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                               paddingRight: '8px',
                               paddingTop: '4px',
                               paddingBottom: '4px',
-                              backgroundColor: (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(255, 224, 204)' : 'transparent',
-                              color: (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(0, 0, 0)' : undefined,
+                              backgroundColor: isSortActiveForButton ? 'rgb(255, 224, 204)' : 'transparent',
+                              color: isSortActiveForButton ? 'rgb(0, 0, 0)' : undefined,
                               // "More square" active pill
-                              borderRadius: (sortRules.length > 0 || draftSortRules.length > 0) ? '4px' : undefined,
+                              borderRadius: isSortActiveForButton ? '4px' : undefined,
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.backgroundColor =
-                                (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(255, 224, 204)' : 'rgba(0, 0, 0, 0.05)';
+                                isSortActiveForButton ? 'rgb(255, 224, 204)' : 'rgba(0, 0, 0, 0.05)';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.backgroundColor =
-                                (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(255, 224, 204)' : 'transparent';
+                                isSortActiveForButton ? 'rgb(255, 224, 204)' : 'transparent';
                             }}
                           >
                             <svg
@@ -664,8 +667,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                               />
                             </svg>
                             <div className="max-width-1 truncate ml-half">
-                              {(sortRules.length > 0 || draftSortRules.length > 0)
-                                ? `Sorted by ${(sortRules.length > 0 ? sortRules.length : draftSortRules.length)} field${(sortRules.length > 0 ? sortRules.length : draftSortRules.length) === 1 ? '' : 's'}`
+                              {isSortActiveForButton
+                                ? `Sorted by ${sortCountForButton} field${sortCountForButton === 1 ? '' : 's'}`
                                 : 'Sort'}
                             </div>
                           </div>
