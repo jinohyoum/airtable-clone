@@ -45,6 +45,19 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const sortButtonRef = useRef<HTMLDivElement | null>(null);
   const sortPopoverRef = useRef<HTMLDivElement | null>(null);
   const [sortRules, setSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
+  const [draftSortRules, setDraftSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
+
+  const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
+    setSortRules(next);
+    // Trigger global "Saving…" UI while the grid refetches sorted rows.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('grid:sortSaving', {
+          detail: { active: true, signature: JSON.stringify(next ?? []) },
+        }),
+      );
+    }
+  };
 
   // Focus input when search bar opens
   useEffect(() => {
@@ -613,19 +626,29 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         >
                           <div
                             className="pointer flex items-center rounded colors-foreground-subtle"
-                            data-isactive="false"
-                            aria-description="Tooltip: Sort"
+                            data-isactive={(sortRules.length > 0 || draftSortRules.length > 0) ? 'true' : 'false'}
+                            aria-description={`Tooltip: ${
+                              (sortRules.length > 0 || draftSortRules.length > 0)
+                                ? `Sorted by ${(sortRules.length > 0 ? sortRules.length : draftSortRules.length)} field${(sortRules.length > 0 ? sortRules.length : draftSortRules.length) === 1 ? '' : 's'}`
+                                : 'Sort'
+                            }`}
                             style={{
                               paddingLeft: '8px',
                               paddingRight: '8px',
                               paddingTop: '4px',
                               paddingBottom: '4px',
+                              backgroundColor: (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(255, 224, 204)' : 'transparent',
+                              color: (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(0, 0, 0)' : undefined,
+                              // "More square" active pill
+                              borderRadius: (sortRules.length > 0 || draftSortRules.length > 0) ? '4px' : undefined,
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                              e.currentTarget.style.backgroundColor =
+                                (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(255, 224, 204)' : 'rgba(0, 0, 0, 0.05)';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.backgroundColor =
+                                (sortRules.length > 0 || draftSortRules.length > 0) ? 'rgb(255, 224, 204)' : 'transparent';
                             }}
                           >
                             <svg
@@ -640,7 +663,11 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                                 href="/icons/icon_definitions.svg#ArrowsDownUp"
                               />
                             </svg>
-                            <div className="max-width-1 truncate ml-half">Sort</div>
+                            <div className="max-width-1 truncate ml-half">
+                              {(sortRules.length > 0 || draftSortRules.length > 0)
+                                ? `Sorted by ${(sortRules.length > 0 ? sortRules.length : draftSortRules.length)} field${(sortRules.length > 0 ? sortRules.length : draftSortRules.length) === 1 ? '' : 's'}`
+                                : 'Sort'}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -651,10 +678,12 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         isOpen={isSortOpen}
                         position={sortPos}
                         sortRules={sortRules}
-                        onChangeSortRules={setSortRules}
+                        onChangeSortRules={applySortRules}
+                        onDraftRulesChange={setDraftSortRules}
                         onRequestClose={() => {
                           setIsSortOpen(false);
                           setSortPos(null);
+                          setDraftSortRules(sortRules);
                         }}
                       />
                     </div>

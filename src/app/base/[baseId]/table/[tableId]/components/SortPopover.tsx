@@ -64,9 +64,13 @@ const SortPopover = forwardRef<
     position: { x: number; y: number; maxH: number } | null;
     sortRules: Array<{ columnId: string; direction: SortDirection }>;
     onChangeSortRules: (next: Array<{ columnId: string; direction: SortDirection }>) => void;
+    onDraftRulesChange?: (draft: Array<{ columnId: string; direction: SortDirection }>) => void;
     onRequestClose?: () => void;
   }
->(function SortPopover({ tableId, isOpen, position, sortRules, onChangeSortRules, onRequestClose }, ref) {
+>(function SortPopover(
+  { tableId, isOpen, position, sortRules, onChangeSortRules, onDraftRulesChange, onRequestClose },
+  ref,
+) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   // Keep forwardRef behavior (layout.tsx uses this for outside-click detection)
   // Use a callback ref so the parent ref is set immediately on mount (not after an effect).
@@ -90,6 +94,13 @@ const SortPopover = forwardRef<
 
   // Draft rules: stage edits while the popover is open; commit only when clicking "Sort".
   const [draftRules, setDraftRules] = useState(sortRules);
+
+  // Let the toolbar reflect how many sorts are configured *while editing*,
+  // even before the user clicks "Sort" to commit.
+  useEffect(() => {
+    if (!isOpen) return;
+    onDraftRulesChange?.(draftRules);
+  }, [draftRules, isOpen, onDraftRulesChange]);
 
   const [query, setQuery] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);

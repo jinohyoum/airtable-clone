@@ -38,6 +38,22 @@ export default function MainContent({
   }, [sortRules]);
 
   const sortSignature = useMemo(() => JSON.stringify(normalizedSortRules ?? []), [normalizedSortRules]);
+
+  // When the user applies Sort in the toolbar, we want to trigger the global "Saving…" UI
+  // while the grid refetches rows for the new sort.
+  const [sortSaving, setSortSaving] = useState<{ active: boolean; signature: string }>({
+    active: false,
+    signature: '[]',
+  });
+
+  const sortedColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const r of normalizedSortRules ?? []) ids.add(r.columnId);
+    return ids;
+  }, [normalizedSortRules]);
+
+  const SORTED_HEADER_BG = 'rgb(255, 251, 249)';
+  const SORTED_COLUMN_BG = 'rgb(255, 242, 235)';
   
   const rootRef = useRef<HTMLDivElement | null>(null);
   const middleHeaderScrollRef = useRef<HTMLDivElement | null>(null);
@@ -104,7 +120,9 @@ export default function MainContent({
     const count =
       new Set<string>([...pendingCells, ...savingCells]).size +
       rowCreatesInFlight.size +
-      rowDeletesInFlight.size;
+      rowDeletesInFlight.size +
+      // Sorting isn't a server mutation, but Airtable shows the same global "Saving…" while refetching.
+      (sortSaving.active ? 1 : 0);
     window.dispatchEvent(
       new CustomEvent('grid:saving', { detail: { count } }),
     );
@@ -112,7 +130,7 @@ export default function MainContent({
       // Clear on unmount so we don't leave a stale indicator visible after route changes.
       window.dispatchEvent(new CustomEvent('grid:saving', { detail: { count: 0 } }));
     };
-  }, [pendingCells, savingCells, rowCreatesInFlight, rowDeletesInFlight]);
+  }, [pendingCells, savingCells, rowCreatesInFlight, rowDeletesInFlight, sortSaving.active]);
 
   // Simple force-update hook used by the virtualizer's onChange scheduler to avoid flushSync.
   const forceUpdate = useReducer((x) => x + 1, 0)[1] as () => void;
@@ -180,6 +198,7 @@ export default function MainContent({
     hasNextPage,
     isFetchingNextPage,
     isLoading: isLoadingRows,
+    isFetching: isFetchingRows,
     error: rowsError,
   } = api.table.getRows.useInfiniteQuery(
     { 
@@ -196,6 +215,28 @@ export default function MainContent({
       refetchOnWindowFocus: false,
     },
   );
+
+  // Listen for "sort applied" events from the toolbar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onSortSaving = (e: Event) => {
+      const ce = e as CustomEvent<{ active?: boolean; signature?: string }>;
+      const active = Boolean(ce.detail?.active);
+      const signature = ce.detail?.signature ?? '[]';
+      setSortSaving({ active, signature });
+    };
+    window.addEventListener('grid:sortSaving', onSortSaving as EventListener);
+    return () => window.removeEventListener('grid:sortSaving', onSortSaving as EventListener);
+  }, []);
+
+  // Turn off sort "saving" once the rows query finishes fetching for the same sort signature.
+  useEffect(() => {
+    if (!sortSaving.active) return;
+    // Only clear if we're on the same sort config that triggered the saving state.
+    if (sortSaving.signature !== sortSignature) return;
+    if (isFetchingRows) return;
+    setSortSaving((prev) => (prev.active ? { ...prev, active: false } : prev));
+  }, [sortSaving.active, sortSaving.signature, sortSignature, isFetchingRows]);
 
   // Get total count from first page (for virtualizer)
   const totalCount = useMemo(() => {
@@ -1571,7 +1612,12 @@ export default function MainContent({
                       <input type="checkbox" className="rounded border-gray-300" />
                     </div>
                   </th>
-                  <th className="w-[180px] h-8 bg-white border-b border-gray-200 p-0 text-left align-middle">
+                  <th
+                    className="w-[180px] h-8 bg-white border-b border-gray-200 p-0 text-left align-middle"
+                    style={{
+                      backgroundColor: sortedColumnIds.has(displayColumns[0]?.id ?? '') ? SORTED_HEADER_BG : undefined,
+                    }}
+                  >
                     <div className="h-8 px-2 flex items-center gap-2">
                       <svg
                         width="16"
@@ -1615,6 +1661,9 @@ export default function MainContent({
                     <th
                       key={col.id}
                       className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
+                      style={{
+                        backgroundColor: sortedColumnIds.has(col.id) ? SORTED_HEADER_BG : undefined,
+                      }}
                     >
                       <div className="h-8 px-2 flex items-center gap-2">
                         <svg
@@ -1699,7 +1748,12 @@ export default function MainContent({
                                   {idx + 1}
                                 </div>
                               </td>
-                              <td className="w-[180px] h-8 border-b border-gray-200 p-0 align-middle bg-white">
+                              <td
+                                className="w-[180px] h-8 border-b border-gray-200 p-0 align-middle bg-white"
+                                style={{
+                                  backgroundColor: sortedColumnIds.has(firstColumn.id) ? SORTED_COLUMN_BG : undefined,
+                                }}
+                              >
                                 <div className="h-8 px-2 flex items-center text-gray-300">
                                   {/* Empty placeholder */}
                                 </div>
@@ -1746,6 +1800,9 @@ export default function MainContent({
                         className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
                           isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
+                        style={{
+                          backgroundColor: sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : undefined,
+                        }}
                       >
                         <input
                           ref={(el) => {
@@ -1817,6 +1874,9 @@ export default function MainContent({
                           className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
                             hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                           }`}
+                          style={{
+                            backgroundColor: sortedColumnIds.has(displayColumns[0]?.id ?? '') ? SORTED_COLUMN_BG : undefined,
+                          }}
                         >
                           <div className="h-8" />
                         </td>
@@ -1848,6 +1908,9 @@ export default function MainContent({
                                 <td
                                   key={col.id}
                                   className="w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle bg-white"
+                                  style={{
+                                    backgroundColor: sortedColumnIds.has(col.id) ? SORTED_COLUMN_BG : undefined,
+                                  }}
                                 >
                                   <div className="h-8 pl-3 pr-2 flex items-center text-gray-300">
                                     {/* Empty placeholder */}
@@ -1899,6 +1962,9 @@ export default function MainContent({
                             className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
                               isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                             }`}
+                            style={{
+                              backgroundColor: sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : undefined,
+                            }}
                           >
                             <input
                               ref={(el) => {
@@ -1963,6 +2029,9 @@ export default function MainContent({
                             className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
                               hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                             }`}
+                            style={{
+                              backgroundColor: sortedColumnIds.has(col.id) ? SORTED_COLUMN_BG : undefined,
+                            }}
                           >
                             <div className="h-8 pl-3 pr-2" />
                           </td>
