@@ -65,6 +65,23 @@ export default function MainContent({
 
   const SORTED_HEADER_BG = 'rgb(255, 251, 249)';
   const SORTED_COLUMN_BG = 'rgb(255, 242, 235)';
+  const SEARCH_CELL_BG = 'rgba(255, 243, 213)';
+  const SEARCH_ROW_NUMBER_BG = 'rgba(255, 243, 213)';
+  
+  // Helper function to check if a cell value contains the search term
+  const cellMatchesSearch = useCallback((cellValue: string, searchTerm?: string): boolean => {
+    if (!searchTerm || searchTerm.trim().length === 0) return false;
+    const normalizedValue = (cellValue ?? '').toLowerCase();
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    return normalizedValue.includes(normalizedSearch);
+  }, []);
+
+  // Helper function to check if any cell in a row contains the search term
+  const rowMatchesSearch = useCallback((row: typeof allRows[0], searchTerm?: string): boolean => {
+    if (!searchTerm || searchTerm.trim().length === 0) return false;
+    if (!row) return false;
+    return row.cells.some(cell => cellMatchesSearch(cell.value ?? '', searchTerm));
+  }, [cellMatchesSearch]);
   
   const rootRef = useRef<HTMLDivElement | null>(null);
   const middleHeaderScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1825,6 +1842,11 @@ export default function MainContent({
                   const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === 0;
                   const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
                   
+                  // Check if cell matches search
+                  const cellMatches = cellMatchesSearch(cellValue, search);
+                  // Check if row matches search (any cell in the row)
+                  const rowMatches = rowMatchesSearch(row, search);
+                  
                   return (
                     <tr
                       key={row.id}
@@ -1836,6 +1858,9 @@ export default function MainContent({
                         className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
                           isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
+                        style={{
+                          backgroundColor: rowMatches ? SEARCH_ROW_NUMBER_BG : undefined,
+                        }}
                       >
                         <div className="h-8 flex items-center justify-center text-xs text-gray-500 font-medium">
                           {idx + 1}
@@ -1846,7 +1871,11 @@ export default function MainContent({
                           isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
                         style={{
-                          backgroundColor: sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : undefined,
+                          backgroundColor: cellMatches 
+                            ? (sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : SEARCH_CELL_BG)
+                            : sortedColumnIds.has(columnId) 
+                              ? SORTED_COLUMN_BG 
+                              : undefined,
                         }}
                       >
                         <input
@@ -1976,6 +2005,9 @@ export default function MainContent({
                   const isRowHighlighted = isHovered || isKeyboardRowActive;
                         const rowId = row.id;
                   
+                  // Check if row matches search (any cell in the row)
+                  const rowMatches = rowMatchesSearch(row, search);
+                  
                   return (
                     <tr
                       key={row.id}
@@ -1998,6 +2030,9 @@ export default function MainContent({
                         const isActive = activeCell?.rowIdx === idx && activeCell?.colIdx === colIdx;
                         const isKeyboardActive = isKeyboardNav && isActive && !isEditing;
                         
+                        // Check if cell matches search
+                        const cellMatches = cellMatchesSearch(cellValue, search);
+                        
                         return (
                           <td
                                   key={columnId}
@@ -2005,7 +2040,11 @@ export default function MainContent({
                               isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                             }`}
                             style={{
-                              backgroundColor: sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : undefined,
+                              backgroundColor: cellMatches 
+                                ? (sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : SEARCH_CELL_BG)
+                                : sortedColumnIds.has(columnId) 
+                                  ? SORTED_COLUMN_BG 
+                                  : undefined,
                             }}
                           >
                             <input

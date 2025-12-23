@@ -1049,6 +1049,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSearchInput('');
                           setIsSearchOpen(false);
                         }}
                         onMouseEnter={(e) => {
