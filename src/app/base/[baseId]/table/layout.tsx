@@ -1044,7 +1044,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <Sidebar />
-              <MainContent isSearchOpen={isSearchOpen} search={search} />
+              <MainContent isSearchOpen={isSearchOpen} search={search} sortRules={sortRules} />
               {/* Keep children mounted for route completeness */}
               {children}
             </div>

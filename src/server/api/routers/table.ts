@@ -375,16 +375,39 @@ export const tableRouter = createTRPCRouter({
         tableId: z.string(),
         limit: z.number().min(1).max(500).default(200),
         cursor: z
-          .object({
-            order: z.number(),
-            id: z.string(),
-          })
+          .discriminatedUnion("mode", [
+            z.object({
+              mode: z.literal("order"),
+              order: z.number(),
+              id: z.string(),
+            }),
+            z.object({
+              mode: z.literal("sort"),
+              keys: z.array(
+                z.object({
+                  isBlank: z.boolean(),
+                  sortKey: z.string(),
+                }),
+              ),
+              id: z.string(),
+            }),
+          ])
           .optional(), // Last row from previous page (stable cursor)
         search: z.string().optional(),
+        sortRules: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              direction: z.enum(["asc", "desc"]),
+            }),
+          )
+          .optional(),
+        sortBy: z.string().optional(),
+        sortDir: z.enum(["asc", "desc"]).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
-      const { tableId, limit, cursor } = input;
+      const { tableId, limit } = input;
       const q = input.search?.trim();
       const search = q && q.length > 0 ? q : undefined;
 
@@ -400,9 +423,19 @@ export const tableRouter = createTRPCRouter({
 
       if (!table) throw new Error("Table not found");
 
-      const cursorSql = cursor
-        ? Prisma.sql`AND (r."order" > ${cursor.order} OR (r."order" = ${cursor.order} AND r."id" > ${cursor.id}))`
-        : Prisma.empty;
+      const requestedRules =
+        input.sortRules && input.sortRules.length > 0
+          ? input.sortRules
+          : input.sortBy && input.sortDir
+            ? [{ columnId: input.sortBy, direction: input.sortDir }]
+            : [];
+
+      const validRules = requestedRules.filter((r) =>
+        table.columns.some((c) => c.id === r.columnId),
+      );
+      const useSort = validRules.length > 0;
+
+      const cursor = input.cursor;
 
       // Search behavior (take-home spec): case-insensitive "contains" across ALL cell values.
       // We do this directly against the JSONB `values` column so search works even if `searchText`
@@ -415,37 +448,192 @@ export const tableRouter = createTRPCRouter({
           )`
         : Prisma.empty;
 
-      // Fetch rows with cursor-based pagination (stable order: order + id).
-      // Note: we use raw SQL here for JSONB searching.
-      const rowsQuery = Prisma.sql`
+      const baseSelect = Prisma.sql`
         SELECT r."id", r."order", r."createdAt", r."updatedAt", r."tableId", r."clientRowId", r."searchText", r."values"
-        FROM "Row" r
-        WHERE r."tableId" = ${tableId}
-        ${searchSql}
-        ${cursorSql}
-        ORDER BY r."order" ASC, r."id" ASC
-        LIMIT ${limit + 1}
       `;
-      const rowsData = await ctx.db.$queryRaw<
-        Array<{
-          id: string;
-          order: number;
-          createdAt: Date;
-          updatedAt: Date;
-          tableId: string;
-          clientRowId: string | null;
-          searchText: string;
-          values: unknown;
-        }>
-      >(rowsQuery);
+
+      // Fetch rows with cursor-based pagination.
+      // Note: we use raw SQL here for JSONB searching + sorting.
+      let rowsData:
+        | Array<{
+            id: string;
+            order: number;
+            createdAt: Date;
+            updatedAt: Date;
+            tableId: string;
+            clientRowId: string | null;
+            searchText: string;
+            values: unknown;
+          }>
+        | Array<{
+            id: string;
+            order: number;
+            createdAt: Date;
+            updatedAt: Date;
+            tableId: string;
+            clientRowId: string | null;
+            searchText: string;
+            values: unknown;
+            __sortKeys: unknown;
+          }>;
+
+      if (!useSort) {
+        const cursorSql =
+          cursor?.mode === "order"
+            ? Prisma.sql`AND (r."order" > ${cursor.order} OR (r."order" = ${cursor.order} AND r."id" > ${cursor.id}))`
+            : Prisma.empty;
+
+        const rowsQuery = Prisma.sql`
+          ${baseSelect}
+          FROM "Row" r
+          WHERE r."tableId" = ${tableId}
+          ${searchSql}
+          ${cursorSql}
+          ORDER BY r."order" ASC, r."id" ASC
+          LIMIT ${limit + 1}
+        `;
+
+        rowsData = await ctx.db.$queryRaw<
+          Array<{
+            id: string;
+            order: number;
+            createdAt: Date;
+            updatedAt: Date;
+            tableId: string;
+            clientRowId: string | null;
+            searchText: string;
+            values: unknown;
+          }>
+        >(rowsQuery);
+      } else {
+        // Build per-rule sort expressions (JSONB text, trimmed, blank grouping, lowercase key)
+        const sortExprs = validRules.map((r) => {
+          const valueExpr = Prisma.sql`(r."values"->>${r.columnId})`;
+          const trimmedExpr = Prisma.sql`btrim(COALESCE(${valueExpr}, ''))`;
+          const isBlankExpr = Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL)`;
+          const sortKeyExpr = Prisma.sql`lower(COALESCE(NULLIF(${trimmedExpr}, ''), ''))`;
+          return { isBlankExpr, sortKeyExpr, direction: r.direction as "asc" | "desc" };
+        });
+
+        // Cursor must match rule count; otherwise ignore it (prevents mismatched pagination when rules change).
+        const cursorOk =
+          cursor?.mode === "sort" &&
+          Array.isArray(cursor.keys) &&
+          cursor.keys.length === sortExprs.length;
+
+        // Build lexicographic keyset predicate for (isBlank1, sortKey1, isBlank2, sortKey2, ..., id)
+        const cursorSql = (() => {
+          if (!cursorOk) return Prisma.empty;
+
+          const orParts: Prisma.Sql[] = [];
+          const eqParts: Prisma.Sql[] = [];
+
+          const pushCmp = (expr: Prisma.Sql, dir: "asc" | "desc", val: unknown) => {
+            const op = dir === "desc" ? Prisma.sql`<` : Prisma.sql`>`;
+            orParts.push(
+              Prisma.sql`(${Prisma.join(eqParts, " AND ")}${eqParts.length ? Prisma.sql` AND ` : Prisma.empty}${expr} ${op} ${val})`,
+            );
+            eqParts.push(Prisma.sql`${expr} = ${val}`);
+          };
+
+          for (let i = 0; i < sortExprs.length; i++) {
+            const k = cursor!.keys[i]!;
+            // isBlank is always ASC (false first, true last)
+            pushCmp(sortExprs[i]!.isBlankExpr, "asc", k.isBlank);
+            // sortKey follows the rule direction
+            pushCmp(sortExprs[i]!.sortKeyExpr, sortExprs[i]!.direction, k.sortKey);
+          }
+
+          // Stable tie-breaker: id ASC
+          pushCmp(Prisma.sql`r."id"`, "asc", cursor!.id);
+
+          return Prisma.sql`AND (${Prisma.join(orParts, " OR ")})`;
+        })();
+
+        // JSON array of per-rule key tuples so we can build nextCursor without relying on dynamic column names.
+        const sortKeysJson = Prisma.sql`jsonb_build_array(${Prisma.join(
+          sortExprs.map(
+            (e) =>
+              Prisma.sql`jsonb_build_object('isBlank', ${e.isBlankExpr}, 'sortKey', ${e.sortKeyExpr})`,
+          ),
+          ", ",
+        )})`;
+
+        const orderByParts: Prisma.Sql[] = [];
+        for (const e of sortExprs) {
+          orderByParts.push(Prisma.sql`${e.isBlankExpr} ASC`);
+          orderByParts.push(
+            Prisma.sql`${e.sortKeyExpr} ${e.direction === "desc" ? Prisma.sql`DESC` : Prisma.sql`ASC`}`,
+          );
+        }
+        orderByParts.push(Prisma.sql`r."id" ASC`);
+
+        const rowsQuery = Prisma.sql`
+          ${baseSelect},
+            ${sortKeysJson} AS "__sortKeys"
+          FROM "Row" r
+          WHERE r."tableId" = ${tableId}
+          ${searchSql}
+          ${cursorSql}
+          ORDER BY ${Prisma.join(orderByParts, ", ")}
+          LIMIT ${limit + 1}
+        `;
+
+        rowsData = await ctx.db.$queryRaw<
+          Array<{
+            id: string;
+            order: number;
+            createdAt: Date;
+            updatedAt: Date;
+            tableId: string;
+            clientRowId: string | null;
+            searchText: string;
+            values: unknown;
+            __sortKeys: unknown;
+          }>
+        >(rowsQuery);
+      }
 
       // Determine if there are more pages
-      let nextCursor: { order: number; id: string } | undefined = undefined;
-      const rows = [...rowsData];
-      if (rows.length > limit) {
-        const nextItem = rows.pop(); // Remove the extra item
-        if (nextItem) {
-          nextCursor = { order: nextItem.order, id: nextItem.id };
+      const hasMore = rowsData.length > limit;
+      const rows = rowsData.slice(0, limit);
+
+      let nextCursor:
+        | { mode: "order"; order: number; id: string }
+        | { mode: "sort"; keys: Array<{ isBlank: boolean; sortKey: string }>; id: string }
+        | undefined = undefined;
+
+      if (hasMore && rows.length > 0) {
+        const last = rows[rows.length - 1] as
+          | {
+              id: string;
+              order: number;
+            }
+          | {
+              id: string;
+              order: number;
+              __isBlank: boolean;
+              __sortKey: string;
+            };
+
+        if (useSort) {
+          const keys = Array.isArray((last as { __sortKeys?: unknown }).__sortKeys)
+            ? ((last as { __sortKeys?: unknown }).__sortKeys as Array<{
+                isBlank?: unknown;
+                sortKey?: unknown;
+              }>).map((k) => ({
+                isBlank: Boolean(k?.isBlank),
+                sortKey: String(k?.sortKey ?? ""),
+              }))
+            : [];
+
+          nextCursor = {
+            mode: "sort",
+            keys,
+            id: last.id,
+          };
+        } else {
+          nextCursor = { mode: "order", order: last.order, id: last.id };
         }
       }
 
@@ -479,7 +667,14 @@ export const tableRouter = createTRPCRouter({
         });
 
         return {
-          ...row,
+          id: row.id,
+          order: row.order,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          tableId: row.tableId,
+          clientRowId: row.clientRowId,
+          searchText: row.searchText,
+          values: row.values,
           cells,
         };
       });

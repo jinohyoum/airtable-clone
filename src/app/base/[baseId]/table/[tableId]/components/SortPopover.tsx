@@ -38,7 +38,6 @@ function SpriteIcon({
 function SwitchPill({ on }: { on: boolean }) {
   return (
     <div
-      as="div"
       className="mx1 pill flex flex-none animate border-box darken2 justify-start"
       style={{
         height: 12,
@@ -89,6 +88,9 @@ const SortPopover = forwardRef<
     { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
   );
 
+  // Draft rules: stage edits while the popover is open; commit only when clicking "Sort".
+  const [draftRules, setDraftRules] = useState(sortRules);
+
   const [query, setQuery] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -107,6 +109,7 @@ const SortPopover = forwardRef<
 
   useEffect(() => {
     if (!isOpen) return;
+    setDraftRules(sortRules);
     setQuery('');
     setPanel(sortRules.length > 0 ? 'config' : 'chooseField');
     setEditingRuleIndex(null);
@@ -126,7 +129,7 @@ const SortPopover = forwardRef<
 
   const showNoResults = query.trim().length > 0 && filteredColumns.length === 0;
 
-  const usedColumnIds = useMemo(() => new Set(sortRules.map((r) => r.columnId)), [sortRules]);
+  const usedColumnIds = useMemo(() => new Set(draftRules.map((r) => r.columnId)), [draftRules]);
 
   const filteredColumnsForAddSort = useMemo(() => {
     const q = addSortQuery.trim().toLowerCase();
@@ -142,6 +145,16 @@ const SortPopover = forwardRef<
 
   const closePopover = () => {
     onRequestClose?.();
+  };
+
+  const cancelAndClose = () => {
+    setDraftRules(sortRules);
+    closePopover();
+  };
+
+  const commitAndClose = () => {
+    onChangeSortRules(draftRules);
+    closePopover();
   };
 
   const goToChooseField = () => {
@@ -333,20 +346,21 @@ const SortPopover = forwardRef<
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    onChangeSortRules(
-                                      (() => {
+                                    setDraftRules((prev) => {
                                       // If editing a specific row, update it; otherwise create/replace the first rule.
                                       const idx = editingRuleIndex ?? 0;
-                                      const next = sortRules.length ? [...sortRules] : [{ columnId: col.id, direction: 'asc' as const }];
-                                      if (sortRules.length === 0) return next;
+                                      const next = prev.length
+                                        ? [...prev]
+                                        : [{ columnId: col.id, direction: 'asc' as const }];
+                                      if (prev.length === 0) return next;
                                       if (idx >= next.length) {
                                         next.push({ columnId: col.id, direction: 'asc' });
                                       } else {
-                                        next[idx] = { ...next[idx], columnId: col.id };
+                                        const cur = next[idx] ?? { columnId: col.id, direction: 'asc' as const };
+                                        next[idx] = { ...cur, columnId: col.id };
                                       }
                                       return next;
-                                      })(),
-                                    );
+                                    });
                                     setEditingRuleIndex(null);
                                     setPanel('config');
                                     setIsAddSortMenuOpen(false);
@@ -390,9 +404,9 @@ const SortPopover = forwardRef<
 
                         <div className="overflow-auto light-scrollbar" style={{ minHeight: 70, maxHeight: 'calc(-380px + 100vh)' }}>
                           <ul className="pt1 flex flex-auto flex-column">
-                            {sortRules.length === 0 ? null : (
+                            {draftRules.length === 0 ? null : (
                               <div className="pb1" style={{ opacity: 1 }}>
-                                {sortRules.map((rule, idx) => {
+                                {draftRules.map((rule, idx) => {
                                   const col = columnsById.get(rule.columnId);
                                   const directionLabel = rule.direction === 'asc' ? 'A → Z' : 'Z → A';
                                   return (
@@ -437,11 +451,11 @@ const SortPopover = forwardRef<
                                             onClick={(e) => {
                                               e.preventDefault();
                                               e.stopPropagation();
-                                              const next = [...sortRules];
+                                              const next = [...draftRules];
                                               const cur = next[idx];
                                               if (!cur) return;
                                               next[idx] = { ...cur, direction: cur.direction === 'asc' ? 'desc' : 'asc' };
-                                              onChangeSortRules(next);
+                                              setDraftRules(next);
                                             }}
                                           >
                                             <div
@@ -466,8 +480,8 @@ const SortPopover = forwardRef<
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          const next = sortRules.filter((_, i) => i !== idx);
-                                          onChangeSortRules(next);
+                                          const next = draftRules.filter((_, i) => i !== idx);
+                                          setDraftRules(next);
                                           if (next.length === 0) {
                                             // Mirror Airtable: removing last sort returns to choose-field.
                                             queueMicrotask(() => goToChooseField());
@@ -544,7 +558,7 @@ const SortPopover = forwardRef<
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                closePopover();
+                                cancelAndClose();
                               }}
                             >
                               Cancel
@@ -558,8 +572,7 @@ const SortPopover = forwardRef<
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                // Not implementing actual sorting yet; close for now.
-                                closePopover();
+                                commitAndClose();
                               }}
                             >
                               <span className="truncate noevents button-text-label no-user-select">Sort</span>
@@ -639,8 +652,8 @@ const SortPopover = forwardRef<
                           e.preventDefault();
                           e.stopPropagation();
                           // Add a new sort row (append) without affecting existing rows.
-                          if (sortRules.some((r) => r.columnId === col.id)) return;
-                          onChangeSortRules([...sortRules, { columnId: col.id, direction: 'asc' }]);
+                          if (draftRules.some((r) => r.columnId === col.id)) return;
+                          setDraftRules([...draftRules, { columnId: col.id, direction: 'asc' }]);
                           setIsAddSortMenuOpen(false);
                         }}
                       >

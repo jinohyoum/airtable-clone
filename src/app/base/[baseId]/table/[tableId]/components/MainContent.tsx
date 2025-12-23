@@ -20,14 +20,24 @@ type CellData = Record<string, string>;
 export default function MainContent({
   isSearchOpen = false,
   search,
+  sortRules,
 }: {
   isSearchOpen?: boolean;
   search?: string;
+  sortRules?: Array<{ columnId: string; direction: 'asc' | 'desc' }>;
 }) {
   const params = useParams();
   const tableId = ((params.tableId as string | undefined) ?? '').toString();
   const hasTableId = tableId.length > 0;
   const isCreatingTable = hasTableId ? tableId.startsWith('__creating__') : false;
+
+  const normalizedSortRules = useMemo(() => {
+    const rules = (sortRules ?? []).filter(Boolean);
+    if (rules.length === 0) return undefined;
+    return rules.map((r) => ({ columnId: r.columnId, direction: r.direction }));
+  }, [sortRules]);
+
+  const sortSignature = useMemo(() => JSON.stringify(normalizedSortRules ?? []), [normalizedSortRules]);
   
   const rootRef = useRef<HTMLDivElement | null>(null);
   const middleHeaderScrollRef = useRef<HTMLDivElement | null>(null);
@@ -176,6 +186,7 @@ export default function MainContent({
       tableId: tableId ?? "",
       limit: 500, // Fetch 500 rows per page for smoother scrolling
       search,
+      sortRules: normalizedSortRules,
     },
     {
       enabled: hasTableId && !isCreatingTable,
@@ -212,14 +223,14 @@ export default function MainContent({
     }
   }, [rowPages]);
 
-  // When search changes, reset selection and scroll to the top so infinite paging + virtual rows start from row 0.
+  // When search or sort changes, reset selection and scroll to the top so infinite paging + virtual rows start from row 0.
   useEffect(() => {
     setEditingCell(null);
     setActiveCell(null);
     setIsKeyboardNav(false);
     pendingRowFocusRef.current = null;
     rootRef.current?.scrollTo({ top: 0 });
-  }, [search, tableId]);
+  }, [search, tableId, sortSignature]);
 
   // Fallback: Focus pending row cell if it wasn't focused in onMutate
   // This only runs if the direct focus in onMutate didn't work (e.g., row not rendered yet)
@@ -261,6 +272,10 @@ export default function MainContent({
   
   // Row creation with optimistic updates (Option B: allow rapid clicks)
   const utils = api.useUtils();
+  const rowsQueryInput = useMemo(
+    () => ({ tableId, limit: 500 as const, search, sortRules: normalizedSortRules }),
+    [tableId, search, normalizedSortRules],
+  );
   const cancelledCreateClientRowIdsRef = useRef<Set<string>>(new Set());
   const skipDeleteOptimisticRowIdsRef = useRef<Set<string>>(new Set());
   const createRowMutation = api.table.createRow.useMutation({
@@ -268,12 +283,13 @@ export default function MainContent({
       console.log('onMutate called:', { clientRowId, afterRowId });
       
       const hasSearchFilter = Boolean(search && search.trim().length > 0);
+      const hasSort = Boolean(normalizedSortRules && normalizedSortRules.length > 0);
 
       // Cancel outgoing refetches - must match the query key exactly
-      await utils.table.getRows.cancel({ tableId, limit: 500, search });
+      await utils.table.getRows.cancel(rowsQueryInput);
       
       // Get the cached data - must match the query key exactly including limit
-      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500, search });
+      const previousPages = utils.table.getRows.getInfiniteData(rowsQueryInput);
       const currentCount = utils.table.getRowCount.getData({ tableId, search });
       
       console.log('previousPages:', previousPages ? `exists with ${previousPages.pages.length} pages` : 'null');
@@ -285,7 +301,8 @@ export default function MainContent({
       }
       
       // If a search filter is active, a new empty row likely won't match; skip optimistic insertion.
-      if (hasSearchFilter || !previousPages || !tableMeta) {
+      // If a sort is active, inserting into the correct sorted position is non-trivial; skip optimistic insertion.
+      if (hasSearchFilter || hasSort || !previousPages || !tableMeta) {
         console.warn('Cannot do optimistic update - missing data');
         return { previousPages: undefined, clientRowId, previousCount: currentCount };
       }
@@ -332,7 +349,7 @@ export default function MainContent({
       // Insert the temp row optimistically
       // We MUST use the updater function form to ensure React Query detects the change
       // Must match the query key exactly including limit
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+      utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
         if (!oldData) {
           console.warn('No oldData in setInfiniteData for row creation');
           return oldData;
@@ -438,7 +455,7 @@ export default function MainContent({
 
       // If we skipped optimistic insertion (e.g. search filter active), just refetch.
       if (!context.previousPages) {
-        void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+        void utils.table.getRows.invalidate(rowsQueryInput);
         void utils.table.getRowCount.invalidate({ tableId, search });
         return;
       }
@@ -446,12 +463,12 @@ export default function MainContent({
       // Find the current active cell to maintain focus after replacing temp row
       const currentActiveCell = activeCell;
       const wasOnNewRow = currentActiveCell && 
-        utils.table.getRows.getInfiniteData({ tableId, limit: 500, search })?.pages
+        utils.table.getRows.getInfiniteData(rowsQueryInput)?.pages
           .flatMap(p => p.rows)
           .some((r, idx) => r.id === `__temp__${context.clientRowId}` && idx === currentActiveCell.rowIdx);
       
       // Replace optimistic temp row with real row from server
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+      utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
         if (!oldData) return oldData;
         
         return {
@@ -540,7 +557,7 @@ export default function MainContent({
         utils.table.getRowCount.setData({ tableId, search }, context.previousCount);
       }
       
-      void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+      void utils.table.getRows.invalidate(rowsQueryInput);
       void utils.table.getRowCount.invalidate({ tableId, search });
     },
     onSettled: (_data, _error, variables) => {
@@ -569,7 +586,7 @@ export default function MainContent({
     onSuccess: (_updatedCell, variables) => {
       // Update the cache with the new cell value
       // The mutation returns a simple object, so we update the cache directly
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+      utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
         if (!oldData) return oldData;
         const newData = {
           pages: oldData.pages.map(page => ({
@@ -610,7 +627,7 @@ export default function MainContent({
     },
     onError: (error) => {
       console.error('Failed to save cell:', error);
-      void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+      void utils.table.getRows.invalidate(rowsQueryInput);
     },
   });
 
@@ -626,10 +643,10 @@ export default function MainContent({
 
       // Cancel outgoing refetches for rows so we can optimistically update
       if (!skipOptimistic) {
-        await utils.table.getRows.cancel({ tableId, limit: 500, search });
+        await utils.table.getRows.cancel(rowsQueryInput);
       }
 
-      const previousPages = utils.table.getRows.getInfiniteData({ tableId, limit: 500, search });
+      const previousPages = utils.table.getRows.getInfiniteData(rowsQueryInput);
       const currentCount = utils.table.getRowCount.getData({ tableId, search });
 
       const rowExistsInCache = Boolean(
@@ -650,7 +667,7 @@ export default function MainContent({
 
       // Optimistically remove the row from the infinite query cache
       if (!skipOptimistic) {
-        utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+        utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
           if (!oldData) return oldData;
 
           const newPages = oldData.pages.map((page, pageIdx) => {
@@ -691,7 +708,7 @@ export default function MainContent({
       console.error('Row delete error:', error);
       if (context?.previousPages) {
         utils.table.getRows.setInfiniteData(
-          { tableId, limit: 500, search },
+          rowsQueryInput,
           context.previousPages,
         );
       }
@@ -745,7 +762,7 @@ export default function MainContent({
           );
         }
 
-        utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+        utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
           if (!oldData) return oldData;
           const currentTotal = oldData.pages[0]?.totalCount ?? 0;
 
@@ -861,7 +878,7 @@ export default function MainContent({
           }
         } catch (error) {
           console.error('Failed to autosave cell:', error);
-          void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+          void utils.table.getRows.invalidate(rowsQueryInput);
         } finally {
           setSavingCells((prev) => {
             const next = new Set(prev);
@@ -873,7 +890,7 @@ export default function MainContent({
     }, 500);
 
     autosaveTimersRef.current.set(cellKey, t);
-  }, [updateCellMutation, utils, tableId, search]);
+  }, [updateCellMutation, utils, rowsQueryInput]);
   
   const handleCellChange = useCallback((rowId: string, columnId: string, newValue: string) => {
     const cellKey = `${rowId}-${columnId}`;
@@ -888,7 +905,7 @@ export default function MainContent({
     setEditValue(newValue);
     
     // Update cache immediately - ensure we always return the full structure
-    utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+    utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
       if (!oldData) return oldData;
       
       return {
@@ -911,7 +928,7 @@ export default function MainContent({
     });
 
     scheduleAutosave(rowId, columnId, newValue);
-  }, [utils, tableId, search, scheduleAutosave]);
+  }, [utils, rowsQueryInput, scheduleAutosave]);
   
   const handleCellSave = useCallback(async (rowId: string, columnId: string, maintainFocus = true) => {
     if (editingCell?.rowId !== rowId || editingCell?.columnId !== columnId) return;
@@ -947,7 +964,7 @@ export default function MainContent({
     setActiveCell({ rowIdx: currentRowIdx, colIdx: currentColIdx });
     
     // Update cache - ensure we always return the full structure
-    utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, (oldData) => {
+    utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
       if (!oldData) return oldData;
       return {
         pages: oldData.pages.map(page => ({
@@ -985,7 +1002,7 @@ export default function MainContent({
         // The local draft will be cleared on next successful refetch or after a delay
       } catch (error) {
         console.error('Failed to save cell:', error);
-        void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+        void utils.table.getRows.invalidate(rowsQueryInput);
       } finally {
         setCommittingCells(prev => {
           const next = new Set(prev);
@@ -1077,7 +1094,7 @@ export default function MainContent({
       
       setLocalDrafts(prev => new Map(prev).set(cellKey, e.key));
 
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500 }, (oldData) => {
+      utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
         if (!oldData) return oldData;
         return {
           pages: oldData.pages.map(page => ({
@@ -1159,7 +1176,7 @@ export default function MainContent({
       e.preventDefault();
       handleCellCancel(rowId, columnId);
     }
-  }, [allRows, tableMeta, editingCell, committingCells, utils, tableId, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow]);
+  }, [allRows, tableMeta, editingCell, committingCells, utils, rowsQueryInput, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow, displayColumns]);
   
   const focusRafRef = useRef<number | null>(null);
   const invalidateTimerRef = useRef<number | null>(null);
@@ -1170,10 +1187,10 @@ export default function MainContent({
     }
     invalidateTimerRef.current = window.setTimeout(() => {
       invalidateTimerRef.current = null;
-      void utils.table.getRows.invalidate({ tableId, limit: 500, search });
+      void utils.table.getRows.invalidate(rowsQueryInput);
       void utils.table.getRowCount.invalidate({ tableId, search });
     }, 150);
-  }, [utils, tableId, search]);
+  }, [utils, rowsQueryInput, tableId, search]);
 
   // Keep DOM focus in sync with the current activeCell selection, without spamming smooth scroll.
   useEffect(() => {
