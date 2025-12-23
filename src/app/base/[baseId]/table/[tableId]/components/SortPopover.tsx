@@ -1,10 +1,11 @@
 'use client';
 
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api } from '~/trpc/react';
 import { getColumnIconName } from './columnIcons';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
+const SORT_POPOVER_W = 428;
 
 type SortDirection = 'asc' | 'desc';
 
@@ -62,9 +63,27 @@ const SortPopover = forwardRef<
     tableId: string;
     isOpen: boolean;
     position: { x: number; y: number; maxH: number } | null;
+    sortRules: Array<{ columnId: string; direction: SortDirection }>;
+    onChangeSortRules: (next: Array<{ columnId: string; direction: SortDirection }>) => void;
     onRequestClose?: () => void;
   }
->(function SortPopover({ tableId, isOpen, position, onRequestClose }, ref) {
+>(function SortPopover({ tableId, isOpen, position, sortRules, onChangeSortRules, onRequestClose }, ref) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // Keep forwardRef behavior (layout.tsx uses this for outside-click detection)
+  // Use a callback ref so the parent ref is set immediately on mount (not after an effect).
+  const setRootNode = useCallback(
+    (node: HTMLDivElement | null) => {
+      rootRef.current = node;
+      if (!ref) return;
+      if (typeof ref === 'function') {
+        ref(node);
+        return;
+      }
+      (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    },
+    [ref],
+  );
+
   const { data: tableMeta } = api.table.getTableMeta.useQuery(
     { tableId },
     { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
@@ -75,18 +94,27 @@ const SortPopover = forwardRef<
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [panel, setPanel] = useState<'chooseField' | 'config'>('chooseField');
-  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
-  const [direction, setDirection] = useState<SortDirection>('asc');
+  const [editingRuleIndex, setEditingRuleIndex] = useState<number | null>(null);
   const [autoSort, setAutoSort] = useState(false);
+
+  const [isAddSortMenuOpen, setIsAddSortMenuOpen] = useState(false);
+  const [addSortQuery, setAddSortQuery] = useState('');
+  const addSortInputRef = useRef<HTMLInputElement | null>(null);
+  const addSortMenuRef = useRef<HTMLDivElement | null>(null);
+  const addAnotherSortButtonRef = useRef<HTMLDivElement | null>(null);
+  const [addSortMenuPos, setAddSortMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const addSortListboxId = useId();
 
   useEffect(() => {
     if (!isOpen) return;
     setQuery('');
-    setPanel('chooseField');
-    setSelectedColumnId(null);
-    setDirection('asc');
+    setPanel(sortRules.length > 0 ? 'config' : 'chooseField');
+    setEditingRuleIndex(null);
     setAutoSort(false);
-  }, [isOpen]);
+    setIsAddSortMenuOpen(false);
+    setAddSortQuery('');
+    setAddSortMenuPos(null);
+  }, [isOpen, sortRules.length]);
 
   const columns = useMemo(() => tableMeta?.columns ?? [], [tableMeta]);
 
@@ -98,13 +126,19 @@ const SortPopover = forwardRef<
 
   const showNoResults = query.trim().length > 0 && filteredColumns.length === 0;
 
-  if (!isOpen || !position) return null;
+  const usedColumnIds = useMemo(() => new Set(sortRules.map((r) => r.columnId)), [sortRules]);
+
+  const filteredColumnsForAddSort = useMemo(() => {
+    const q = addSortQuery.trim().toLowerCase();
+    const base = q ? columns.filter((c) => c.name.toLowerCase().includes(q)) : columns;
+    // Only show columns not already used by existing sort rules.
+    return base.filter((c) => !usedColumnIds.has(c.id));
+  }, [columns, addSortQuery, usedColumnIds]);
 
   const NUDGE_RIGHT_PX = 6;
   const NUDGE_UP_PX = 2;
 
-  const selectedColumn = selectedColumnId ? columns.find((c) => c.id === selectedColumnId) : null;
-  const directionLabel = direction === 'asc' ? 'A → Z' : 'Z → A';
+  const columnsById = useMemo(() => new Map(columns.map((c) => [c.id, c] as const)), [columns]);
 
   const closePopover = () => {
     onRequestClose?.();
@@ -112,15 +146,67 @@ const SortPopover = forwardRef<
 
   const goToChooseField = () => {
     setPanel('chooseField');
-    setSelectedColumnId(null);
-    setDirection('asc');
     setQuery('');
+    setEditingRuleIndex(null);
+    setIsAddSortMenuOpen(false);
+    setAddSortQuery('');
+    setAddSortMenuPos(null);
     queueMicrotask(() => inputRef.current?.focus());
   };
 
+  const openAddSortMenuUnderButton = () => {
+    const btn = addAnotherSortButtonRef.current;
+    const root = rootRef.current;
+    if (!btn || !root) return;
+
+    const btnRect = btn.getBoundingClientRect();
+    const rootRect = root.getBoundingClientRect();
+
+    // Convert viewport coords -> popover-local coords (so the menu stays inside sortPopoverRef DOM)
+    const x = 0; // Align left edge with the main popover so the top-right corner matches across panels.
+    const y = Math.round(btnRect.bottom - rootRect.top);
+
+    // Keep within viewport horizontally (matches Airtable-ish behavior)
+    const MENU_W = SORT_POPOVER_W;
+    const globalLeft = rootRect.left + x;
+    const overflowRight = globalLeft + MENU_W - (window.innerWidth - 8);
+    if (overflowRight > 0) {
+      // If the whole sort popover is already clamped to the viewport, this should rarely happen,
+      // but keep a safety clamp anyway.
+      setAddSortMenuPos({ x: Math.max(8 - rootRect.left, x - overflowRight), y });
+    } else {
+      setAddSortMenuPos({ x, y });
+    }
+
+    setIsAddSortMenuOpen(true);
+    setAddSortQuery('');
+    queueMicrotask(() => addSortInputRef.current?.focus());
+  };
+
+  // Close nested menu when clicking elsewhere *inside* the sort popover.
+  useEffect(() => {
+    if (!isAddSortMenuOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      // If click isn't even in the sort popover, layout.tsx will close it; nothing to do here.
+      if (!rootRef.current?.contains(t)) return;
+      if (addSortMenuRef.current?.contains(t)) return;
+      if (addAnotherSortButtonRef.current?.contains(t)) return;
+      setIsAddSortMenuOpen(false);
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () => window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+  }, [isAddSortMenuOpen]);
+
+  // IMPORTANT: Keep this guard *after* all hooks to avoid hook-order mismatches when opening/closing.
+  if (!isOpen || !position) return null;
+
   return (
     <div
-      ref={ref}
+      ref={setRootNode}
       style={{
         position: 'fixed',
         inset: '0px auto auto 0px',
@@ -132,14 +218,14 @@ const SortPopover = forwardRef<
         <div>
           <div
             className="xs-max-width-1 baymax nowrap max-width-3"
-            style={{ transform: 'translateY(4px)', width: 'min-content' }}
+            style={{ transform: 'translateY(4px)', width: SORT_POPOVER_W }}
           >
             <div
               className="colors-background-raised-popover rounded shadow-elevation-high overflow-hidden"
               style={{ borderRadius: 3 }}
             >
               <div data-testid="view-config-sort">
-                <div style={{ minWidth: 320, maxHeight: position.maxH }}>
+                <div style={{ width: SORT_POPOVER_W, maxHeight: position.maxH }}>
                   {panel === 'chooseField' ? (
                     <div className="p1-and-half">
                       <div className="flex justify-between mx1 items-center">
@@ -247,9 +333,23 @@ const SortPopover = forwardRef<
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    setSelectedColumnId(col.id);
-                                    setDirection('asc');
+                                    onChangeSortRules(
+                                      (() => {
+                                      // If editing a specific row, update it; otherwise create/replace the first rule.
+                                      const idx = editingRuleIndex ?? 0;
+                                      const next = sortRules.length ? [...sortRules] : [{ columnId: col.id, direction: 'asc' as const }];
+                                      if (sortRules.length === 0) return next;
+                                      if (idx >= next.length) {
+                                        next.push({ columnId: col.id, direction: 'asc' });
+                                      } else {
+                                        next[idx] = { ...next[idx], columnId: col.id };
+                                      }
+                                      return next;
+                                      })(),
+                                    );
+                                    setEditingRuleIndex(null);
                                     setPanel('config');
+                                    setIsAddSortMenuOpen(false);
                                   }}
                                 >
                                   <SpriteIcon name={iconName} className="flex-none flex-none mr1-and-half quiet" />
@@ -290,80 +390,97 @@ const SortPopover = forwardRef<
 
                         <div className="overflow-auto light-scrollbar" style={{ minHeight: 70, maxHeight: 'calc(-380px + 100vh)' }}>
                           <ul className="pt1 flex flex-auto flex-column">
-                            <div className="pb1" style={{ opacity: 1 }}>
-                              <div className="mx1 relative rounded flex justify-start">
-                                <div className="mr1-and-half" style={{ width: 240 }}>
-                                  <div className="flex flex-auto">
-                                    <div className="flex flex-auto relative baymax">
+                            {sortRules.length === 0 ? null : (
+                              <div className="pb1" style={{ opacity: 1 }}>
+                                {sortRules.map((rule, idx) => {
+                                  const col = columnsById.get(rule.columnId);
+                                  const directionLabel = rule.direction === 'asc' ? 'A → Z' : 'Z → A';
+                                  return (
+                                    <div key={`${rule.columnId}-${idx}`} className="mx1 relative rounded flex justify-start mb-half">
+                                      <div className="mr1-and-half" style={{ width: 240 }}>
+                                        <div className="flex flex-auto">
+                                          <div className="flex flex-auto relative baymax">
+                                            <div
+                                              data-testid="autocomplete-button"
+                                              className="flex items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover width-full border colors-border-default pointer"
+                                              role="button"
+                                              aria-expanded="false"
+                                              tabIndex={0}
+                                              style={{ height: 28 }}
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                // Reuse the choose-field panel to pick a different column for this row.
+                                                setEditingRuleIndex(idx);
+                                                setPanel('chooseField');
+                                                setQuery('');
+                                                queueMicrotask(() => inputRef.current?.focus());
+                                              }}
+                                            >
+                                              <div className="flex-auto truncate left-align">{col?.name ?? 'Field'}</div>
+                                              <div className="flex-none flex items-center ml-half hide-print">
+                                                <SpriteIcon name="ChevronDown" className="flex-none icon" />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="mr1-and-half flex" style={{ width: 120, height: 28 }}>
+                                        <div className="flex flex-auto items-stretch selectMenu">
+                                          <span
+                                            role="button"
+                                            aria-haspopup="true"
+                                            aria-expanded="false"
+                                            className="flex flex-auto truncate left-align pointer focus-container selectMenuButton pointer"
+                                            tabIndex={0}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              const next = [...sortRules];
+                                              const cur = next[idx];
+                                              if (!cur) return;
+                                              next[idx] = { ...cur, direction: cur.direction === 'asc' ? 'desc' : 'asc' };
+                                              onChangeSortRules(next);
+                                            }}
+                                          >
+                                            <div
+                                              className="flex flex-auto items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover border colors-border-default"
+                                              data-testid="sort-direction-selector"
+                                            >
+                                              <div className="flex-auto textOverflowEllipsis">
+                                                <span className="sortOrderLabel">{directionLabel}</span>
+                                              </div>
+                                              <SpriteIcon name="ChevronDown" className="flex-none flex-none ml-half" />
+                                            </div>
+                                          </span>
+                                        </div>
+                                      </div>
+
                                       <div
-                                        data-testid="autocomplete-button"
-                                        className="flex items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover width-full border colors-border-default pointer"
-                                        role="button"
-                                        aria-expanded="false"
                                         tabIndex={0}
-                                        style={{ height: 28 }}
+                                        role="button"
+                                        className="flex pointer link-unquiet-focusable text-blue-focus items-center quieter justify-center colors-background-selected-hover rounded focus-visible"
+                                        aria-label="Remove sort"
+                                        style={{ width: 28, opacity: 0.5 }}
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          // For now, reuse the "choose field" panel to pick a different column.
-                                          setPanel('chooseField');
-                                          setQuery('');
-                                          queueMicrotask(() => inputRef.current?.focus());
+                                          const next = sortRules.filter((_, i) => i !== idx);
+                                          onChangeSortRules(next);
+                                          if (next.length === 0) {
+                                            // Mirror Airtable: removing last sort returns to choose-field.
+                                            queueMicrotask(() => goToChooseField());
+                                          }
                                         }}
                                       >
-                                        <div className="flex-auto truncate left-align">{selectedColumn?.name ?? 'Field'}</div>
-                                        <div className="flex-none flex items-center ml-half hide-print">
-                                          <SpriteIcon name="ChevronDown" className="flex-none icon" />
-                                        </div>
+                                        <SpriteIcon name="X" className="flex-none icon" />
                                       </div>
                                     </div>
-                                  </div>
-                                </div>
-
-                                <div className="mr1-and-half flex" style={{ width: 120, height: 28 }}>
-                                  <div className="flex flex-auto items-stretch selectMenu">
-                                    <span
-                                      role="button"
-                                      aria-haspopup="true"
-                                      aria-expanded="false"
-                                      className="flex flex-auto truncate left-align pointer focus-container selectMenuButton pointer"
-                                      tabIndex={0}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-                                      }}
-                                    >
-                                      <div
-                                        className="flex flex-auto items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover border colors-border-default"
-                                        data-testid="sort-direction-selector"
-                                      >
-                                        <div className="flex-auto textOverflowEllipsis">
-                                          <span className="sortOrderLabel">{directionLabel}</span>
-                                        </div>
-                                        <SpriteIcon name="ChevronDown" className="flex-none flex-none ml-half" />
-                                      </div>
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div
-                                  tabIndex={0}
-                                  role="button"
-                                  className="flex pointer link-unquiet-focusable text-blue-focus items-center quieter justify-center colors-background-selected-hover rounded focus-visible"
-                                  aria-label="Remove sort"
-                                  style={{ width: 28, opacity: 0.5 }}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    // With only 1 sort row for now, the X returns to the previous dropdown.
-                                    goToChooseField();
-                                  }}
-                                >
-                                  <SpriteIcon name="X" className="flex-none icon" />
-                                </div>
+                                  );
+                                })}
                               </div>
-                            </div>
+                            )}
                           </ul>
 
                           <div>
@@ -376,10 +493,11 @@ const SortPopover = forwardRef<
                                   aria-expanded="false"
                                   tabIndex={0}
                                   style={{ height: 32 }}
+                                  ref={addAnotherSortButtonRef}
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    // Not implemented yet.
+                                    openAddSortMenuUnderButton();
                                   }}
                                 >
                                   <div className="truncate flex-auto right-align">
@@ -457,6 +575,95 @@ const SortPopover = forwardRef<
           </div>
         </div>
       </div>
+
+      {/* Nested "Add another sort" field picker (must appear under the "+ Add another sort" button) */}
+      {panel === 'config' && isAddSortMenuOpen && addSortMenuPos ? (
+        <div
+          ref={addSortMenuRef}
+          style={{
+            position: 'absolute',
+            top: addSortMenuPos.y,
+            left: addSortMenuPos.x,
+            zIndex: 10004,
+            minWidth: 428,
+          }}
+        >
+          <div>
+            <span data-focus-scope-start="true" hidden />
+            <div>
+              <div className="colors-background-raised-popover baymax preventGridDeselect rounded stroked1">
+                <div className="flex flex-auto rounded" style={{ minHeight: 32 }}>
+                  <input
+                    ref={addSortInputRef}
+                    autoComplete="false"
+                    className="css-1uw7fyx background-transparent p1 flex-auto"
+                    placeholder="Find a field"
+                    type="search"
+                    role="combobox"
+                    aria-autocomplete="none"
+                    aria-expanded="true"
+                    aria-controls={`${addSortListboxId}-listbox`}
+                    aria-label="Find a field"
+                    value={addSortQuery}
+                    onChange={(e) => setAddSortQuery(e.target.value)}
+                    style={{ border: 0, height: 32 }}
+                  />
+                </div>
+                <ul
+                  id={`${addSortListboxId}-listbox`}
+                  role="listbox"
+                  className="overflow-auto light-scrollbar suggestionRowsContainerSelector relative"
+                  style={{
+                    maxHeight: 220,
+                    maxWidth: 450,
+                    position: 'relative',
+                    width: 428,
+                  }}
+                >
+                  {filteredColumnsForAddSort.map((col, idx) => {
+                    const iconName = getColumnIconName(col.type);
+                    const iconStyle =
+                      iconName.toLowerCase().includes('ai') ? ({ ['--colors-foreground-accent-ai']: 'rgb(4, 138, 14)' } as React.CSSProperties) : undefined;
+                    return (
+                      <li
+                        key={col.id}
+                        id={`${addSortListboxId}-${idx}`}
+                        role="option"
+                        aria-disabled="false"
+                        className="p1 flex items-center overflow-hidden pointer"
+                        onMouseDown={(e) => {
+                          // Keep focus in the input (prevents blur before click)
+                          e.preventDefault();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Add a new sort row (append) without affecting existing rows.
+                          if (sortRules.some((r) => r.columnId === col.id)) return;
+                          onChangeSortRules([...sortRules, { columnId: col.id, direction: 'asc' }]);
+                          setIsAddSortMenuOpen(false);
+                        }}
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          className="flex-none flex-none mr-half"
+                          style={{ shapeRendering: 'geometricPrecision', ...(iconStyle ?? {}) }}
+                        >
+                          <use fill="currentColor" href={`${ICON_SPRITE}#${iconName}`} />
+                        </svg>
+                        <div>{col.name}</div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+            <span data-focus-scope-end="true" hidden />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 });

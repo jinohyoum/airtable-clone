@@ -1220,7 +1220,20 @@ li:hover .visually-hidden {
 }
 
 .css-1uw7fyx {
-  /* Search input specific styles */
+  /* Search input styles (used by sort/hide-fields menus) */
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Remove native search decorations that can render as a dark/black box */
+.css-1uw7fyx::-webkit-search-decoration,
+.css-1uw7fyx::-webkit-search-cancel-button,
+.css-1uw7fyx::-webkit-search-results-button,
+.css-1uw7fyx::-webkit-search-results-decoration {
+  -webkit-appearance: none;
 }
 
 .colors-background-inset-control-hover:hover {

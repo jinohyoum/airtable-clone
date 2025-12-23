@@ -44,6 +44,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [sortPos, setSortPos] = useState<{ x: number; y: number; maxH: number } | null>(null);
   const sortButtonRef = useRef<HTMLDivElement | null>(null);
   const sortPopoverRef = useRef<HTMLDivElement | null>(null);
+  const [sortRules, setSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
 
   // Focus input when search bar opens
   useEffect(() => {
@@ -106,6 +107,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setHideFieldsPos(null);
     setIsSortOpen(false);
     setSortPos(null);
+    setSortRules([]);
   }, [tableId]);
 
   // Position hide-fields popover under the button when opened
@@ -157,7 +159,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     if (!btn) return;
 
     const rect = btn.getBoundingClientRect();
-    const width = 320;
+    const width = 428;
     const offsetRight = 0;
     const desiredX = Math.round(rect.right + offsetRight - width);
     const x = Math.max(8, Math.min(desiredX, window.innerWidth - width - 8));
@@ -648,6 +650,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         tableId={tableId ?? ''}
                         isOpen={isSortOpen}
                         position={sortPos}
+                        sortRules={sortRules}
+                        onChangeSortRules={setSortRules}
                         onRequestClose={() => {
                           setIsSortOpen(false);
                           setSortPos(null);
