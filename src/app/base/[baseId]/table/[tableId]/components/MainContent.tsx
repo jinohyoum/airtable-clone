@@ -934,9 +934,15 @@ export default function MainContent({
     setActiveCell({ rowIdx, colIdx });
   }, []);
 
-  const handleCellDoubleClick = useCallback((rowId: string, columnId: string, currentValue: string) => {
+  const handleCellDoubleClick = useCallback((
+    e: React.MouseEvent,
+    rowId: string,
+    columnId: string,
+    currentValue: string
+  ) => {
+    e.preventDefault(); // Stop native dblclick selection behavior
     const cellKey = `${rowId}-${columnId}`;
-    doubleClickEditRef.current = cellKey; // Mark this cell for text selection on focus
+    doubleClickEditRef.current = cellKey; // Mark this cell for caret positioning on focus
     setEditingCell({ rowId, columnId });
     setEditValue(currentValue);
   }, []);
@@ -1283,6 +1289,16 @@ export default function MainContent({
       e.preventDefault();
       if (isCurrentlyEditing) {
         void handleCellSave(rowId, columnId);
+      } else {
+        // Enter edit mode with cursor at end (same as double-click)
+        const cell = currentRow.cells.find(c => c.columnId === columnId);
+        const serverValue = cell?.value ?? '';
+        const cellValue = localDraftsRef.current.get(cellKey) ?? serverValue;
+        
+        // Mark for cursor positioning at end (same as double-click)
+        doubleClickEditRef.current = cellKey;
+        setEditingCell({ rowId, columnId });
+        setEditValue(cellValue);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -1351,7 +1367,16 @@ export default function MainContent({
         const inputRef = cellInputRefs.current.get(cellKey);
         if (inputRef) {
           inputRef.focus();
-          inputRef.select(); // Select all text
+          // Place cursor at the end (no highlight)
+          try {
+            const len = inputRef.value?.length ?? 0;
+            // Some input types (e.g. number) may not support selection APIs
+            if (typeof (inputRef as any).setSelectionRange === "function") {
+              (inputRef as any).setSelectionRange(len, len);
+            }
+          } catch {
+            // Ignore selection errors for non-text inputs.
+          }
         }
       });
     }
@@ -1573,6 +1598,34 @@ export default function MainContent({
       // This check is now *after* Shift+Enter and Tab to ensure they are always handled by the grid.
       if (isEditableTarget) return;
 
+      // Enter key: enter edit mode with cursor at end (when not already editing)
+      if (key === 'Enter') {
+        e.preventDefault();
+        setIsKeyboardNav(true);
+        const current = allRows[activeCell.rowIdx];
+        const targetColumn = displayColumns[activeCell.colIdx];
+        if (!current || !targetColumn) return;
+        
+        const rowId = current.id;
+        const columnId = targetColumn.id;
+        const cellKey = `${rowId}-${columnId}`;
+        
+        // Check if already editing this cell
+        const isCurrentlyEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
+        if (isCurrentlyEditing) return;
+        
+        // Get current cell value (from localDrafts or server)
+        const cell = current.cells.find(c => c.columnId === columnId);
+        const serverValue = cell?.value ?? '';
+        const cellValue = localDraftsRef.current.get(cellKey) ?? serverValue;
+        
+        // Mark for cursor positioning at end (same as double-click)
+        doubleClickEditRef.current = cellKey;
+        setEditingCell({ rowId, columnId });
+        setEditValue(cellValue);
+        return;
+      }
+
       if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {
         e.preventDefault();
         setIsKeyboardNav(true);
@@ -1595,7 +1648,7 @@ export default function MainContent({
 
     root.addEventListener('keydown', onKeyDownCapture, { capture: true });
     return () => root.removeEventListener('keydown', onKeyDownCapture, { capture: true } as never);
-  }, [activeCell, allRows, tableMeta, navigateToCell, handleCreateRow, editingCell, handleCellSave]);
+  }, [activeCell, allRows, tableMeta, displayColumns, navigateToCell, handleCreateRow, editingCell, handleCellSave]);
 
   const syncFromMiddle = () => {
     const middleHeader = middleHeaderScrollRef.current;
@@ -1956,13 +2009,19 @@ export default function MainContent({
                           className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
                             isEditing
                               ? 'bg-blue-50'
-                              : isActive
-                                ? `ring-2 ring-blue-500 ring-inset text-[rgb(22,110,225)] cursor-pointer`
-                                : ''
+                              : ''
+                          } ${
+                            isActive
+                              ? `ring-2 ring-blue-500 ring-inset ${!isEditing ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                              : ''
                           }`}
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
-                          onDoubleClick={() => handleCellDoubleClick(rowId, columnId, cellValue)}
+                          onMouseDownCapture={(e) => {
+                            // Prevent the browser's native word selection that happens during dblclick
+                            if (e.detail === 2) e.preventDefault();
+                          }}
+                          onDoubleClick={(e) => handleCellDoubleClick(e, rowId, columnId, cellValue)}
                           onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                           onBlur={() => {
                             if (committingCellKeyRef.current === cellKey) return;
@@ -2126,13 +2185,19 @@ export default function MainContent({
                               className={`w-full h-8 pl-3 pr-2 bg-transparent outline-none table-cell-input ${
                                 isEditing
                                   ? 'bg-blue-50'
-                                  : isActive
-                                    ? `ring-2 ring-blue-500 ring-inset text-[rgb(22,110,225)] cursor-pointer`
-                                    : ''
+                                  : ''
+                              } ${
+                                isActive
+                                  ? `ring-2 ring-blue-500 ring-inset ${!isEditing ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                  : ''
                               }`}
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
-                              onDoubleClick={() => handleCellDoubleClick(rowId, columnId, cellValue)}
+                              onMouseDownCapture={(e) => {
+                                // Prevent the browser's native word selection that happens during dblclick
+                                if (e.detail === 2) e.preventDefault();
+                              }}
+                              onDoubleClick={(e) => handleCellDoubleClick(e, rowId, columnId, cellValue)}
                               onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                               onBlur={() => {
                                 if (committingCellKeyRef.current === cellKey) return;
