@@ -124,6 +124,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setIsSortOpen(false);
     setSortPos(null);
     setSortRules([]);
+    setIsSearchOpen(false);
+    setSearchInput('');
   }, [tableId]);
 
   // Position hide-fields popover under the button when opened

@@ -220,7 +220,9 @@ export default function TableTabsBar() {
     },
     onSuccess: () => {
       void utils.table.list.invalidate({ baseId });
+      // Form is already closed when Save is clicked, but ensure it's closed here too
       setShowRenameForm(false);
+      setRenameFormPos(null);
     },
     onSettled: () => {
       setTablesSaving(0);
@@ -1469,8 +1471,13 @@ export default function TableTabsBar() {
             if (activeId.startsWith('__creating__')) {
               queuedRenameRef.current = { name, recordTerm };
               setShowRenameForm(false);
+              setRenameFormPos(null);
               return;
             }
+
+            // Close the form immediately when Save is clicked
+            setShowRenameForm(false);
+            setRenameFormPos(null);
 
             // Only update if name changed
             if (currentTable && name !== currentTable.name) {
@@ -1478,16 +1485,15 @@ export default function TableTabsBar() {
                 id: activeId,
                 name,
               });
-            } else {
-              // Just close the form
-              setShowRenameForm(false);
             }
           }}
           onCancel={() => {
             setShowRenameForm(false);
+            setRenameFormPos(null);
           }}
           onClickOutside={() => {
             setShowRenameForm(false);
+            setRenameFormPos(null);
           }}
           position={renameFormPos}
         />

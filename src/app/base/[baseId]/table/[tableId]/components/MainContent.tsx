@@ -115,6 +115,8 @@ export default function MainContent({
   const [rowDeletesInFlight, setRowDeletesInFlight] = useState<Set<string>>(new Set());
   // Track the most recent row creation that needs focus (using ref to avoid stale closures)
   const pendingRowFocusRef = useRef<{ rowId: string; colIdx: number; rowIdx: number } | null>(null);
+  // Track when we enter edit mode via double-click (to select all text)
+  const doubleClickEditRef = useRef<string | null>(null);
 
   // Prevent double-saves: saving a focused input temporarily disables it, which triggers blur.
   // That blur should NOT trigger another save (otherwise focus restoration gets lost).
@@ -932,6 +934,13 @@ export default function MainContent({
     setActiveCell({ rowIdx, colIdx });
   }, []);
 
+  const handleCellDoubleClick = useCallback((rowId: string, columnId: string, currentValue: string) => {
+    const cellKey = `${rowId}-${columnId}`;
+    doubleClickEditRef.current = cellKey; // Mark this cell for text selection on focus
+    setEditingCell({ rowId, columnId });
+    setEditValue(currentValue);
+  }, []);
+
   const scheduleAutosave = useCallback((rowId: string, columnId: string, value: string) => {
     const cellKey = `${rowId}-${columnId}`;
     if (rowId.startsWith('__temp__')) return;
@@ -1278,6 +1287,38 @@ export default function MainContent({
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handleCellCancel(rowId, columnId);
+    } else if (e.key === 'Backspace' && !isCurrentlyEditing) {
+      // Clear cell value when Backspace is pressed on a clicked (not editing) cell
+      e.preventDefault();
+      const emptyValue = '';
+      const cellKey = `${rowId}-${columnId}`;
+      
+      // Update local draft
+      setLocalDrafts(prev => new Map(prev).set(cellKey, emptyValue));
+      
+      // Update cache optimistically
+      utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          pages: oldData.pages.map(page => ({
+            ...page,
+            rows: page.rows.map(row => {
+              if (row.id !== rowId) return row;
+              return {
+                ...row,
+                cells: row.cells.map(cell => {
+                  if (cell.columnId !== columnId) return cell;
+                  return { ...cell, value: emptyValue };
+                }),
+              };
+            }),
+          })),
+          pageParams: oldData.pageParams,
+        };
+      });
+      
+      // Schedule autosave
+      scheduleAutosave(rowId, columnId, emptyValue);
     }
   }, [allRows, tableMeta, editingCell, committingCells, utils, rowsQueryInput, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow, displayColumns]);
   
@@ -1295,6 +1336,27 @@ export default function MainContent({
     }, 150);
   }, [utils, rowsQueryInput, tableId, search]);
 
+  // Handle focus and text selection when entering edit mode via double-click
+  useEffect(() => {
+    if (!editingCell) return;
+    const cellKey = `${editingCell.rowId}-${editingCell.columnId}`;
+    const shouldSelectAll = doubleClickEditRef.current === cellKey;
+    
+    if (shouldSelectAll) {
+      // Clear the ref so it only applies once
+      doubleClickEditRef.current = null;
+      
+      // Use requestAnimationFrame to ensure the input is rendered and focused
+      requestAnimationFrame(() => {
+        const inputRef = cellInputRefs.current.get(cellKey);
+        if (inputRef) {
+          inputRef.focus();
+          inputRef.select(); // Select all text
+        }
+      });
+    }
+  }, [editingCell]);
+
   // Keep DOM focus in sync with the current activeCell selection, without spamming smooth scroll.
   useEffect(() => {
     if (!activeCell) return;
@@ -1308,6 +1370,9 @@ export default function MainContent({
     const rowId = targetRow.id;
     const columnId = targetColumn.id;
     const cellKey = `${rowId}-${columnId}`;
+
+    // Skip focus if we're editing this cell (it's handled by the editingCell effect)
+    if (editingCell?.rowId === rowId && editingCell?.columnId === columnId) return;
 
     if (focusRafRef.current != null) {
       cancelAnimationFrame(focusRafRef.current);
@@ -1892,11 +1957,12 @@ export default function MainContent({
                             isEditing
                               ? 'bg-blue-50'
                               : isActive
-                                ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                ? `ring-2 ring-blue-500 ring-inset text-[rgb(22,110,225)] cursor-pointer`
                                 : ''
                           }`}
                           value={isEditing ? editValue : cellValue}
                           onClick={() => handleCellClick(rowId, columnId, cellValue, idx, 0)}
+                          onDoubleClick={() => handleCellDoubleClick(rowId, columnId, cellValue)}
                           onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                           onBlur={() => {
                             if (committingCellKeyRef.current === cellKey) return;
@@ -2061,11 +2127,12 @@ export default function MainContent({
                                 isEditing
                                   ? 'bg-blue-50'
                                   : isActive
-                                    ? `ring-2 ring-blue-500 ring-inset ${isKeyboardActive ? 'text-[rgb(22,110,225)] cursor-pointer' : ''}`
+                                    ? `ring-2 ring-blue-500 ring-inset text-[rgb(22,110,225)] cursor-pointer`
                                     : ''
                               }`}
                               value={isEditing ? editValue : cellValue}
                               onClick={() => handleCellClick(rowId, columnId, cellValue, idx, colIdx)}
+                              onDoubleClick={() => handleCellDoubleClick(rowId, columnId, cellValue)}
                               onChange={(e) => isEditing && handleCellChange(rowId, columnId, e.target.value)}
                               onBlur={() => {
                                 if (committingCellKeyRef.current === cellKey) return;
