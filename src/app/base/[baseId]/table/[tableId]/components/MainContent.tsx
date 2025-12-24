@@ -31,11 +31,8 @@ export default function MainContent({
   const hasTableId = tableId.length > 0;
   const isCreatingTable = hasTableId ? tableId.startsWith('__creating__') : false;
 
-  const normalizedSortRules = useMemo(() => {
-    const rules = (sortRules ?? []).filter(Boolean);
-    if (rules.length === 0) return undefined;
-    return rules.map((r) => ({ columnId: r.columnId, direction: r.direction }));
-  }, [sortRules]);
+  // sortRules is already normalized in applySortRules, so use it directly
+  const normalizedSortRules = sortRules?.length ? sortRules : undefined;
 
   const sortSignature = useMemo(() => JSON.stringify(normalizedSortRules ?? []), [normalizedSortRules]);
 
@@ -43,7 +40,8 @@ export default function MainContent({
   const utils = api.useUtils();
   const rowsQueryInput = useMemo(
     () => ({ tableId, limit: 500 as const, search, sortRules: normalizedSortRules }),
-    [tableId, search, normalizedSortRules],
+    // Use the stringified signature so identical-content new references don't retrigger.
+    [tableId, search, sortSignature],
   );
 
   // When the user applies Sort in the toolbar, we want to trigger the global "Saving…" UI
@@ -258,6 +256,17 @@ export default function MainContent({
     window.addEventListener('grid:sortSaving', onSortSaving as EventListener);
     return () => window.removeEventListener('grid:sortSaving', onSortSaving as EventListener);
   }, []);
+
+  // When committed sort rules change, reset pagination and refetch deterministically.
+  // We watch `rowsQueryInput` (which uses `sortSignature`) so this only runs when
+  // the effective sort content actually changes.
+  useEffect(() => {
+    if (!hasTableId || isCreatingTable) return;
+    // Reset to page 1 for the new sort (avoids mixing cursors/pages from old sort)
+    utils.table.getRows.setInfiniteData(rowsQueryInput, () => undefined);
+    // Mark this query as stale and refetch even if staleTime hasn't expired
+    void utils.table.getRows.invalidate(rowsQueryInput);
+  }, [rowsQueryInput, hasTableId, isCreatingTable, utils]);
 
   // Turn off sort "saving" once the rows query finishes fetching for the same sort signature.
   useEffect(() => {

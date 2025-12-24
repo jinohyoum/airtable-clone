@@ -51,12 +51,21 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const isSortActiveForButton = sortCountForButton > 0;
 
   const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
-    setSortRules(next);
+    // Always create new references to ensure React detects the change
+    const normalized = (next ?? [])
+      .filter(Boolean)
+      .map((r) => ({ columnId: r.columnId, direction: r.direction })); // new objects
+
+    setSortRules((prev) => {
+      console.log("same ref?", prev === next);
+      return normalized; // new array reference guaranteed
+    });
+
     // Trigger global "Saving…" UI while the grid refetches sorted rows.
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('grid:sortSaving', {
-          detail: { active: true, signature: JSON.stringify(next ?? []) },
+          detail: { active: true, signature: JSON.stringify(normalized) },
         }),
       );
     }

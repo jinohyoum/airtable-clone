@@ -249,13 +249,26 @@ const SortPopover = forwardRef<
   const isInitialMount = useRef(true);
   const previousDraftRulesRef = useRef<string>(JSON.stringify(draftRules));
 
+  // Sync draftRules from committed sortRules only when popover opens (not on every committed change)
+  // This prevents overwriting user edits while the popover is open
+  useEffect(() => {
+    if (!isOpen) return;
+    // Sync once when opened
+    setDraftRules(sortRules ?? []);
+    previousDraftRulesRef.current = JSON.stringify(sortRules ?? []);
+    isInitialMount.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Keep previousDraftRulesRef aligned when popover is closed
+  useEffect(() => {
+    if (isOpen) return;
+    previousDraftRulesRef.current = JSON.stringify(sortRules ?? []);
+  }, [isOpen, sortRules]);
+
   // When auto-sort is enabled, automatically save whenever draftRules change
   useEffect(() => {
-    if (!isOpen) {
-      isInitialMount.current = true;
-      previousDraftRulesRef.current = JSON.stringify(sortRules);
-      return;
-    }
+    if (!isOpen) return;
 
     // Skip auto-save on initial mount (when popover first opens)
     if (isInitialMount.current) {
@@ -269,13 +282,14 @@ const SortPopover = forwardRef<
       const currentRulesString = JSON.stringify(draftRules);
       if (previousDraftRulesRef.current !== currentRulesString) {
         previousDraftRulesRef.current = currentRulesString;
-        onChangeSortRules(draftRules);
+        // Pass a fresh cloned array to avoid any shared references
+        onChangeSortRules(draftRules.map(r => ({ ...r })));
       }
     } else {
       // Update the ref even when autoSort is off, so we can detect changes when it's turned back on
       previousDraftRulesRef.current = JSON.stringify(draftRules);
     }
-  }, [draftRules, autoSort, isOpen, onChangeSortRules, sortRules]);
+  }, [draftRules, autoSort, isOpen, onChangeSortRules]);
 
   const [query, setQuery] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -292,9 +306,10 @@ const SortPopover = forwardRef<
   const [addSortMenuPos, setAddSortMenuPos] = useState<{ x: number; y: number } | null>(null);
   const addSortListboxId = useId();
 
+  // Note: draftRules sync moved to the effect above that only runs on isOpen
+  // This effect just handles other UI state resets
   useEffect(() => {
     if (!isOpen) return;
-    setDraftRules(sortRules);
     setQuery('');
     setPanel(sortRules.length > 0 ? 'config' : 'chooseField');
     setEditingRuleIndex(null);
@@ -302,8 +317,6 @@ const SortPopover = forwardRef<
     setIsAddSortMenuOpen(false);
     setAddSortQuery('');
     setAddSortMenuPos(null);
-    // Reset the initial mount flag when popover opens
-    isInitialMount.current = true;
   }, [isOpen, sortRules.length]);
 
   const columns = useMemo(() => tableMeta?.columns ?? [], [tableMeta]);
@@ -345,7 +358,8 @@ const SortPopover = forwardRef<
   };
 
   const commitAndClose = () => {
-    onChangeSortRules(draftRules);
+    // Pass a fresh cloned array to avoid any shared references
+    onChangeSortRules(draftRules.map(r => ({ ...r })));
     closePopover();
   };
 
