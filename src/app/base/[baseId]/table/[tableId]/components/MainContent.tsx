@@ -1878,17 +1878,29 @@ export default function MainContent({
         {/* Fixed Header Row */}
         <div className="flex flex-shrink-0">
           {/* Left header (checkbox + Name) */}
-          <div className="w-[224px] flex-shrink-0 border-r border-gray-200">
+          <div className="w-[264px] flex-shrink-0 border-r border-gray-200 bg-[rgb(242,242,242)]">
             <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
                 <tr className="bg-white h-8">
-                  <th className="w-[44px] h-8 bg-white border-b border-gray-200 p-0 align-middle">
-                    <div className="flex items-center justify-center h-8">
-                      <input type="checkbox" className="rounded border-gray-300" />
+                  <th className="w-[84px] h-8 bg-white border-b border-b-[rgb(209,209,209)] p-0 align-middle">
+                    <div className="staticCellContainer">
+                      <div className="rowNumber rowNumber--header">
+                        <div className="checkbox flex items-center justify-center text-white" aria-hidden="true">
+                          <svg
+                            width="9"
+                            height="9"
+                            viewBox="0 0 16 16"
+                            style={{ shapeRendering: 'geometricPrecision' }}
+                            className="flex-none icon"
+                          >
+                            <use fill="currentColor" href={`${ICON_SPRITE}#CheckBold`} />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
                   </th>
                   <th
-                    className="w-[180px] h-8 bg-white border-b border-gray-200 p-0 text-left align-middle"
+                    className="w-[180px] h-8 bg-white border-b border-b-[rgb(209,209,209)] p-0 text-left align-middle"
                     style={{
                       backgroundColor: filteredColumnIds.has(displayColumns[0]?.id ?? '') 
                         ? FILTERED_HEADER_BG 
@@ -1910,13 +1922,12 @@ export default function MainContent({
                           href={`${ICON_SPRITE}#${getColumnIconName(displayColumns[0]?.type ?? 'singleLineText')}`}
                         />
                       </svg>
-                      <span 
-                        className="text-xs font-semibold leading-4"
-                        style={{ 
+                      <span
+                        className="text-[13px] font-semibold leading-4"
+                        style={{
                           color: 'lab(27.1134 -0.956401 -12.3224)',
                           height: '16px',
                           lineHeight: '16px',
-                          fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
                         }}
                       >
                         {displayColumns[0]?.name ?? 'Name'}
@@ -1973,7 +1984,7 @@ export default function MainContent({
                     </th>
                   ))}
                   {/* Add column button */}
-                  <th className="w-28 h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
+                  <th className="w-[94px] h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
                     <button className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500">
                       <svg
                         width="16"
@@ -2010,7 +2021,7 @@ export default function MainContent({
             >
           <div className="flex min-w-0">
           {/* Left body (Name cells) */}
-          <div className="w-[224px] flex-shrink-0 border-r border-gray-200">
+          <div className="w-[264px] flex-shrink-0 border-r border-gray-200">
             <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <tbody>
                       {virtualItems.map((virtualRow) => {
@@ -2026,9 +2037,19 @@ export default function MainContent({
                               key={`placeholder-${idx}`}
                               className="bg-white"
                             >
-                              <td className="w-[44px] h-8 border-b border-gray-200 text-center align-middle bg-white">
-                                <div className="h-8 flex items-center justify-center text-xs text-gray-400 font-medium">
-                                  {idx + 1}
+                              <td className="w-[84px] h-8 border-b border-gray-200 p-0 align-middle bg-white">
+                                <div className="staticCellContainer">
+                                  <div className="rowNumber">
+                                    <div className="grabby" aria-hidden="true" />
+                                    <div className="numberText" data-rownumberlength="1">{idx + 1}</div>
+                                    <div className="checkbox" aria-hidden="true" />
+                                  </div>
+                                  <div className="rowColorContainer" aria-label="Row color container">
+                                    <div className="rowColor" />
+                                  </div>
+                                  <div className="expandButtonContainer">
+                                    <div className="expandRowCell flex" aria-hidden="true" />
+                                  </div>
                                 </div>
                               </td>
                               <td
@@ -2080,15 +2101,30 @@ export default function MainContent({
                       onMouseLeave={() => setHoveredRow(null)}
                     >
                       <td
-                        className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
+                        className={`w-[84px] h-8 border-b border-gray-200 p-0 align-middle ${
                           isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
                         style={{
                           backgroundColor: rowMatches ? SEARCH_ROW_NUMBER_BG : undefined,
                         }}
                       >
-                        <div className="h-8 flex items-center justify-center text-xs text-gray-500 font-medium">
-                          {idx + 1}
+                        <div className="staticCellContainer">
+                          <div className="rowNumber">
+                            <div className="grabby" aria-hidden="true" />
+                            <div
+                              className="numberText"
+                              data-rownumberlength={(idx + 1).toString().length}
+                            >
+                              {idx + 1}
+                            </div>
+                            <div className="checkbox" aria-hidden="true" />
+                          </div>
+                          <div className="rowColorContainer" aria-label="Row color container">
+                            <div className="rowColor" />
+                          </div>
+                          <div className="expandButtonContainer">
+                            <div className="expandRowCell flex" aria-hidden="true" />
+                          </div>
                         </div>
                       </td>
                       <td
@@ -2117,7 +2153,7 @@ export default function MainContent({
                           }}
                           key={`${tableId}-${row.id}-name`}
                           type="text"
-                          className={`w-full h-8 px-2 bg-transparent outline-none table-cell-input ${
+                          className={`w-full h-8 p-[6px] bg-transparent outline-none table-cell-input ${
                             isEditing
                               ? 'bg-blue-50'
                               : ''
@@ -2161,31 +2197,35 @@ export default function MainContent({
                         title="Insert new record in grid"
                       >
                         <td
-                          className={`w-[44px] h-8 border-b border-gray-200 text-center align-middle ${
+                          className={`w-[84px] h-[31px] p-0 align-middle ${
                             hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                           }`}
                         >
-                          <div className="h-8 flex items-center justify-center text-gray-500">
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 16 16"
-                              className="flex-none icon"
-                              style={{ shapeRendering: 'geometricPrecision' }}
-                            >
-                              <use
-                                fill="currentColor"
-                                href={`${ICON_SPRITE}#Plus`}
-                              />
-                            </svg>
+                          <div
+                            className="dataRow ghost leftPane rowInsertionEnabled"
+                            data-tutorial-selector-id="ghostRowLeftPane"
+                            aria-label="Insert new record in grid"
+                            title="You can also insert a new record anywhere by pressing Shift-Enter"
+                          >
+                            <div className="rowNumber">
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 16 16"
+                                className="flex-none icon"
+                                style={{ shapeRendering: 'geometricprecision' }}
+                              >
+                                <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
+                              </svg>
+                            </div>
                           </div>
                         </td>
                         <td
-                          className={`w-[180px] h-8 border-b border-gray-200 p-0 align-middle ${
+                          className={`w-[180px] h-[31px] p-0 align-middle ${
                             hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                           }`}
                         >
-                          <div className="h-8" />
+                          <div className="h-[31px]" />
                         </td>
                       </tr>
                     </tbody>
@@ -2230,7 +2270,7 @@ export default function MainContent({
                               ))}
                               {/* Add column cell */}
                               <td 
-                                className="w-28 h-8 border-0 bg-transparent"
+                                className="w-[94px] h-8 border-0 bg-transparent"
                                 onMouseEnter={(e) => {
                                   e.stopPropagation();
                                   setHoveredRow(null);
@@ -2334,7 +2374,7 @@ export default function MainContent({
 
                       {/* Add column cell */}
                       <td 
-                        className="w-28 h-8 border-0 bg-transparent"
+                        className="w-[94px] h-8 border-0 bg-transparent"
                         onMouseEnter={(e) => {
                           e.stopPropagation();
                           setHoveredRow(null);
@@ -2365,7 +2405,7 @@ export default function MainContent({
                             <div className="h-8 pl-3 pr-2" />
                           </td>
                         ))}
-                        <td className="w-28 h-8 border-0 bg-transparent" />
+                        <td className="w-[94px] h-8 border-0 bg-transparent" />
                       </tr>
                     </tbody>
                   </table>

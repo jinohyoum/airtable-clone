@@ -226,6 +226,162 @@
 /* Table Creation Dropdown Styles                                             */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/* Airtable-like grid left pane (row header)                                  */
+/* -------------------------------------------------------------------------- */
+
+.staticCellContainer {
+  box-sizing: border-box;
+  display: flex;
+  width: 84px;
+  height: 32px;
+  user-select: none;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans,
+    Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  color: rgb(29, 31, 37);
+}
+
+.staticCellContainer .rowNumber {
+  box-sizing: border-box;
+  display: flex;
+  position: relative;
+  width: 44px;
+  height: 32px;
+  padding-top: 7px;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: rgb(97, 102, 112);
+}
+
+/* The request explicitly says not to add draggable/selectable/fullscreen buttons.
+   Keep DOM parity for layout, but hide the interactive affordances. */
+.staticCellContainer .grabby,
+.staticCellContainer .expandRowCell {
+  display: none;
+}
+
+/* Header-only checkbox styling (non-functional; just visual parity) */
+.staticCellContainer .rowNumber.rowNumber--header {
+  display: block;
+  width: 44px;
+  height: 30px;
+  padding-left: 12px;
+  padding-top: 8px;
+  color: rgb(29, 31, 37);
+}
+
+/* Hide row checkboxes (avoid “selectable” UX); show only in header */
+.staticCellContainer .rowNumber:not(.rowNumber--header) .checkbox {
+  display: none;
+}
+
+.staticCellContainer .rowNumber.rowNumber--header .checkbox {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background-color: rgb(255, 255, 255);
+  box-shadow: rgba(0, 0, 0, 0.32) 0px 0px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 2px 0px,
+    rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
+}
+
+.staticCellContainer .rowNumber.rowNumber--header .checkbox svg {
+  opacity: 0;
+  width: 9px;
+  height: 9px;
+}
+
+.staticCellContainer .numberText {
+  box-sizing: border-box;
+  display: block;
+}
+
+.staticCellContainer .rowColorContainer {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 4px;
+  height: 31px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  transform: translateX(-2px);
+}
+
+.staticCellContainer .rowColor {
+  width: 4px;
+  height: 100%;
+}
+
+.staticCellContainer .expandButtonContainer {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  height: 31px;
+}
+
+/* Normalize grid cell typography closer to Airtable */
+.table-cell-input {
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans,
+    Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  color: rgb(29, 31, 37);
+}
+
+/* Airtable-like add-row ghost left pane */
+.dataRow.ghost.leftPane.rowInsertionEnabled {
+  box-sizing: border-box;
+  display: block;
+  background-color: transparent;
+  border-bottom: 0;
+  cursor: pointer;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans,
+    Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  height: 31px;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  padding-right: 5px;
+  user-select: none;
+}
+
+.dataRow.ghost.leftPane.rowInsertionEnabled > .rowNumber {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  margin-left: 12px;
+  color: rgb(84, 84, 84);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.dataRow.ghost.leftPane.rowInsertionEnabled > .rowNumber svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  user-select: none;
+}
+
 .table-creation-dropdown {
   font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   font-size: 13px;

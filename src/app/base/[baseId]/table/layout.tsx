@@ -5,17 +5,92 @@ import type { ReactNode } from 'react';
 
 import BulkInsertButton from './[tableId]/components/BulkInsertButton';
 import { useParams } from 'next/navigation';
-import { useDeferredValue, useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { forwardRef, useDeferredValue, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '~/trpc/react';
 import LeftSidebarNarrow from './[tableId]/components/LeftSidebarNarrow';
 import MainContent from './[tableId]/components/MainContent';
 import Sidebar from './[tableId]/components/Sidebar';
-import { ColumnsUiProvider } from './[tableId]/components/ColumnsUiContext';
+import { ColumnsUiProvider, useColumnsUi } from './[tableId]/components/ColumnsUiContext';
 import HideFieldsPopover from './[tableId]/components/HideFieldsPopover';
 import SortPopover from './[tableId]/components/SortPopover';
 import FilterPopover from './[tableId]/components/FilterPopover';
 import TableTabsBar from './[tableId]/components/TableTabsBar';
 import TopNav from './[tableId]/components/TopNav';
+
+const HideFieldsButton = forwardRef<
+  HTMLDivElement,
+  {
+    isOpen: boolean;
+    onToggle: () => void;
+  }
+>(function HideFieldsButton({ isOpen, onToggle }, ref) {
+  const { hiddenColumnIds } = useColumnsUi();
+  const hiddenCount = hiddenColumnIds.size;
+  const isActive = hiddenCount > 0;
+  const label = isActive
+    ? `${hiddenCount} hidden field${hiddenCount === 1 ? '' : 's'}`
+    : 'Hide fields';
+
+  return (
+    <div
+      ref={ref}
+      role="button"
+      aria-label="Hide fields"
+      aria-haspopup="true"
+      aria-expanded={isOpen}
+      className="focus-visible mr1"
+      tabIndex={0}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggle();
+        }
+      }}
+    >
+      <div
+        className="pointer flex items-center rounded colors-foreground-subtle"
+        data-isactive={isActive ? 'true' : 'false'}
+        aria-description="Tooltip: Hide fields"
+        style={{
+          paddingLeft: '8px',
+          paddingRight: '8px',
+          paddingTop: '4px',
+          paddingBottom: '4px',
+          backgroundColor: isActive ? 'rgb(196, 236, 255)' : 'transparent',
+          color: isActive ? 'rgb(29, 31, 37)' : undefined,
+          borderRadius: isActive ? '4px' : undefined,
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = isActive
+            ? 'rgb(196, 236, 255)'
+            : 'transparent';
+        }}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          className="flex-none"
+          style={{ shapeRendering: 'geometricPrecision' }}
+        >
+          <use fill="currentColor" href="/icons/icon_definitions.svg#EyeSlash" />
+        </svg>
+        <div className="max-width-1 truncate ml-half">{label}</div>
+      </div>
+    </div>
+  );
+});
 
 export default function TableLayout({ children }: { children: ReactNode }) {
   const params = useParams();
@@ -562,59 +637,11 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                       {/* Hide fields button */}
                       <div className="flex flex-row mr-half">
                         <div>
-                          <div
+                          <HideFieldsButton
                             ref={hideFieldsButtonRef}
-                            role="button"
-                            aria-label="Hide fields"
-                            aria-haspopup="true"
-                            aria-expanded={isHideFieldsOpen}
-                            className="focus-visible mr1"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setIsHideFieldsOpen((v) => !v);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setIsHideFieldsOpen((v) => !v);
-                              }
-                            }}
-                          >
-                            <div
-                              className="pointer flex items-center rounded colors-foreground-subtle"
-                              data-isactive="false"
-                              aria-description="Tooltip: Hide fields"
-                              style={{
-                                paddingLeft: '8px',
-                                paddingRight: '8px',
-                                paddingTop: '4px',
-                                paddingBottom: '4px',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                            >
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 16 16"
-                                className="flex-none"
-                                style={{ shapeRendering: 'geometricPrecision' }}
-                              >
-                                <use
-                                  fill="currentColor"
-                                  href="/icons/icon_definitions.svg#EyeSlash"
-                                />
-                              </svg>
-                              <div className="max-width-1 truncate ml-half">Hide fields</div>
-                            </div>
-                          </div>
+                            isOpen={isHideFieldsOpen}
+                            onToggle={() => setIsHideFieldsOpen((v) => !v)}
+                          />
                         </div>
                       </div>
 
