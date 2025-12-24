@@ -1769,8 +1769,26 @@ export default function MainContent({
     <div
       ref={rootRef}
       tabIndex={0}
-      onMouseDown={() => rootRef.current?.focus()}
-      className="flex-1 min-h-0 flex flex-col overflow-hidden"
+      onMouseDown={(e) => {
+        // Only focus root if clicking on background, not on cells or other interactive elements
+        const target = e.target as HTMLElement;
+        const isCellInput = target.closest('.table-cell-input');
+        const isInteractive = target.closest('button, a, input[type="checkbox"], [role="button"]');
+        if (!isCellInput && !isInteractive) {
+          rootRef.current?.focus();
+        }
+      }}
+      onClick={(e) => {
+        // Clear active cell when clicking on background (not on cells or other interactive elements)
+        const target = e.target as HTMLElement;
+        const isCellInput = target.closest('.table-cell-input');
+        const isInteractive = target.closest('button, a, input[type="checkbox"], [role="button"], th');
+        if (!isCellInput && !isInteractive) {
+          setActiveCell(null);
+          setIsKeyboardNav(false);
+        }
+      }}
+      className="flex-1 min-h-0 flex flex-col overflow-hidden outline-none"
       style={{ backgroundColor: '#f6f8fc' }}
     >
       {loadError ? (
