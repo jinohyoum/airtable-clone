@@ -266,10 +266,10 @@ function SortableFilterRow({
               {showOperatorDropdown && operatorButtonRef.current && (
                 <div
                   style={{
-                    position: 'absolute',
-                    top: `${operatorButtonRef.current.getBoundingClientRect().bottom - operatorButtonRef.current.getBoundingClientRect().top}px`,
-                    left: 0,
-                    zIndex: 10004,
+                    position: 'fixed',
+                    top: `${operatorButtonRef.current.getBoundingClientRect().bottom}px`,
+                    left: `${operatorButtonRef.current.getBoundingClientRect().left}px`,
+                    zIndex: 10005,
                     minWidth: '56px',
                   }}
                 >
@@ -282,7 +282,7 @@ function SortableFilterRow({
                           maxHeight: '200px',
                           backgroundColor: 'rgb(255, 255, 255)',
                           borderRadius: '3px',
-                          boxShadow: 'rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.16) 0px 0px 2px 0px, rgba(0, 0, 0, 0.06) 0px 3px 4px 0px, rgba(0, 0, 0, 0.06) 0px 6px 8px 0px, rgba(0, 0, 0, 0.08) 0px 12px 16px 0px, rgba(0, 0, 0, 0.06) 0px 18px 32px 0px',
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
                           overflowX: 'hidden',
                           overflowY: 'auto',
                           padding: 0,
@@ -290,7 +290,6 @@ function SortableFilterRow({
                           listStyle: 'none',
                           position: 'relative',
                           zIndex: 1,
-                          transition: 'opacity 0.1s ease-out',
                         }}
                       >
                         <li
