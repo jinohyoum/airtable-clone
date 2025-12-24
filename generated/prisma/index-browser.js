@@ -156,6 +156,7 @@ exports.Prisma.RowScalarFieldEnum = {
   tableId: 'tableId',
   clientRowId: 'clientRowId',
   searchText: 'searchText',
+  sortKeys: 'sortKeys',
   values: 'values'
 };
 
@@ -171,7 +172,10 @@ exports.Prisma.CellScalarFieldEnum = {
 exports.Prisma.ViewScalarFieldEnum = {
   id: 'id',
   name: 'name',
-  config: 'config',
+  filters: 'filters',
+  sortRules: 'sortRules',
+  search: 'search',
+  hiddenColumns: 'hiddenColumns',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   tableId: 'tableId'
@@ -217,6 +221,11 @@ exports.Prisma.VerificationTokenScalarFieldEnum = {
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.JsonNullValueInput = {

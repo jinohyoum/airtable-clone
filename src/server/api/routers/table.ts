@@ -404,6 +404,23 @@ export const tableRouter = createTRPCRouter({
           .optional(),
         sortBy: z.string().optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
+        filters: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              operator: z.enum([
+                "isEmpty",
+                "isNotEmpty",
+                "contains",
+                "notContains",
+                "equals",
+                "greaterThan",
+                "lessThan",
+              ]),
+              value: z.string().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -436,6 +453,103 @@ export const tableRouter = createTRPCRouter({
       const useSort = validRules.length > 0;
 
       const cursor = input.cursor;
+
+      // Build filter SQL conditions
+      // Each filter is AND-ed together (flat conditions)
+      const filterConditions: Prisma.Sql[] = [];
+      
+      if (input.filters && input.filters.length > 0) {
+        for (const filter of input.filters) {
+          const { columnId, operator, value } = filter;
+          const columnExists = table.columns.some((c) => c.id === columnId);
+          if (!columnExists) continue; // Skip invalid column IDs
+
+          // Get the JSONB value for this column
+          const valueExpr = Prisma.sql`(r."values"->>${columnId})`;
+          const trimmedExpr = Prisma.sql`btrim(COALESCE(${valueExpr}, ''))`;
+
+          switch (operator) {
+            case "isEmpty": {
+              // Empty means: NULL or blank string
+              filterConditions.push(
+                Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL)`,
+              );
+              break;
+            }
+            case "isNotEmpty": {
+              // Not empty means: has a value that's not blank
+              filterConditions.push(
+                Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NOT NULL)`,
+              );
+              break;
+            }
+            case "contains": {
+              // Case-insensitive contains
+              if (value !== undefined && value !== null) {
+                filterConditions.push(
+                  Prisma.sql`(${valueExpr} ILIKE '%' || ${value} || '%')`,
+                );
+              }
+              break;
+            }
+            case "notContains": {
+              // Does not contain (or is empty)
+              if (value !== undefined && value !== null) {
+                filterConditions.push(
+                  Prisma.sql`(${valueExpr} IS NULL OR ${valueExpr} NOT ILIKE '%' || ${value} || '%')`,
+                );
+              }
+              break;
+            }
+            case "equals": {
+              // Exact match (case-insensitive for text, or numeric equality for numbers)
+              if (value !== undefined && value !== null) {
+                filterConditions.push(
+                  Prisma.sql`(lower(${trimmedExpr}) = lower(${value}))`,
+                );
+              }
+              break;
+            }
+            case "greaterThan": {
+              // Number comparison: treat non-numeric as NULL/invalid
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  // Check if the cell value is numeric and greater than the filter value
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      AND (${trimmedExpr})::numeric > ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            }
+            case "lessThan": {
+              // Number comparison: treat non-numeric as NULL/invalid
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  // Check if the cell value is numeric and less than the filter value
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      AND (${trimmedExpr})::numeric < ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      const filterSql =
+        filterConditions.length > 0
+          ? Prisma.sql`AND (${Prisma.join(filterConditions, " AND ")})`
+          : Prisma.empty;
 
       // Search behavior (take-home spec): case-insensitive "contains" across ALL cell values.
       // We do this directly against the JSONB `values` column so search works even if `searchText`
@@ -487,6 +601,7 @@ export const tableRouter = createTRPCRouter({
           ${baseSelect}
           FROM "Row" r
           WHERE r."tableId" = ${tableId}
+          ${filterSql}
           ${searchSql}
           ${cursorSql}
           ORDER BY r."order" ASC, r."id" ASC
@@ -573,6 +688,7 @@ export const tableRouter = createTRPCRouter({
             ${sortKeysJson} AS "__sortKeys"
           FROM "Row" r
           WHERE r."tableId" = ${tableId}
+          ${filterSql}
           ${searchSql}
           ${cursorSql}
           ORDER BY ${Prisma.join(orderByParts, ", ")}
@@ -643,6 +759,7 @@ export const tableRouter = createTRPCRouter({
         SELECT COUNT(*) AS count
         FROM "Row" r
         WHERE r."tableId" = ${tableId}
+        ${filterSql}
         ${searchSql}
       `;
       const totalCountResult = await ctx.db.$queryRaw<Array<{ count: bigint }>>(
@@ -706,10 +823,109 @@ export const tableRouter = createTRPCRouter({
 
   // Get total row count for a table
   getRowCount: protectedProcedure
-    .input(z.object({ tableId: z.string(), search: z.string().optional() }))
+    .input(
+      z.object({
+        tableId: z.string(),
+        search: z.string().optional(),
+        filters: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              operator: z.enum([
+                "isEmpty",
+                "isNotEmpty",
+                "contains",
+                "notContains",
+                "equals",
+                "greaterThan",
+                "lessThan",
+              ]),
+              value: z.string().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const q = input.search?.trim();
       const search = q && q.length > 0 ? q : undefined;
+
+      // Build filter SQL (same logic as getRows)
+      const filterConditions: Prisma.Sql[] = [];
+      
+      if (input.filters && input.filters.length > 0) {
+        for (const filter of input.filters) {
+          const { columnId, operator, value } = filter;
+          
+          const valueExpr = Prisma.sql`(r."values"->>${columnId})`;
+          const trimmedExpr = Prisma.sql`btrim(COALESCE(${valueExpr}, ''))`;
+
+          switch (operator) {
+            case "isEmpty":
+              filterConditions.push(
+                Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL)`,
+              );
+              break;
+            case "isNotEmpty":
+              filterConditions.push(
+                Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NOT NULL)`,
+              );
+              break;
+            case "contains":
+              if (value !== undefined && value !== null) {
+                filterConditions.push(
+                  Prisma.sql`(${valueExpr} ILIKE '%' || ${value} || '%')`,
+                );
+              }
+              break;
+            case "notContains":
+              if (value !== undefined && value !== null) {
+                filterConditions.push(
+                  Prisma.sql`(${valueExpr} IS NULL OR ${valueExpr} NOT ILIKE '%' || ${value} || '%')`,
+                );
+              }
+              break;
+            case "equals":
+              if (value !== undefined && value !== null) {
+                filterConditions.push(
+                  Prisma.sql`(lower(${trimmedExpr}) = lower(${value}))`,
+                );
+              }
+              break;
+            case "greaterThan":
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      AND (${trimmedExpr})::numeric > ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            case "lessThan":
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      AND (${trimmedExpr})::numeric < ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+          }
+        }
+      }
+
+      const filterSql =
+        filterConditions.length > 0
+          ? Prisma.sql`AND (${Prisma.join(filterConditions, " AND ")})`
+          : Prisma.empty;
 
       const searchSql = search
         ? Prisma.sql`AND EXISTS (
@@ -723,6 +939,7 @@ export const tableRouter = createTRPCRouter({
         SELECT COUNT(*) AS count
         FROM "Row" r
         WHERE r."tableId" = ${input.tableId}
+        ${filterSql}
         ${searchSql}
       `;
       const result = await ctx.db.$queryRaw<Array<{ count: bigint }>>(countQuery);

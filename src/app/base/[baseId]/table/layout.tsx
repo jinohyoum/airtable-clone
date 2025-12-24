@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 import BulkInsertButton from './[tableId]/components/BulkInsertButton';
 import { useParams } from 'next/navigation';
-import { useDeferredValue, useMemo, useState, useRef, useEffect } from 'react';
+import { useDeferredValue, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '~/trpc/react';
 import LeftSidebarNarrow from './[tableId]/components/LeftSidebarNarrow';
 import MainContent from './[tableId]/components/MainContent';
@@ -55,6 +55,37 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [filterPos, setFilterPos] = useState<{ x: number; y: number; maxH: number } | null>(null);
   const filterButtonRef = useRef<HTMLDivElement | null>(null);
   const filterPopoverRef = useRef<HTMLDivElement | null>(null);
+  
+  // Filter state
+  type FilterCondition = {
+    id: string;
+    columnId: string;
+    operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+    value?: string;
+  };
+  const [filters, setFilters] = useState<FilterCondition[]>([]);
+  const [draftFilters, setDraftFilters] = useState<FilterCondition[]>([]);
+
+  const filterCountForButton = isFilterOpen ? draftFilters.length : filters.length;
+  const isFilterActiveForButton = filterCountForButton > 0;
+
+  const applyFilters = useCallback((next: FilterCondition[]) => {
+    // Always create new references to ensure React detects the change
+    const normalized = (next ?? [])
+      .filter(Boolean)
+      .map((f) => ({ id: f.id, columnId: f.columnId, operator: f.operator, value: f.value })); // new objects
+
+    setFilters(normalized); // new array reference guaranteed
+
+    // Trigger global "Saving…" UI while the grid refetches filtered rows
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('grid:filterSaving', {
+          detail: { active: true, signature: JSON.stringify(normalized) },
+        }),
+      );
+    }
+  }, []);
 
   const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
     // Always create new references to ensure React detects the change
@@ -141,6 +172,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setSortRules([]);
     setIsFilterOpen(false);
     setFilterPos(null);
+    setFilters([]);
     setIsSearchOpen(false);
     setSearchInput('');
   }, [tableId]);
@@ -283,9 +315,16 @@ export default function TableLayout({ children }: { children: ReactNode }) {
         count: totalRows,
       });
 
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search }, undefined);
-      await utils.table.getRows.invalidate({ tableId, limit: 500, search });
-      void utils.table.getRowCount.invalidate({ tableId, search });
+      // Invalidate queries with current filters
+      const normalizedFilters = filters.map(f => ({
+        columnId: f.columnId,
+        operator: f.operator,
+        value: f.value,
+      }));
+      
+      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search, filters: normalizedFilters }, undefined);
+      await utils.table.getRows.invalidate({ tableId, limit: 500, search, filters: normalizedFilters });
+      void utils.table.getRowCount.invalidate({ tableId, search, filters: normalizedFilters });
     } catch (error) {
       console.error('Bulk insert error:', error);
       alert(`Failed to insert rows: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -597,7 +636,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                       >
                         <div
                           className="pointer flex items-center rounded colors-foreground-subtle"
-                          data-isactive="false"
+                          data-isactive={isFilterActiveForButton ? 'true' : 'false'}
                           aria-description="Tooltip: Filter"
                           style={{
                             paddingLeft: '8px',
@@ -625,7 +664,9 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                             />
                           </svg>
                           <div className="max-width-1 truncate ml-half">
-                            <span data-activefiltercount="0">Filter</span>
+                            {isFilterActiveForButton
+                              ? `Filtered by ${filterCountForButton} condition${filterCountForButton === 1 ? '' : 's'}`
+                              : 'Filter'}
                           </div>
                         </div>
                       </div>
@@ -635,9 +676,13 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         tableId={tableId ?? ''}
                         isOpen={isFilterOpen}
                         position={filterPos}
+                        filters={filters}
+                        onChangeFilters={applyFilters}
+                        onDraftFiltersChange={setDraftFilters}
                         onRequestClose={() => {
                           setIsFilterOpen(false);
                           setFilterPos(null);
+                          setDraftFilters(filters);
                         }}
                       />
                     </div>
@@ -1164,7 +1209,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <Sidebar />
-              <MainContent isSearchOpen={isSearchOpen} search={search} sortRules={sortRules} />
+              <MainContent isSearchOpen={isSearchOpen} search={search} sortRules={sortRules} filters={filters} />
               {/* Keep children mounted for route completeness */}
               {children}
             </div>

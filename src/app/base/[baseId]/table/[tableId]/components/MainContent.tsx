@@ -21,10 +21,17 @@ export default function MainContent({
   isSearchOpen = false,
   search,
   sortRules,
+  filters,
 }: {
   isSearchOpen?: boolean;
   search?: string;
   sortRules?: Array<{ columnId: string; direction: 'asc' | 'desc' }>;
+  filters?: Array<{
+    id: string;
+    columnId: string;
+    operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+    value?: string;
+  }>;
 }) {
   const params = useParams();
   const tableId = ((params.tableId as string | undefined) ?? '').toString();
@@ -34,14 +41,31 @@ export default function MainContent({
   // sortRules is already normalized in applySortRules, so use it directly
   const normalizedSortRules = sortRules?.length ? sortRules : undefined;
 
+  // Normalize filters for API (map to the shape expected by the router)
+  const normalizedFilters = useMemo(() => {
+    if (!filters || filters.length === 0) return undefined;
+    return filters.map(f => ({
+      columnId: f.columnId,
+      operator: f.operator,
+      value: f.value,
+    }));
+  }, [filters]);
+
   const sortSignature = useMemo(() => JSON.stringify(normalizedSortRules ?? []), [normalizedSortRules]);
+  const filterSignature = useMemo(() => JSON.stringify(normalizedFilters ?? []), [normalizedFilters]);
 
   // tRPC utils + rows query key are used throughout (including in early effects), so define them up-front.
   const utils = api.useUtils();
   const rowsQueryInput = useMemo(
-    () => ({ tableId, limit: 500 as const, search, sortRules: normalizedSortRules }),
-    // Use the stringified signature so identical-content new references don't retrigger.
-    [tableId, search, sortSignature],
+    () => ({ 
+      tableId, 
+      limit: 500 as const, 
+      search, 
+      sortRules: normalizedSortRules,
+      filters: normalizedFilters,
+    }),
+    // Use the stringified signatures so identical-content new references don't retrigger.
+    [tableId, search, sortSignature, filterSignature],
   );
 
   // When the user applies Sort in the toolbar, we want to trigger the global "Saving…" UI
@@ -215,7 +239,7 @@ export default function MainContent({
 
   // Fetch total row count from database (for accurate record count display)
   const { data: rowCountData, error: rowCountError } = api.table.getRowCount.useQuery(
-    { tableId: tableId ?? "", search },
+    { tableId: tableId ?? "", search, filters: normalizedFilters },
     { enabled: hasTableId && !isCreatingTable },
   );
   
@@ -234,6 +258,7 @@ export default function MainContent({
       limit: 500, // Fetch 500 rows per page for smoother scrolling
       search,
       sortRules: normalizedSortRules,
+      filters: normalizedFilters,
     },
     {
       enabled: hasTableId && !isCreatingTable,

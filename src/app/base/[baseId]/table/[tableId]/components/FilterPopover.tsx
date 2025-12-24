@@ -59,6 +59,38 @@ type FilterCondition = {
   value: string;
 };
 
+// Map UI operator labels to DB operator types
+function mapOperatorToDbType(uiOperator: string): 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan' {
+  const mapping: Record<string, 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan'> = {
+    'contains...': 'contains',
+    'contains': 'contains',
+    'does not contain': 'notContains',
+    'is...': 'equals',
+    'is': 'equals',
+    'is not...': 'notContains', // Map "is not" to notContains for text
+    'is empty': 'isEmpty',
+    'is not empty': 'isNotEmpty',
+    '>': 'greaterThan',
+    '<': 'lessThan',
+    '=': 'equals',
+  };
+  return mapping[uiOperator] ?? 'contains';
+}
+
+// Map DB operator types back to UI labels
+function mapDbTypeToOperator(dbType: string): string {
+  const mapping: Record<string, string> = {
+    'contains': 'contains...',
+    'notContains': 'does not contain',
+    'equals': 'is...',
+    'isEmpty': 'is empty',
+    'isNotEmpty': 'is not empty',
+    'greaterThan': '>',
+    'lessThan': '<',
+  };
+  return mapping[dbType] ?? 'contains...';
+}
+
 function SortableFilterRow({
   id,
   condition,
@@ -755,11 +787,65 @@ const FilterPopover = forwardRef<
     tableId: string;
     isOpen: boolean;
     position: { x: number; y: number; maxH: number } | null;
+    filters: Array<{
+      id: string;
+      columnId: string;
+      operator: string;
+      value?: string;
+    }>;
+    onChangeFilters: (filters: Array<{
+      id: string;
+      columnId: string;
+      operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+      value?: string;
+    }>) => void;
+    onDraftFiltersChange: (filters: Array<{
+      id: string;
+      columnId: string;
+      operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+      value?: string;
+    }>) => void;
     onRequestClose?: () => void;
   }
->(function FilterPopover({ tableId, isOpen, position, onRequestClose }, ref) {
+>(function FilterPopover({ tableId, isOpen, position, filters, onChangeFilters, onDraftFiltersChange, onRequestClose }, ref) {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const [conditions, setConditions] = useState<FilterCondition[]>([]);  const [isAddConditionActive, setIsAddConditionActive] = useState(false);
+  const [conditions, setConditions] = useState<FilterCondition[]>([]);
+  const [isAddConditionActive, setIsAddConditionActive] = useState(false);
+  
+  // Sync conditions with filters prop when popover opens
+  useEffect(() => {
+    if (isOpen) {
+      setConditions(filters.map(f => ({
+        id: f.id,
+        columnId: f.columnId,
+        operator: mapDbTypeToOperator(f.operator), // Convert DB type to UI label
+        value: f.value ?? '',
+      })));
+    }
+  }, [isOpen, filters]);
+
+  // Notify parent of draft changes and auto-apply filters
+  useEffect(() => {
+    if (isOpen && conditions.length >= 0) {
+      const mappedFilters = conditions.map(c => ({
+        id: c.id,
+        columnId: c.columnId,
+        operator: mapOperatorToDbType(c.operator),
+        value: c.value || undefined,
+      }));
+      
+      onDraftFiltersChange(mappedFilters);
+      
+      // Auto-apply filters with minimal debounce for instant filtering
+      const timer = setTimeout(() => {
+        onChangeFilters(mappedFilters);
+      }, 150);
+      
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conditions, isOpen]);
+  
   const { data: tableMeta } = api.table.getTableMeta.useQuery(
     { tableId },
     { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
@@ -784,7 +870,7 @@ const FilterPopover = forwardRef<
     const newCondition: FilterCondition = {
       id: `flt${Date.now()}${Math.random().toString(36).substring(2, 9)}`,
       columnId: columns[0]?.id ?? '',
-      operator: 'contains',
+      operator: 'contains...',
       value: '',
     };
     setConditions((prev) => [...prev, newCondition]);

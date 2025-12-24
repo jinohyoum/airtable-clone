@@ -58,6 +58,7 @@ model Row {
   tableId     String
   clientRowId String?  // Client-generated UUID for idempotency
   searchText  String   @default("") @db.Text // Denormalized search text (concatenated cell values)
+  sortKeys    Json?    // Legacy field (not used anymore, but keeping to avoid data loss)
   values      Json     @default("{}") // jsonb - stores cell values keyed by columnId
   cells       Cell[]
   table       Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
@@ -84,13 +85,16 @@ model Cell {
 }
 
 model View {
-  id        String   @id @default(cuid())
-  name      String
-  config    String?  @db.Text // JSON string for filters, sort, hidden columns, search
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tableId   String
-  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  name          String
+  filters       Json     @default("[]") // Array of filter conditions: [{columnId, operator, value}]
+  sortRules     Json     @default("[]") // Array of sort rules: [{columnId, direction}]
+  search        String   @default("") @db.Text // Global search term
+  hiddenColumns Json     @default("[]") // Array of hidden column IDs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tableId       String
+  table         Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   @@index([tableId])
 }
