@@ -13,6 +13,7 @@ import Sidebar from './[tableId]/components/Sidebar';
 import { ColumnsUiProvider } from './[tableId]/components/ColumnsUiContext';
 import HideFieldsPopover from './[tableId]/components/HideFieldsPopover';
 import SortPopover from './[tableId]/components/SortPopover';
+import FilterPopover from './[tableId]/components/FilterPopover';
 import TableTabsBar from './[tableId]/components/TableTabsBar';
 import TopNav from './[tableId]/components/TopNav';
 
@@ -49,6 +50,11 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
   const sortCountForButton = isSortOpen ? draftSortRules.length : sortRules.length;
   const isSortActiveForButton = sortCountForButton > 0;
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterPos, setFilterPos] = useState<{ x: number; y: number; maxH: number } | null>(null);
+  const filterButtonRef = useRef<HTMLDivElement | null>(null);
+  const filterPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
     // Always create new references to ensure React detects the change
@@ -133,6 +139,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setIsSortOpen(false);
     setSortPos(null);
     setSortRules([]);
+    setIsFilterOpen(false);
+    setFilterPos(null);
     setIsSearchOpen(false);
     setSearchInput('');
   }, [tableId]);
@@ -220,6 +228,48 @@ export default function TableLayout({ children }: { children: ReactNode }) {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isSortOpen]);
+
+  // Position filter popover under the button when opened
+  useEffect(() => {
+    if (!isFilterOpen) return;
+    const btn = filterButtonRef.current;
+    if (!btn) return;
+
+    const rect = btn.getBoundingClientRect();
+    const width = 328;
+    const offsetRight = 0;
+    const desiredX = Math.round(rect.right + offsetRight - width);
+    const x = Math.max(8, Math.min(desiredX, window.innerWidth - width - 8));
+    const y = Math.round(rect.bottom + 4);
+    const maxH = Math.max(236, Math.min(670, window.innerHeight - y - 16));
+    setFilterPos({ x, y, maxH });
+  }, [isFilterOpen]);
+
+  // Close filter popover on outside click / Escape
+  useEffect(() => {
+    if (!isFilterOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (filterPopoverRef.current?.contains(t)) return;
+      if (filterButtonRef.current?.contains(t)) return;
+      setIsFilterOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsFilterOpen(false);
+      filterButtonRef.current?.focus();
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isFilterOpen]);
 
   const handleBulkInsert = async () => {
     if (!tableId || tableId.startsWith('__creating__')) return;
@@ -529,6 +579,21 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         id="id_c7f6290319c67ac93b78bf99c80f47cd"
                         data-tutorial-selector-id="filterButton"
                         aria-label="Filter rows"
+                        aria-haspopup="true"
+                        aria-expanded={isFilterOpen}
+                        ref={filterButtonRef}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsFilterOpen((v) => !v);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsFilterOpen((v) => !v);
+                          }
+                        }}
                       >
                         <div
                           className="pointer flex items-center rounded colors-foreground-subtle"
@@ -564,6 +629,16 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           </div>
                         </div>
                       </div>
+
+                      <FilterPopover
+                        ref={filterPopoverRef}
+                        isOpen={isFilterOpen}
+                        position={filterPos}
+                        onRequestClose={() => {
+                          setIsFilterOpen(false);
+                          setFilterPos(null);
+                        }}
+                      />
                     </div>
 
                     {/* Group and Sort buttons */}
@@ -700,46 +775,46 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                           setDraftSortRules(sortRules);
                         }}
                       />
-                    </div>
 
-                    {/* Color button */}
-                    <div
-                      tabIndex={0}
-                      role="button"
-                      className="collapsed focus-visible mr-half"
-                      id="viwbTwMqnWkLGzJTN-colorConfigButton"
-                      aria-label="Row colors"
-                    >
+                      {/* Color button */}
                       <div
-                        className="pointer flex items-center rounded colors-foreground-subtle"
-                        data-isactive="false"
-                        aria-description="Tooltip: Color"
-                        style={{
-                          paddingLeft: '8px',
-                          paddingRight: '8px',
-                          paddingTop: '4px',
-                          paddingBottom: '4px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
+                        tabIndex={0}
+                        role="button"
+                        className="collapsed focus-visible mr-half"
+                        id="viwbTwMqnWkLGzJTN-colorConfigButton"
+                        aria-label="Row colors"
                       >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 16 16"
-                          className="flex-none"
-                          style={{ shapeRendering: 'geometricPrecision' }}
+                        <div
+                          className="pointer flex items-center rounded colors-foreground-subtle"
+                          data-isactive="false"
+                          aria-description="Tooltip: Color"
+                          style={{
+                            paddingLeft: '8px',
+                            paddingRight: '8px',
+                            paddingTop: '4px',
+                            paddingBottom: '4px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                         >
-                          <use
-                            fill="currentColor"
-                            href="/icons/icon_definitions.svg#PaintBucket"
-                          />
-                        </svg>
-                        <div className="max-width-1 truncate ml-half">Color</div>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            className="flex-none"
+                            style={{ shapeRendering: 'geometricPrecision' }}
+                          >
+                            <use
+                              fill="currentColor"
+                              href="/icons/icon_definitions.svg#PaintBucket"
+                            />
+                          </svg>
+                          <div className="max-width-1 truncate ml-half">Color</div>
+                        </div>
                       </div>
                     </div>
 
@@ -752,7 +827,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         aria-expanded="false"
                         className="focus-visible mr-half"
                         tabIndex={0}
-                        style={{ marginLeft: '8px' }} // shift row-height button slightly right between color and Share
+                        style={{ marginLeft: '8px' }}
                       >
                         <div
                           className="pointer flex items-center rounded colors-foreground-subtle"
