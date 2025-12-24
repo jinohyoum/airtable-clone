@@ -23,7 +23,11 @@ import { api } from '~/trpc/react';
 import { getColumnIconName } from './columnIcons';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
-const SORT_POPOVER_W = 428;
+const SORT_POPOVER_W = 320;
+const SORT_POPOVER_BOX_SHADOW =
+  'rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.16) 0px 0px 2px 0px, rgba(0, 0, 0, 0.06) 0px 3px 4px 0px, rgba(0, 0, 0, 0.06) 0px 6px 8px 0px, rgba(0, 0, 0, 0.08) 0px 12px 16px 0px, rgba(0, 0, 0, 0.06) 0px 18px 32px 0px';
+const HEADING_COLOR = 'rgb(97, 102, 112)';
+const BODY_COLOR = 'rgb(29, 31, 37)';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -92,7 +96,7 @@ function SortableSortRuleRow({
   directionLabel: string;
   showDragHandle: boolean;
   onFieldClick: () => void;
-  onDirectionClick: () => void;
+  onDirectionClick: (anchor?: HTMLElement | null) => void;
   onRemove: () => void;
 }) {
   const {
@@ -109,6 +113,8 @@ function SortableSortRuleRow({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+  // ensure row corners match reduced rounding used elsewhere
+  style.borderRadius = 2;
 
   return (
     <div ref={setNodeRef} className="mx1 relative rounded flex justify-start mb-half" style={style}>
@@ -128,6 +134,8 @@ function SortableSortRuleRow({
                 onFieldClick();
               }}
             >
+              {/* Reduce rounding for field picker to be less rounded than global "rounded" */}
+              <div style={{ position: 'absolute', inset: 0, borderRadius: 2, pointerEvents: 'none' }} aria-hidden />
               <div className="flex-auto truncate left-align">{col?.name ?? 'Field'}</div>
               <div className="flex-none flex items-center ml-half hide-print">
                 <SpriteIcon name="ChevronDown" className="flex-none icon" />
@@ -148,12 +156,13 @@ function SortableSortRuleRow({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onDirectionClick();
+              onDirectionClick(e.currentTarget as HTMLElement);
             }}
           >
             <div
-              className="flex flex-auto items-center px1 rounded text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover border colors-border-default"
+              className="flex flex-auto items-center px1 text-blue-focus pointer link-quiet colors-background-raised-control colors-background-selected-hover border colors-border-default"
               data-testid="sort-direction-selector"
+              style={{ borderRadius: 2 }}
             >
               <div className="flex-auto textOverflowEllipsis">
                 <span className="sortOrderLabel">{directionLabel}</span>
@@ -176,7 +185,7 @@ function SortableSortRuleRow({
           onRemove();
         }}
       >
-        <SpriteIcon name="X" className="flex-none icon" />
+        <SpriteIcon name="X" className="flex-none icon" style={{ color: 'rgba(158,159,161,1)' }} />
       </div>
 
       {showDragHandle && (
@@ -303,8 +312,14 @@ const SortPopover = forwardRef<
   const addSortInputRef = useRef<HTMLInputElement | null>(null);
   const addSortMenuRef = useRef<HTMLDivElement | null>(null);
   const addAnotherSortButtonRef = useRef<HTMLDivElement | null>(null);
-  const [addSortMenuPos, setAddSortMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [addSortMenuPos, setAddSortMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const addSortListboxId = useId();
+
+  // Direction selector nested menu state
+  const [isDirectionMenuOpen, setIsDirectionMenuOpen] = useState(false);
+  const [directionMenuPos, setDirectionMenuPos] = useState<{ x: number; y: number; w: number } | null>(null);
+  const [directionMenuIndex, setDirectionMenuIndex] = useState<number | null>(null);
+  const directionMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Note: draftRules sync moved to the effect above that only runs on isOpen
   // This effect just handles other UI state resets
@@ -340,6 +355,10 @@ const SortPopover = forwardRef<
 
   const NUDGE_RIGHT_PX = 6;
   const NUDGE_UP_PX = 2;
+  // For right alignment of chooseField panel
+  const CONFIG_PANEL_W = 452; // previous width of popover when fields are selected
+  const CHOOSE_FIELD_W = SORT_POPOVER_W; // 320
+  const RIGHT_SHIFT_FOR_CHOOSE_FIELD = CONFIG_PANEL_W - CHOOSE_FIELD_W;
 
   const columnsById = useMemo(() => new Map(columns.map((c) => [c.id, c] as const)), [columns]);
 
@@ -382,25 +401,67 @@ const SortPopover = forwardRef<
     const rootRect = root.getBoundingClientRect();
 
     // Convert viewport coords -> popover-local coords (so the menu stays inside sortPopoverRef DOM)
-    const x = 0; // Align left edge with the main popover so the top-right corner matches across panels.
+    // Center the nested menu inside the popover and use the slightly-reduced menu width.
+    const MENU_W = 440;
+    const x = Math.round((rootRect.width - MENU_W) / 2);
     const y = Math.round(btnRect.bottom - rootRect.top);
+    const w = Math.round(MENU_W);
+    const h = Math.round(btnRect.height);
 
     // Keep within viewport horizontally (matches Airtable-ish behavior)
-    const MENU_W = SORT_POPOVER_W;
     const globalLeft = rootRect.left + x;
     const overflowRight = globalLeft + MENU_W - (window.innerWidth - 8);
     if (overflowRight > 0) {
-      // If the whole sort popover is already clamped to the viewport, this should rarely happen,
-      // but keep a safety clamp anyway.
-      setAddSortMenuPos({ x: Math.max(8 - rootRect.left, x - overflowRight), y });
+      // Clamp if it would overflow the viewport.
+      setAddSortMenuPos({ x: Math.max(8 - rootRect.left, x - overflowRight) + 4, y, w, h });
     } else {
-      setAddSortMenuPos({ x, y });
+      setAddSortMenuPos({ x: x + 4, y, w, h });
     }
 
     setIsAddSortMenuOpen(true);
     setAddSortQuery('');
     queueMicrotask(() => addSortInputRef.current?.focus());
   };
+
+  const openDirectionMenuUnderButton = (idx: number, anchor?: HTMLElement | null) => {
+    // If we don't have a valid anchor or root, fall back to toggling immediately
+    if (!anchor || !rootRef.current) {
+      const next = [...draftRules];
+      const cur = next[idx];
+      if (!cur) return;
+      next[idx] = { ...cur, direction: cur.direction === 'asc' ? 'desc' : 'asc' };
+      setDraftRules(next);
+      return;
+    }
+
+    const btnRect = anchor.getBoundingClientRect();
+    const rootRect = rootRef.current.getBoundingClientRect();
+    const x = Math.round(btnRect.left - rootRect.left);
+    const y = Math.round(btnRect.bottom - rootRect.top);
+    const w = Math.round(btnRect.width);
+
+    setDirectionMenuPos({ x, y, w });
+    setDirectionMenuIndex(idx);
+    setIsDirectionMenuOpen(true);
+  };
+
+  // Close direction menu when clicking elsewhere inside the popover
+  useEffect(() => {
+    if (!isDirectionMenuOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (!rootRef.current?.contains(t)) return;
+      if (directionMenuRef.current?.contains(t)) return;
+      setIsDirectionMenuOpen(false);
+      setDirectionMenuIndex(null);
+      setDirectionMenuPos(null);
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () => window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+  }, [isDirectionMenuOpen]);
 
   // Close nested menu when clicking elsewhere *inside* the sort popover.
   useEffect(() => {
@@ -430,28 +491,28 @@ const SortPopover = forwardRef<
         position: 'fixed',
         inset: '0px auto auto 0px',
         zIndex: 10004,
-        transform: `translate3d(${position.x + NUDGE_RIGHT_PX}px, ${position.y - NUDGE_UP_PX}px, 0px)`,
+        transform: `translate3d(${position.x + NUDGE_RIGHT_PX + (panel === 'chooseField' ? RIGHT_SHIFT_FOR_CHOOSE_FIELD : 0)}px, ${position.y - NUDGE_UP_PX}px, 0px)`,
       }}
     >
       <div>
         <div>
           <div
             className="xs-max-width-1 baymax nowrap max-width-3"
-            style={{ transform: 'translateY(4px)', width: SORT_POPOVER_W }}
+            style={{ transform: 'translateY(4px)', width: 'min-content' }}
           >
             <div
               className="colors-background-raised-popover rounded shadow-elevation-high overflow-hidden"
-              style={{ borderRadius: 3 }}
+              style={{ borderRadius: 3, backgroundColor: 'rgb(255, 255, 255)', boxShadow: SORT_POPOVER_BOX_SHADOW, boxSizing: 'border-box' }}
             >
               <div data-testid="view-config-sort">
-                <div style={{ width: SORT_POPOVER_W, maxHeight: position.maxH }}>
+                <div style={{ minWidth: SORT_POPOVER_W, maxHeight: position.maxH }}>
                   {panel === 'chooseField' ? (
-                    <div className="p1-and-half">
+                    <div className="p1-and-half" style={{ padding: 12 }}>
                       <div className="flex justify-between mx1 items-center">
                         <div className="flex items-center">
                           <p
                             className="font-family-default text-size-default text-color-quiet line-height-4 font-weight-strong"
-                            style={{ color: 'rgb(97, 102, 112)' }}
+                            style={{ color: HEADING_COLOR }}
                           >
                             Sort by
                           </p>
@@ -583,10 +644,10 @@ const SortPopover = forwardRef<
                     </div>
                   ) : (
                     <div>
-                      <div className="p1-and-half">
+                      <div className="p1-and-half" style={{ padding: 12 }}>
                         <div className="flex justify-between mx1 items-center">
                           <div className="flex items-center">
-                            <p className="font-family-default text-size-default text-color-quiet line-height-4 font-weight-strong">
+                            <p className="font-family-default text-size-default text-color-quiet line-height-4 font-weight-strong" style={{ color: HEADING_COLOR }}>
                               Sort by
                             </p>
                             <div
@@ -652,13 +713,7 @@ const SortPopover = forwardRef<
                                             setQuery('');
                                             queueMicrotask(() => inputRef.current?.focus());
                                           }}
-                                          onDirectionClick={() => {
-                                            const next = [...draftRules];
-                                            const cur = next[idx];
-                                            if (!cur) return;
-                                            next[idx] = { ...cur, direction: cur.direction === 'asc' ? 'desc' : 'asc' };
-                                            setDraftRules(next);
-                                          }}
+                                          onDirectionClick={(anchor) => openDirectionMenuUnderButton(idx, anchor)}
                                           onRemove={() => {
                                             const next = draftRules.filter((_, i) => i !== idx);
                                             setDraftRules(next);
@@ -680,31 +735,48 @@ const SortPopover = forwardRef<
 
                           <div>
                             <div className="flex flex-auto">
-                              <div className="flex flex-auto relative baymax">
-                                <div
-                                  data-testid="autocomplete-button"
-                                  className="flex quiet items-center strong link-unquiet-focusable pointer pointer"
-                                  role="button"
-                                  aria-expanded="false"
-                                  tabIndex={0}
-                                  style={{ height: 32 }}
-                                  ref={addAnotherSortButtonRef}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openAddSortMenuUnderButton();
-                                  }}
-                                >
-                                  <div className="truncate flex-auto right-align">
-                                    <div className="flex items-center ml1">
-                                      <SpriteIcon name="Plus" className="flex-none mr1-and-half quiet" />
-                                      <p className="font-family-default text-size-default text-color-default line-height-4 font-weight-default">
-                                        Add another sort
-                                      </p>
+                              <div className="mr1-and-half" style={{ width: 240 }}>
+                                <div className="flex flex-auto">
+                                  <div className="flex flex-auto relative baymax">
+                                    <div
+                                      data-testid="autocomplete-button"
+                                      className="flex quiet items-center strong link-unquiet-focusable pointer pointer"
+                                      role="button"
+                                      aria-expanded="false"
+                                      tabIndex={0}
+                                      style={{ height: 32, width: '100%', borderRadius: 2 }}
+                                      ref={addAnotherSortButtonRef}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (isAddSortMenuOpen) {
+                                          setIsAddSortMenuOpen(false);
+                                          setAddSortMenuPos(null);
+                                        } else {
+                                          openAddSortMenuUnderButton();
+                                        }
+                                      }}
+                                    >
+                                      <div className="truncate flex-auto right-align">
+                                        <div className="flex items-center" style={{ marginLeft: 8 }}>
+                                          <SpriteIcon
+                                            name="Plus"
+                                            className="flex-none mr1-and-half quiet"
+                                            style={{ color: draftRules.length >= 2 ? 'rgba(128,129,133,1)' : HEADING_COLOR, opacity: draftRules.length >= 2 ? 1 : 0.75 }}
+                                          />
+                                          <p
+                                            className="font-family-default text-size-default text-color-default line-height-4 font-weight-default"
+                                            style={{ color: draftRules.length >= 2 ? 'rgba(128,129,133,1)' : BODY_COLOR, margin: 0, fontWeight: draftRules.length >= 2 ? 400 : undefined }}
+                                          >
+                                            Add another sort
+                                          </p>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
                               </div>
+                              <div className="flex-auto" />
                             </div>
                           </div>
                         </div>
@@ -772,6 +844,69 @@ const SortPopover = forwardRef<
         </div>
       </div>
 
+      {/* Nested direction selector (appears under the direction button) */}
+                {panel === 'config' && isDirectionMenuOpen && directionMenuPos && directionMenuIndex !== null ? (
+        <div
+          ref={directionMenuRef}
+          style={{
+            position: 'absolute',
+            top: directionMenuPos.y,
+            left: directionMenuPos.x,
+            zIndex: 10004,
+            width: directionMenuPos.w,
+          }}
+        >
+          <div>
+            <span data-focus-scope-start="true" hidden />
+            <div>
+              <div className="colors-background-raised-popover baymax preventGridDeselect stroked1" style={{ borderRadius: 4 }}>
+                <div className="flex flex-column" style={{ boxSizing: 'border-box' }}>
+                  <div
+                    role="button"
+                    className="px1 py-half pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const idx = directionMenuIndex;
+                      if (idx === null) return;
+                      const next = [...draftRules];
+                      const cur = next[idx];
+                      if (!cur) return;
+                      next[idx] = { ...cur, direction: 'asc' };
+                      setDraftRules(next);
+                      setIsDirectionMenuOpen(false);
+                      setDirectionMenuIndex(null);
+                    }}
+                  >
+                    A → Z
+                  </div>
+                  <div
+                    role="button"
+                    className="px1 py-half pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const idx = directionMenuIndex;
+                      if (idx === null) return;
+                      const next = [...draftRules];
+                      const cur = next[idx];
+                      if (!cur) return;
+                      next[idx] = { ...cur, direction: 'desc' };
+                      setDraftRules(next);
+                      setIsDirectionMenuOpen(false);
+                      setDirectionMenuIndex(null);
+                    }}
+                  >
+                    Z → A
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span data-focus-scope-end="true" hidden />
+          </div>
+        </div>
+      ) : null}
+
       {/* Nested "Add another sort" field picker (must appear under the "+ Add another sort" button) */}
       {panel === 'config' && isAddSortMenuOpen && addSortMenuPos ? (
         <div
@@ -781,14 +916,19 @@ const SortPopover = forwardRef<
             top: addSortMenuPos.y,
             left: addSortMenuPos.x,
             zIndex: 10004,
-            minWidth: 428,
+            width: 432,
+            minHeight: addSortMenuPos.h,
+            border: '1px solid rgba(229,229,229,1)',
+            borderRadius: 4,
+            boxSizing: 'border-box',
+            backgroundColor: 'rgb(255, 255, 255)'
           }}
         >
           <div>
             <span data-focus-scope-start="true" hidden />
             <div>
-              <div className="colors-background-raised-popover baymax preventGridDeselect rounded stroked1">
-                <div className="flex flex-auto rounded" style={{ minHeight: 32 }}>
+              <div className="colors-background-raised-popover baymax preventGridDeselect stroked1" style={{ borderRadius: 4 }}>
+                <div className="flex flex-auto" style={{ minHeight: addSortMenuPos.h }}>
                   <input
                     ref={addSortInputRef}
                     autoComplete="false"
@@ -813,7 +953,9 @@ const SortPopover = forwardRef<
                     maxHeight: 220,
                     maxWidth: 450,
                     position: 'relative',
-                    width: 428,
+                    // match the container's reduced width
+                    width: SORT_POPOVER_W - 12,
+                    boxSizing: 'border-box',
                   }}
                 >
                   {filteredColumnsForAddSort.map((col, idx) => {

@@ -186,7 +186,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     if (!btn) return;
 
     const rect = btn.getBoundingClientRect();
-    const width = 428;
+    const width = 452;
     const offsetRight = 0;
     const desiredX = Math.round(rect.right + offsetRight - width);
     const x = Math.max(8, Math.min(desiredX, window.innerWidth - width - 8));
