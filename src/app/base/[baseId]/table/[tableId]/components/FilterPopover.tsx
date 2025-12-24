@@ -154,40 +154,40 @@ function SortableFilterRow({
   );
 
   useEffect(() => {
-    if (!showColumnDropdown) return;
+    if (!showColumnDropdown && !isColumnFieldSelected) return;
     function handleClick(e: MouseEvent) {
       const target = e.target as Node;
-      if (
-        columnButtonRef.current &&
-        !columnButtonRef.current.contains(target) &&
-        columnDropdownRef.current &&
-        !columnDropdownRef.current.contains(target)
-      ) {
+      const clickedOutsideButton =
+        !columnButtonRef.current || !columnButtonRef.current.contains(target);
+      const clickedOutsideDropdown =
+        !columnDropdownRef.current || !columnDropdownRef.current.contains(target);
+
+      if (clickedOutsideButton && clickedOutsideDropdown) {
         setShowColumnDropdown(false);
         setIsColumnFieldSelected(false);
       }
     }
     window.addEventListener('mousedown', handleClick);
     return () => window.removeEventListener('mousedown', handleClick);
-  }, [showColumnDropdown]);
+  }, [showColumnDropdown, isColumnFieldSelected]);
 
   useEffect(() => {
-    if (!showOperatorSelectorDropdown) return;
+    if (!showOperatorSelectorDropdown && !isOperatorFieldSelected) return;
     function handleClick(e: MouseEvent) {
       const target = e.target as Node;
-      if (
-        operatorSelectorButtonRef.current &&
-        !operatorSelectorButtonRef.current.contains(target) &&
-        operatorSelectorDropdownRef.current &&
-        !operatorSelectorDropdownRef.current.contains(target)
-      ) {
+      const clickedOutsideButton =
+        !operatorSelectorButtonRef.current || !operatorSelectorButtonRef.current.contains(target);
+      const clickedOutsideDropdown =
+        !operatorSelectorDropdownRef.current || !operatorSelectorDropdownRef.current.contains(target);
+
+      if (clickedOutsideButton && clickedOutsideDropdown) {
         setShowOperatorSelectorDropdown(false);
         setIsOperatorFieldSelected(false);
       }
     }
     window.addEventListener('mousedown', handleClick);
     return () => window.removeEventListener('mousedown', handleClick);
-  }, [showOperatorSelectorDropdown]);
+  }, [showOperatorSelectorDropdown, isOperatorFieldSelected]);
 
   return (
     <div
@@ -417,7 +417,7 @@ function SortableFilterRow({
                               setIsColumnFieldSelected(false);
                             } else {
                               setShowColumnDropdown(true);
-                              setIsColumnFieldSelected(false);
+                              setIsColumnFieldSelected(true);
                             }
                           }}
                           style={{
@@ -516,7 +516,6 @@ function SortableFilterRow({
                                         setConditions((prev) =>
                                           prev.map((c) => (c.id === condition.id ? { ...c, columnId: col.id } : c))
                                         );
-                                        setIsColumnFieldSelected(true);
                                         setShowColumnDropdown(false);
                                         setColumnSearchValue('');
                                       }}
@@ -573,7 +572,7 @@ function SortableFilterRow({
                             setIsOperatorFieldSelected(false);
                           } else {
                             setShowOperatorSelectorDropdown(true);
-                            setIsOperatorFieldSelected(false);
+                            setIsOperatorFieldSelected(true);
                           }
                         }}
                         style={{
@@ -672,7 +671,6 @@ function SortableFilterRow({
                                       setConditions((prev) =>
                                         prev.map((c) => (c.id === condition.id ? { ...c, operator: op } : c))
                                       );
-                                      setIsOperatorFieldSelected(true);
                                       setShowOperatorSelectorDropdown(false);
                                       setOperatorSearchValue('');
                                     }}
@@ -706,34 +704,36 @@ function SortableFilterRow({
                     borderRight: '1px solid rgba(0, 0, 0, 0.1)',
                   }}
                 >
-                  <span className="relative flex flex-auto" data-testid="textInputWithDebounce">
-                    {/* Add state for managing focus and typing */}
-                    <input
-                      type="text"
-                      placeholder={condition.value ? '' : 'Enter a value'} // Update placeholder logic
-                      className="px1 truncate"
-                      aria-label="Filter comparison value"
-                      name="textInputWithDebounce"
-                      value={condition.value}
-                      onChange={(e) => {
-                        const updatedValue = e.target.value;
-                        setConditions((prev) =>
-                          prev.map((c) => (c.id === condition.id ? { ...c, value: updatedValue } : c))
-                        );
-                      }}
-                      onFocus={() => setIsFocused(true)}
-                      onBlur={() => setIsFocused(false)}
-                      style={{
-                        border: isFocused ? '2.4px solid rgba(10, 110, 220)' : '0px',
-                        backgroundColor: 'transparent',
-                        width: isFocused ? 'calc(100% - 4.8px)' : 'calc(100% - 4px)',
-                        padding: '4px',
-                        fontSize: '13px',
-                        lineHeight: '18px',
-                        outline: 'none',
-                      }}
-                    />
-                  </span>
+                  {condition.operator !== 'is empty' && condition.operator !== 'is not empty' && (
+                    <span className="relative flex flex-auto" data-testid="textInputWithDebounce">
+                      {/* Add state for managing focus and typing */}
+                      <input
+                        type="text"
+                        placeholder={condition.value ? '' : 'Enter a value'} // Update placeholder logic
+                        className="px1 truncate"
+                        aria-label="Filter comparison value"
+                        name="textInputWithDebounce"
+                        value={condition.value}
+                        onChange={(e) => {
+                          const updatedValue = e.target.value;
+                          setConditions((prev) =>
+                            prev.map((c) => (c.id === condition.id ? { ...c, value: updatedValue } : c))
+                          );
+                        }}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        style={{
+                          border: isFocused ? '2.4px solid rgba(10, 110, 220)' : '0px',
+                          backgroundColor: 'transparent',
+                          width: isFocused ? 'calc(100% - 4.8px)' : 'calc(100% - 4px)',
+                          padding: '4px',
+                          fontSize: '13px',
+                          lineHeight: '18px',
+                          outline: 'none',
+                        }}
+                      />
+                    </span>
+                  )}
                 </div>
               </div>
 
