@@ -632,6 +632,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
                       <FilterPopover
                         ref={filterPopoverRef}
+                        tableId={tableId ?? ''}
                         isOpen={isFilterOpen}
                         position={filterPos}
                         onRequestClose={() => {
