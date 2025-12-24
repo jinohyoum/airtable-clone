@@ -109,7 +109,7 @@ function SortableFilterRow({
   // Define operator options
   const operatorOptions = [
     'contains...',
-    'does not contain...',
+    'does not contain',
     'is...',
     'is not...',
     'is empty',
@@ -560,7 +560,9 @@ function SortableFilterRow({
                             color: isOperatorFieldSelected ? 'rgba(10, 110, 220)' : 'inherit',
                           }}
                         >
-                          {condition.operator}
+                          {condition.operator === 'does not contain'
+                            ? 'does not con...'
+                            : condition.operator}
                         </div>
                         <div className="flex-none flex items-center" style={{ marginLeft: '4px' }}>
                           <SpriteIcon name="ChevronDown" width={16} height={16} />
