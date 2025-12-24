@@ -1446,11 +1446,9 @@ export default function MainContent({
           inputRef.focus();
           // Place cursor at the end (no highlight)
           try {
-            const len = inputRef.value?.length ?? 0;
-            // Some input types (e.g. number) may not support selection APIs
-            if (typeof (inputRef as any).setSelectionRange === "function") {
-              (inputRef as any).setSelectionRange(len, len);
-            }
+            const len = inputRef.value.length;
+            // Some input types (e.g. number) may throw on selection APIs
+            inputRef.setSelectionRange(len, len);
           } catch {
             // Ignore selection errors for non-text inputs.
           }
@@ -2213,7 +2211,7 @@ export default function MainContent({
                                 height="16"
                                 viewBox="0 0 16 16"
                                 className="flex-none icon"
-                                style={{ shapeRendering: 'geometricprecision' }}
+                                style={{ shapeRendering: 'geometricPrecision' }}
                               >
                                 <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
                               </svg>

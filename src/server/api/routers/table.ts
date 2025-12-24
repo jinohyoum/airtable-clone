@@ -627,18 +627,20 @@ export const tableRouter = createTRPCRouter({
           const trimmedExpr = Prisma.sql`btrim(COALESCE(${valueExpr}, ''))`;
           const isBlankExpr = Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL)`;
           const sortKeyExpr = Prisma.sql`lower(COALESCE(NULLIF(${trimmedExpr}, ''), ''))`;
-          return { isBlankExpr, sortKeyExpr, direction: r.direction as "asc" | "desc" };
+          return { isBlankExpr, sortKeyExpr, direction: r.direction };
         });
-
-        // Cursor must match rule count; otherwise ignore it (prevents mismatched pagination when rules change).
-        const cursorOk =
-          cursor?.mode === "sort" &&
-          Array.isArray(cursor.keys) &&
-          cursor.keys.length === sortExprs.length;
 
         // Build lexicographic keyset predicate for (isBlank1, sortKey1, isBlank2, sortKey2, ..., id)
         const cursorSql = (() => {
-          if (!cursorOk) return Prisma.empty;
+          if (
+            cursor?.mode !== "sort" ||
+            !Array.isArray(cursor.keys) ||
+            cursor.keys.length !== sortExprs.length
+          ) {
+            return Prisma.empty;
+          }
+
+          const sortCursor = cursor;
 
           const orParts: Prisma.Sql[] = [];
           const eqParts: Prisma.Sql[] = [];
@@ -652,15 +654,18 @@ export const tableRouter = createTRPCRouter({
           };
 
           for (let i = 0; i < sortExprs.length; i++) {
-            const k = cursor!.keys[i]!;
+            const expr = sortExprs[i];
+            const k = sortCursor.keys[i];
+            if (!expr || !k) continue;
+
             // isBlank is always ASC (false first, true last)
-            pushCmp(sortExprs[i]!.isBlankExpr, "asc", k.isBlank);
+            pushCmp(expr.isBlankExpr, "asc", k.isBlank);
             // sortKey follows the rule direction
-            pushCmp(sortExprs[i]!.sortKeyExpr, sortExprs[i]!.direction, k.sortKey);
+            pushCmp(expr.sortKeyExpr, expr.direction, k.sortKey);
           }
 
           // Stable tie-breaker: id ASC
-          pushCmp(Prisma.sql`r."id"`, "asc", cursor!.id);
+          pushCmp(Prisma.sql`r."id"`, "asc", sortCursor.id);
 
           return Prisma.sql`AND (${Prisma.join(orParts, " OR ")})`;
         })();
@@ -739,7 +744,7 @@ export const tableRouter = createTRPCRouter({
                 sortKey?: unknown;
               }>).map((k) => ({
                 isBlank: Boolean(k?.isBlank),
-                sortKey: String(k?.sortKey ?? ""),
+                sortKey: typeof k?.sortKey === "string" ? k.sortKey : "",
               }))
             : [];
 

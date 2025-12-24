@@ -5,6 +5,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  type DragEndEvent,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -44,7 +45,7 @@ function SpriteIcon({
       height={height}
       viewBox="0 0 16 16"
       className={className ?? 'flex-none icon'}
-      style={{ shapeRendering: 'geometricprecision' }}
+      style={{ shapeRendering: 'geometricPrecision' }}
       aria-hidden="true"
     >
       <use fill="currentColor" href={`${ICON_SPRITE}#${name}`} />
@@ -157,10 +158,8 @@ function SortableFilterRow({
     if (!showColumnDropdown && !isColumnFieldSelected) return;
     function handleClick(e: MouseEvent) {
       const target = e.target as Node;
-      const clickedOutsideButton =
-        !columnButtonRef.current || !columnButtonRef.current.contains(target);
-      const clickedOutsideDropdown =
-        !columnDropdownRef.current || !columnDropdownRef.current.contains(target);
+      const clickedOutsideButton = !columnButtonRef.current?.contains(target);
+      const clickedOutsideDropdown = !columnDropdownRef.current?.contains(target);
 
       if (clickedOutsideButton && clickedOutsideDropdown) {
         setShowColumnDropdown(false);
@@ -175,10 +174,8 @@ function SortableFilterRow({
     if (!showOperatorSelectorDropdown && !isOperatorFieldSelected) return;
     function handleClick(e: MouseEvent) {
       const target = e.target as Node;
-      const clickedOutsideButton =
-        !operatorSelectorButtonRef.current || !operatorSelectorButtonRef.current.contains(target);
-      const clickedOutsideDropdown =
-        !operatorSelectorDropdownRef.current || !operatorSelectorDropdownRef.current.contains(target);
+      const clickedOutsideButton = !operatorSelectorButtonRef.current?.contains(target);
+      const clickedOutsideDropdown = !operatorSelectorDropdownRef.current?.contains(target);
 
       if (clickedOutsideButton && clickedOutsideDropdown) {
         setShowOperatorSelectorDropdown(false);
@@ -451,7 +448,7 @@ function SortableFilterRow({
                               zIndex: 10004,
                             }}
                           >
-                            <span data-focus-scope-start="true" hidden=""></span>
+                            <span data-focus-scope-start="true" hidden></span>
                             <div>
                               <div
                                 className="colors-background-raised-popover baymax preventGridDeselect rounded shadow-elevation-medium p1-and-half"
@@ -542,7 +539,7 @@ function SortableFilterRow({
                               </ul>
                             </div>
                           </div>
-                          <span data-focus-scope-end="true" hidden=""></span>
+                          <span data-focus-scope-end="true" hidden></span>
                           </div>
                         )}
                       </div>
@@ -609,7 +606,7 @@ function SortableFilterRow({
                             minWidth: '124px',
                           }}
                         >
-                          <span data-focus-scope-start="true" hidden=""></span>
+                          <span data-focus-scope-start="true" hidden></span>
                           <div>
                             <div
                               className="colors-background-raised-popover baymax preventGridDeselect rounded shadow-elevation-medium p1-and-half"
@@ -690,7 +687,7 @@ function SortableFilterRow({
                               </ul>
                             </div>
                           </div>
-                          <span data-focus-scope-end="true" hidden=""></span>
+                          <span data-focus-scope-end="true" hidden></span>
                         </div>
                       )}
                     </div>
@@ -756,11 +753,7 @@ function SortableFilterRow({
                 </div>
 
                 <div
-                  tabIndex={0}
-                  role="button"
-                  aria-disabled="false"
                   className="flex-none self-stretch justify-center flex items-center dragHandle"
-                  aria-roledescription="sortable"
                   style={{
                     width: '2rem',
                     height: 'auto',
@@ -890,13 +883,17 @@ const FilterPopover = forwardRef<
     }),
   );
 
-  const handleDragEnd = useCallback((event: any) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
 
     setConditions((items) => {
-      const oldIndex = items.findIndex((item) => item.id === active.id);
-      const newIndex = items.findIndex((item) => item.id === over.id);
+      const oldIndex = items.findIndex((item) => item.id === activeId);
+      const newIndex = items.findIndex((item) => item.id === overId);
       return arrayMove(items, oldIndex, newIndex);
     });
   }, []);

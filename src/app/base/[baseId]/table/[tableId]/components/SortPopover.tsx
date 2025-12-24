@@ -192,10 +192,6 @@ function SortableSortRuleRow({
         <div
           ref={setActivatorNodeRef}
           className="dragHandle link-unquiet quieter flex items-center justify-center focus-visible rounded"
-          role="button"
-          tabIndex={0}
-          aria-disabled="false"
-          aria-roledescription="sortable"
           {...attributes}
           {...listeners}
           style={{ width: 28 }}
