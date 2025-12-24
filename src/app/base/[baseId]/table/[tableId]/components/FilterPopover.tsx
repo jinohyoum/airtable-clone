@@ -18,8 +18,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
-import { forwardRef, useCallback, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '~/trpc/react';
+import { getColumnIconName } from './columnIcons';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
 const FILTER_POPOVER_W = 590;
@@ -65,15 +66,31 @@ function SortableFilterRow({
   totalConditions,
   columns,
   onRemove,
+  setConditions, // Add setConditions here
 }: {
   id: string;
   condition: FilterCondition;
   idx: number;
   totalConditions: number;
-  columns: Array<{ id: string; name: string }>;
+  columns: Array<{ id: string; name: string; type: string }>;
   onRemove: () => void;
+  setConditions: React.Dispatch<React.SetStateAction<FilterCondition[]>>; // Define the type
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const [isFocused, setIsFocused] = useState(false);
+  const [showOperatorDropdown, setShowOperatorDropdown] = useState(false);
+  const [operatorType, setOperatorType] = useState('or');
+  const operatorButtonRef = useRef<HTMLSpanElement>(null);
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
+  const [columnSearchValue, setColumnSearchValue] = useState('');
+  const columnButtonRef = useRef<HTMLDivElement>(null);
+  const [isColumnFieldSelected, setIsColumnFieldSelected] = useState(false);
+  const columnDropdownRef = useRef<HTMLDivElement>(null);
+  const [showOperatorSelectorDropdown, setShowOperatorSelectorDropdown] = useState(false);
+  const [operatorSearchValue, setOperatorSearchValue] = useState('');
+  const operatorSelectorButtonRef = useRef<HTMLDivElement>(null);
+  const [isOperatorFieldSelected, setIsOperatorFieldSelected] = useState(false);
+  const operatorSelectorDropdownRef = useRef<HTMLDivElement>(null);
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -83,6 +100,62 @@ function SortableFilterRow({
 
   const column = columns.find((c) => c.id === condition.columnId);
   const columnName = column?.name ?? 'Select field';
+
+  // Filter columns based on search
+  const filteredColumns = columns.filter((col) =>
+    col.name.toLowerCase().includes(columnSearchValue.toLowerCase())
+  );
+
+  // Define operator options
+  const operatorOptions = [
+    'contains...',
+    'does not contain...',
+    'is...',
+    'is not...',
+    'is empty',
+    'is not empty',
+  ];
+
+  // Filter operators based on search
+  const filteredOperators = operatorOptions.filter((op) =>
+    op.toLowerCase().includes(operatorSearchValue.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (!showColumnDropdown) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        columnButtonRef.current &&
+        !columnButtonRef.current.contains(target) &&
+        columnDropdownRef.current &&
+        !columnDropdownRef.current.contains(target)
+      ) {
+        setShowColumnDropdown(false);
+        setIsColumnFieldSelected(false);
+      }
+    }
+    window.addEventListener('mousedown', handleClick);
+    return () => window.removeEventListener('mousedown', handleClick);
+  }, [showColumnDropdown]);
+
+  useEffect(() => {
+    if (!showOperatorSelectorDropdown) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        operatorSelectorButtonRef.current &&
+        !operatorSelectorButtonRef.current.contains(target) &&
+        operatorSelectorDropdownRef.current &&
+        !operatorSelectorDropdownRef.current.contains(target)
+      ) {
+        setShowOperatorSelectorDropdown(false);
+        setIsOperatorFieldSelected(false);
+      }
+    }
+    window.addEventListener('mousedown', handleClick);
+    return () => window.removeEventListener('mousedown', handleClick);
+  }, [showOperatorSelectorDropdown]);
 
   return (
     <div
@@ -126,15 +199,17 @@ function SortableFilterRow({
           ) : idx === 1 ? (
             <div
               className="width-full height-full"
-              style={{ width: '100%', height: '100%' }}
-              aria-label="or"
+              style={{ width: '100%', height: '100%', position: 'relative' }}
+              aria-label={operatorType}
             >
               <span
+                ref={operatorButtonRef}
                 role="button"
                 aria-haspopup="true"
-                aria-expanded="false"
+                aria-expanded={showOperatorDropdown}
                 className="rounded flex items-center flex-auto pointer"
                 tabIndex={0}
+                onClick={() => setShowOperatorDropdown(!showOperatorDropdown)}
                 style={{
                   paddingLeft: '8px',
                   paddingRight: '8px',
@@ -152,10 +227,91 @@ function SortableFilterRow({
                     lineHeight: '18px',
                   }}
                 >
-                  <div>or</div>
+                  <div>{operatorType}</div>
                   <SpriteIcon name="ChevronDown" width={16} height={16} className="flex-none flex-none" />
                 </div>
               </span>
+              {showOperatorDropdown && operatorButtonRef.current && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: `${operatorButtonRef.current.getBoundingClientRect().bottom - operatorButtonRef.current.getBoundingClientRect().top}px`,
+                    left: 0,
+                    zIndex: 10004,
+                    minWidth: '56px',
+                  }}
+                >
+                  <div>
+                    <div>
+                      <ul
+                        className="hdropdown selectMenuList menu"
+                        role="menu"
+                        style={{
+                          maxHeight: '200px',
+                          backgroundColor: 'rgb(255, 255, 255)',
+                          borderRadius: '3px',
+                          boxShadow: 'rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.16) 0px 0px 2px 0px, rgba(0, 0, 0, 0.06) 0px 3px 4px 0px, rgba(0, 0, 0, 0.06) 0px 6px 8px 0px, rgba(0, 0, 0, 0.08) 0px 12px 16px 0px, rgba(0, 0, 0, 0.06) 0px 18px 32px 0px',
+                          overflowX: 'hidden',
+                          overflowY: 'auto',
+                          padding: 0,
+                          margin: 0,
+                          listStyle: 'none',
+                          position: 'relative',
+                          zIndex: 1,
+                          transition: 'opacity 0.1s ease-out',
+                        }}
+                      >
+                        <li
+                          tabIndex={0}
+                          role="menuitem"
+                          aria-disabled="false"
+                          onClick={() => {
+                            setOperatorType('and');
+                            setShowOperatorDropdown(false);
+                          }}
+                          style={{
+                            boxSizing: 'border-box',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            lineHeight: '18px',
+                            height: '36px',
+                            paddingTop: '9px',
+                            paddingBottom: '6px',
+                            paddingLeft: '6px',
+                            paddingRight: '20px',
+                            listStyle: 'none',
+                          }}
+                        >
+                          and
+                        </li>
+                        <li
+                          tabIndex={0}
+                          role="menuitem"
+                          aria-disabled="false"
+                          onClick={() => {
+                            setOperatorType('or');
+                            setShowOperatorDropdown(false);
+                          }}
+                          style={{
+                            boxSizing: 'border-box',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            lineHeight: '18px',
+                            height: '36px',
+                            paddingTop: '9px',
+                            paddingBottom: '6px',
+                            paddingLeft: '6px',
+                            paddingRight: '20px',
+                            listStyle: 'none',
+                          }}
+                        >
+                          or
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div
@@ -168,7 +324,7 @@ function SortableFilterRow({
               }}
               data-testid="filter-prefix-label"
             >
-              or
+              {operatorType}
             </div>
           )}
         </div>
@@ -212,16 +368,27 @@ function SortableFilterRow({
                       borderRight: '1px solid rgba(0, 0, 0, 0.1)',
                       width: '50%',
                       maxWidth: 'none',
+                      position: 'relative',
                     }}
                   >
                     <div className="flex flex-auto">
                       <div className="flex flex-auto relative">
                         <div
+                          ref={columnButtonRef}
                           data-testid="autocomplete-button"
                           className="flex items-center rounded pointer"
                           role="button"
-                          aria-expanded="false"
+                          aria-expanded={showColumnDropdown}
                           tabIndex={0}
+                          onClick={() => {
+                            if (showColumnDropdown) {
+                              setShowColumnDropdown(false);
+                              setIsColumnFieldSelected(false);
+                            } else {
+                              setShowColumnDropdown(true);
+                              setIsColumnFieldSelected(false);
+                            }
+                          }}
                           style={{
                             paddingLeft: '8px',
                             paddingRight: '8px',
@@ -234,6 +401,7 @@ function SortableFilterRow({
                               textAlign: 'left',
                               fontSize: '13px',
                               lineHeight: '18px',
+                              color: isColumnFieldSelected ? 'rgba(10, 110, 220)' : 'inherit',
                             }}
                           >
                             {columnName}
@@ -242,6 +410,111 @@ function SortableFilterRow({
                             <SpriteIcon name="ChevronDown" width={16} height={16} />
                           </div>
                         </div>
+                        {showColumnDropdown && columnButtonRef.current && (
+                          <div
+                            ref={columnDropdownRef}
+                            style={{
+                              position: 'fixed',
+                              top: `${columnButtonRef.current.getBoundingClientRect().bottom + 4}px`,
+                              left: `${columnButtonRef.current.getBoundingClientRect().left}px`,
+                              zIndex: 10004,
+                            }}
+                          >
+                            <span data-focus-scope-start="true" hidden=""></span>
+                            <div>
+                              <div
+                                className="colors-background-raised-popover baymax preventGridDeselect rounded shadow-elevation-medium p1-and-half"
+                                style={{
+                                  backgroundColor: 'rgb(255, 255, 255)',
+                                  borderRadius: '3px',
+                                  boxShadow:
+                                    'rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 2px 0px, rgba(0, 0, 0, 0.08) 0px 2px 4px 0px',
+                                  padding: '12px',
+                                }}
+                              >
+                                <div className="flex flex-auto rounded" style={{ minHeight: '32px' }}>
+                                <input
+                                  autoComplete="false"
+                                  className="css-1uw7fyx background-transparent p1 flex-auto"
+                                  placeholder="Find a field"
+                                  type="search"
+                                  role="combobox"
+                                  aria-autocomplete="none"
+                                  aria-expanded="true"
+                                  aria-label="Find a field"
+                                  value={columnSearchValue}
+                                  onChange={(e) => setColumnSearchValue(e.target.value)}
+                                  style={{
+                                    border: '0px',
+                                    height: '32px',
+                                    backgroundColor: 'transparent',
+                                    padding: '8px',
+                                    width: '100%',
+                                    fontSize: '13px',
+                                    lineHeight: '18px',
+                                    borderRadius: '2px',
+                                    outline: 'none',
+                                  }}
+                                />
+                              </div>
+                              <ul
+                                role="listbox"
+                                className="overflow-auto light-scrollbar suggestionRowsContainerSelector relative"
+                                style={{
+                                  maxHeight: '220px',
+                                  maxWidth: '450px',
+                                  position: 'relative',
+                                  overflowX: 'auto',
+                                  overflowY: 'auto',
+                                  padding: 0,
+                                  margin: 0,
+                                  listStyle: 'none',
+                                }}
+                              >
+                                {filteredColumns.map((col, colIdx) => {
+                                  const iconName = getColumnIconName(col.type);
+                                  return (
+                                    <li
+                                      key={col.id}
+                                      role="option"
+                                      aria-disabled="false"
+                                      className={`rounded p1 flex items-center overflow-hidden pointer ${
+                                        col.id === condition.columnId ? 'colors-background-selected' : ''
+                                      }`}
+                                      onClick={() => {
+                                        setConditions((prev) =>
+                                          prev.map((c) => (c.id === condition.id ? { ...c, columnId: col.id } : c))
+                                        );
+                                        setIsColumnFieldSelected(true);
+                                        setShowColumnDropdown(false);
+                                        setColumnSearchValue('');
+                                      }}
+                                      style={{
+                                        borderRadius: '3px',
+                                        padding: '8px',
+                                        height: '34px',
+                                        cursor: 'pointer',
+                                        overflow: 'hidden',
+                                        backgroundColor:
+                                          col.id === condition.columnId ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+                                      }}
+                                    >
+                                      <SpriteIcon
+                                        name={iconName}
+                                        width={16}
+                                        height={16}
+                                        className="flex-none flex-none mr-half"
+                                      />
+                                      <div style={{ fontSize: '13px', lineHeight: '18px' }}>{col.name}</div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          </div>
+                          <span data-focus-scope-end="true" hidden=""></span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -252,15 +525,26 @@ function SortableFilterRow({
                     style={{
                       borderRight: '1px solid rgba(0, 0, 0, 0.1)',
                       width: '50%',
+                      position: 'relative',
                     }}
                   >
                     <div className="flex flex flex-auto relative">
                       <div
+                        ref={operatorSelectorButtonRef}
                         data-testid="autocomplete-button"
                         className="flex items-center rounded pointer"
                         role="button"
-                        aria-expanded="false"
+                        aria-expanded={showOperatorSelectorDropdown}
                         tabIndex={0}
+                        onClick={() => {
+                          if (showOperatorSelectorDropdown) {
+                            setShowOperatorSelectorDropdown(false);
+                            setIsOperatorFieldSelected(false);
+                          } else {
+                            setShowOperatorSelectorDropdown(true);
+                            setIsOperatorFieldSelected(false);
+                          }
+                        }}
                         style={{
                           paddingLeft: '8px',
                           paddingRight: '8px',
@@ -273,6 +557,7 @@ function SortableFilterRow({
                             textAlign: 'left',
                             fontSize: '13px',
                             lineHeight: '18px',
+                            color: isOperatorFieldSelected ? 'rgba(10, 110, 220)' : 'inherit',
                           }}
                         >
                           {condition.operator}
@@ -281,6 +566,102 @@ function SortableFilterRow({
                           <SpriteIcon name="ChevronDown" width={16} height={16} />
                         </div>
                       </div>
+                      {showOperatorSelectorDropdown && operatorSelectorButtonRef.current && (
+                        <div
+                          ref={operatorSelectorDropdownRef}
+                          style={{
+                            position: 'fixed',
+                            top: `${operatorSelectorButtonRef.current.getBoundingClientRect().bottom + 4}px`,
+                            left: `${operatorSelectorButtonRef.current.getBoundingClientRect().left}px`,
+                            zIndex: 10004,
+                            minWidth: '124px',
+                          }}
+                        >
+                          <span data-focus-scope-start="true" hidden=""></span>
+                          <div>
+                            <div
+                              className="colors-background-raised-popover baymax preventGridDeselect rounded shadow-elevation-medium p1-and-half"
+                              style={{
+                                backgroundColor: 'rgb(255, 255, 255)',
+                                borderRadius: '3px',
+                                boxShadow:
+                                  'rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 2px 0px, rgba(0, 0, 0, 0.08) 0px 2px 4px 0px',
+                                padding: '12px',
+                              }}
+                            >
+                              <div className="flex flex-auto rounded" style={{ minHeight: '32px' }}>
+                                <input
+                                  autoComplete="false"
+                                  className="css-1uw7fyx background-transparent p1 flex-auto"
+                                  placeholder="Find an operator"
+                                  type="search"
+                                  role="combobox"
+                                  aria-autocomplete="none"
+                                  aria-expanded="true"
+                                  aria-label="Find an operator"
+                                  value={operatorSearchValue}
+                                  onChange={(e) => setOperatorSearchValue(e.target.value)}
+                                  style={{
+                                    border: '0px',
+                                    height: '32px',
+                                    backgroundColor: 'transparent',
+                                    padding: '8px',
+                                    width: '100%',
+                                    fontSize: '13px',
+                                    lineHeight: '18px',
+                                    borderRadius: '2px',
+                                    outline: 'none',
+                                  }}
+                                />
+                              </div>
+                              <ul
+                                role="listbox"
+                                className="overflow-auto light-scrollbar suggestionRowsContainerSelector relative"
+                                style={{
+                                  maxHeight: '220px',
+                                  maxWidth: '450px',
+                                  position: 'relative',
+                                  overflowX: 'auto',
+                                  overflowY: 'auto',
+                                  padding: 0,
+                                  margin: 0,
+                                  listStyle: 'none',
+                                }}
+                              >
+                                {filteredOperators.map((op, opIdx) => (
+                                  <li
+                                    key={op}
+                                    role="option"
+                                    className={`rounded p1 flex items-center overflow-hidden pointer ${
+                                      op === condition.operator ? 'colors-background-selected' : ''
+                                    }`}
+                                    onClick={() => {
+                                      setConditions((prev) =>
+                                        prev.map((c) => (c.id === condition.id ? { ...c, operator: op } : c))
+                                      );
+                                      setIsOperatorFieldSelected(true);
+                                      setShowOperatorSelectorDropdown(false);
+                                      setOperatorSearchValue('');
+                                    }}
+                                    style={{
+                                      borderRadius: '3px',
+                                      padding: '8px',
+                                      height: '34px',
+                                      cursor: 'pointer',
+                                      overflow: 'hidden',
+                                      backgroundColor:
+                                        op === condition.operator ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+                                    }}
+                                  >
+                                    {op}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                          <span data-focus-scope-end="true" hidden=""></span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -293,22 +674,30 @@ function SortableFilterRow({
                   }}
                 >
                   <span className="relative flex flex-auto" data-testid="textInputWithDebounce">
+                    {/* Add state for managing focus and typing */}
                     <input
                       type="text"
-                      placeholder="Enter a value"
+                      placeholder={condition.value ? '' : 'Enter a value'} // Update placeholder logic
                       className="px1 truncate"
                       aria-label="Filter comparison value"
                       name="textInputWithDebounce"
                       value={condition.value}
-                      readOnly
+                      onChange={(e) => {
+                        const updatedValue = e.target.value;
+                        setConditions((prev) =>
+                          prev.map((c) => (c.id === condition.id ? { ...c, value: updatedValue } : c))
+                        );
+                      }}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
                       style={{
-                        border: '0px',
+                        border: isFocused ? '2.4px solid rgba(10, 110, 220)' : '0px',
                         backgroundColor: 'transparent',
-                        width: '100%',
-                        paddingTop: '4px',
-                        paddingBottom: '4px',
+                        width: isFocused ? 'calc(100% - 4.8px)' : 'calc(100% - 4px)',
+                        padding: '4px',
                         fontSize: '13px',
                         lineHeight: '18px',
+                        outline: 'none',
                       }}
                     />
                   </span>
@@ -357,7 +746,6 @@ function SortableFilterRow({
     </div>
   );
 }
-
 
 const FilterPopover = forwardRef<
   HTMLDivElement,
@@ -502,21 +890,19 @@ const FilterPopover = forwardRef<
               >
                 No filter conditions are applied
               </div>
-              <div
-                tabIndex={0}
-                role="button"
-                aria-label="Learn more about filtering your views"
+              {/* Remove functionality from the info button */}
+              <span
                 style={{
+                  marginLeft: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   opacity: 0.75,
                   color: 'rgb(97, 102, 112)',
-                  marginLeft: '8px',
-                  cursor: 'pointer',
+                  cursor: 'default', // Change cursor to indicate no functionality
                 }}
               >
                 <SpriteIcon name="Question" width={16} height={16} />
-              </div>
+              </span>
             </div>
           ) : (
             <div
@@ -568,6 +954,7 @@ const FilterPopover = forwardRef<
                             totalConditions={conditions.length}
                             columns={columns}
                             onRemove={() => handleRemoveCondition(condition.id)}
+                            setConditions={setConditions} // Pass setConditions here
                           />
                         ))}
                       </SortableContext>
