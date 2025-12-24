@@ -61,7 +61,7 @@ function SwitchPill({ on }: { on: boolean }) {
         height: 12,
         width: 19.2,
         padding: 2,
-        backgroundColor: on ? 'rgb(22, 110, 225)' : 'rgba(0, 0, 0, 0.1)',
+        backgroundColor: on ? 'rgb(4, 138, 14)' : 'rgba(0, 0, 0, 0.1)',
         justifyContent: on ? 'flex-end' : 'flex-start',
       }}
     >
@@ -236,6 +236,7 @@ const SortPopover = forwardRef<
 
   // Draft rules: stage edits while the popover is open; commit only when clicking "Sort".
   const [draftRules, setDraftRules] = useState(sortRules);
+  const [autoSort, setAutoSort] = useState(true);
 
   // Let the toolbar reflect how many sorts are configured *while editing*,
   // even before the user clicks "Sort" to commit.
@@ -244,13 +245,44 @@ const SortPopover = forwardRef<
     onDraftRulesChange?.(draftRules);
   }, [draftRules, isOpen, onDraftRulesChange]);
 
+  // Track if we've initialized (to avoid auto-saving on initial mount)
+  const isInitialMount = useRef(true);
+  const previousDraftRulesRef = useRef<string>(JSON.stringify(draftRules));
+
+  // When auto-sort is enabled, automatically save whenever draftRules change
+  useEffect(() => {
+    if (!isOpen) {
+      isInitialMount.current = true;
+      previousDraftRulesRef.current = JSON.stringify(sortRules);
+      return;
+    }
+
+    // Skip auto-save on initial mount (when popover first opens)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      previousDraftRulesRef.current = JSON.stringify(draftRules);
+      return;
+    }
+
+    // Only auto-save if autoSort is enabled and draftRules have actually changed
+    if (autoSort) {
+      const currentRulesString = JSON.stringify(draftRules);
+      if (previousDraftRulesRef.current !== currentRulesString) {
+        previousDraftRulesRef.current = currentRulesString;
+        onChangeSortRules(draftRules);
+      }
+    } else {
+      // Update the ref even when autoSort is off, so we can detect changes when it's turned back on
+      previousDraftRulesRef.current = JSON.stringify(draftRules);
+    }
+  }, [draftRules, autoSort, isOpen, onChangeSortRules, sortRules]);
+
   const [query, setQuery] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [panel, setPanel] = useState<'chooseField' | 'config'>('chooseField');
   const [editingRuleIndex, setEditingRuleIndex] = useState<number | null>(null);
-  const [autoSort, setAutoSort] = useState(false);
 
   const [isAddSortMenuOpen, setIsAddSortMenuOpen] = useState(false);
   const [addSortQuery, setAddSortQuery] = useState('');
@@ -266,10 +298,12 @@ const SortPopover = forwardRef<
     setQuery('');
     setPanel(sortRules.length > 0 ? 'config' : 'chooseField');
     setEditingRuleIndex(null);
-    setAutoSort(false);
+    setAutoSort(true);
     setIsAddSortMenuOpen(false);
     setAddSortQuery('');
     setAddSortMenuPos(null);
+    // Reset the initial mount flag when popover opens
+    isInitialMount.current = true;
   }, [isOpen, sortRules.length]);
 
   const columns = useMemo(() => tableMeta?.columns ?? [], [tableMeta]);
@@ -682,36 +716,38 @@ const SortPopover = forwardRef<
                           </div>
                         </div>
 
-                        <div>
-                          <div className="flex items-center m1">
-                            <div
-                              tabIndex={0}
-                              role="button"
-                              className="quiet link-unquiet-focusable pointer focus-visible p-half mr-half"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                cancelAndClose();
-                              }}
-                            >
-                              Cancel
-                            </div>
+                        {!autoSort && (
+                          <div>
+                            <div className="flex items-center m1">
+                              <div
+                                tabIndex={0}
+                                role="button"
+                                className="quiet link-unquiet-focusable pointer focus-visible p-half mr-half"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  cancelAndClose();
+                                }}
+                              >
+                                Cancel
+                              </div>
 
-                            <button
-                              className="pointer items-center justify-center border-box text-decoration-none print-color-exact focus-visible rounded-big ignore-baymax-defaults border-none text-white font-weight-strong colors-background-primary-control shadow-elevation-low shadow-elevation-low-hover px1 button-size-small flex-inline"
-                              type="button"
-                              aria-disabled="false"
-                              data-testid="sort-once"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                commitAndClose();
-                              }}
-                            >
-                              <span className="truncate noevents button-text-label no-user-select">Sort</span>
-                            </button>
+                              <button
+                                className="pointer items-center justify-center border-box text-decoration-none print-color-exact focus-visible rounded-big ignore-baymax-defaults border-none text-white font-weight-strong colors-background-primary-control shadow-elevation-low shadow-elevation-low-hover px1 button-size-small flex-inline"
+                                type="button"
+                                aria-disabled="false"
+                                data-testid="sort-once"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  commitAndClose();
+                                }}
+                              >
+                                <span className="truncate noevents button-text-label no-user-select">Sort</span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   )}
