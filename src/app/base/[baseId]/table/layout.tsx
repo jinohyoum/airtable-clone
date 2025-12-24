@@ -23,6 +23,16 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const hasTableId = Boolean(tableId && tableId.length > 0);
   const utils = api.useUtils();
   const [isInserting, setIsInserting] = useState(false);
+  
+  // Fetch table metadata to get column names for filter button
+  const { data: tableMeta } = api.table.getTableMeta.useQuery(
+    { tableId: tableId ?? "" },
+    { 
+      enabled: hasTableId,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+    },
+  );
   const bulkInsertMutation = api.table.bulkInsertRows.useMutation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -68,6 +78,27 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
   const filterCountForButton = isFilterOpen ? draftFilters.length : filters.length;
   const isFilterActiveForButton = filterCountForButton > 0;
+  
+  // Get unique field names for active filters (only those with non-empty values)
+  const filteredFieldNames = useMemo(() => {
+    const activeFilters = isFilterOpen ? draftFilters : filters;
+    if (!tableMeta || activeFilters.length === 0) return [];
+    
+    // Only include filters that have a value (non-empty)
+    const filtersWithValues = activeFilters.filter(f => f.value && f.value.trim().length > 0);
+    const uniqueColumnIds = new Set(filtersWithValues.map(f => f.columnId));
+    const columnMap = new Map(tableMeta.columns.map(c => [c.id, c.name]));
+    
+    return Array.from(uniqueColumnIds)
+      .map(id => columnMap.get(id))
+      .filter((name): name is string => Boolean(name));
+  }, [isFilterOpen, draftFilters, filters, tableMeta]);
+  
+  const filterButtonText = useMemo(() => {
+    if (!isFilterActiveForButton) return 'Filter';
+    if (filteredFieldNames.length === 0) return 'Filter';
+    return `Filtered by ${filteredFieldNames.join(', ')}`;
+  }, [isFilterActiveForButton, filteredFieldNames]);
 
   const applyFilters = useCallback((next: FilterCondition[]) => {
     // Always create new references to ensure React detects the change
@@ -75,17 +106,22 @@ export default function TableLayout({ children }: { children: ReactNode }) {
       .filter(Boolean)
       .map((f) => ({ id: f.id, columnId: f.columnId, operator: f.operator, value: f.value })); // new objects
 
+    // Check if filters actually changed
+    const prevSignature = JSON.stringify(filters);
+    const nextSignature = JSON.stringify(normalized);
+    const hasChanged = prevSignature !== nextSignature;
+
     setFilters(normalized); // new array reference guaranteed
 
-    // Trigger global "Saving…" UI while the grid refetches filtered rows
-    if (typeof window !== 'undefined') {
+    // Only trigger global "Saving…" UI if filters actually changed
+    if (hasChanged && typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('grid:filterSaving', {
-          detail: { active: true, signature: JSON.stringify(normalized) },
+          detail: { active: true, signature: nextSignature },
         }),
       );
     }
-  }, []);
+  }, [filters]);
 
   const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
     // Always create new references to ensure React detects the change
@@ -115,25 +151,20 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     }
   }, [isSearchOpen]);
 
-  // Close search bar when clicking outside
+  // Handle Ctrl+F to open search
   useEffect(() => {
-    if (!isSearchOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        searchBarRef.current &&
-        !searchBarRef.current.contains(event.target as Node) &&
-        !(event.target as HTMLElement).closest('[aria-label="toggle view search input"]')
-      ) {
-        setIsSearchOpen(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        setIsSearchOpen(true);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSearchOpen]);
+  }, []);
 
   // Hide antiscroll scrollbars when search is open
   useEffect(() => {
@@ -144,22 +175,6 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     }
     return () => {
       document.body.classList.remove('search-open');
-    };
-  }, [isSearchOpen]);
-
-  // Handle Escape key to close search bar
-  useEffect(() => {
-    if (!isSearchOpen) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsSearchOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
     };
   }, [isSearchOpen]);
 
@@ -643,12 +658,17 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                             paddingRight: '8px',
                             paddingTop: '4px',
                             paddingBottom: '4px',
+                            backgroundColor: filteredFieldNames.length > 0 ? 'rgb(207, 245, 209)' : 'transparent',
+                            color: filteredFieldNames.length > 0 ? 'rgb(29, 31, 37)' : undefined,
+                            borderRadius: filteredFieldNames.length > 0 ? '4px' : undefined,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                            if (filteredFieldNames.length === 0) {
+                              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                            }
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.backgroundColor = filteredFieldNames.length > 0 ? 'rgb(207, 245, 209)' : 'transparent';
                           }}
                         >
                           <svg
@@ -664,9 +684,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                             />
                           </svg>
                           <div className="max-width-1 truncate ml-half">
-                            {isFilterActiveForButton
-                              ? `Filtered by ${filterCountForButton} condition${filterCountForButton === 1 ? '' : 's'}`
-                              : 'Filter'}
+                            {filterButtonText}
                           </div>
                         </div>
                       </div>
@@ -773,7 +791,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                               paddingTop: '4px',
                               paddingBottom: '4px',
                               backgroundColor: isSortActiveForButton ? 'rgb(255, 224, 204)' : 'transparent',
-                              color: isSortActiveForButton ? 'rgb(0, 0, 0)' : undefined,
+                              color: isSortActiveForButton ? 'rgb(29, 31, 37)' : undefined,
                               // "More square" active pill
                               borderRadius: isSortActiveForButton ? '4px' : undefined,
                             }}

@@ -75,11 +75,28 @@ export default function MainContent({
     signature: '[]',
   });
 
+  // Track filter saving state (similar to sort)
+  const [filterSaving, setFilterSaving] = useState<{ active: boolean; signature: string }>({
+    active: false,
+    signature: '[]',
+  });
+
   const sortedColumnIds = useMemo(() => {
     const ids = new Set<string>();
     for (const r of normalizedSortRules ?? []) ids.add(r.columnId);
     return ids;
   }, [normalizedSortRules]);
+
+  // Track filtered columns (only those with non-empty values)
+  const filteredColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const f of normalizedFilters ?? []) {
+      if (f.value && f.value.trim().length > 0) {
+        ids.add(f.columnId);
+      }
+    }
+    return ids;
+  }, [normalizedFilters]);
 
   // When creating a row while sort is active, we keep it visible where it was created
   // (so the user's focus doesn't "teleport"), and only refetch to re-sort once focus leaves that row.
@@ -87,8 +104,11 @@ export default function MainContent({
 
   const SORTED_HEADER_BG = 'rgb(255, 251, 249)';
   const SORTED_COLUMN_BG = 'rgb(255, 242, 235)';
+  const FILTERED_HEADER_BG = 'rgba(249, 254, 250)';
+  const FILTERED_COLUMN_BG = 'rgba(236, 251, 237)';
   const SEARCH_CELL_BG = 'rgba(255, 243, 213)';
   const SEARCH_ROW_NUMBER_BG = 'rgba(255, 243, 213)';
+  const SEARCH_FILTER_OVERLAP_BG = 'rgba(236, 230, 172)';
   
   // Helper function to check if a cell value contains the search term
   const cellMatchesSearch = useCallback((cellValue: string, searchTerm?: string): boolean => {
@@ -173,8 +193,9 @@ export default function MainContent({
       new Set<string>([...pendingCells, ...savingCells]).size +
       rowCreatesInFlight.size +
       rowDeletesInFlight.size +
-      // Sorting isn't a server mutation, but Airtable shows the same global "Saving…" while refetching.
-      (sortSaving.active ? 1 : 0);
+      // Sorting and filtering aren't server mutations, but Airtable shows the same global "Saving…" while refetching.
+      (sortSaving.active ? 1 : 0) +
+      (filterSaving.active ? 1 : 0);
     window.dispatchEvent(
       new CustomEvent('grid:saving', { detail: { count } }),
     );
@@ -182,7 +203,7 @@ export default function MainContent({
       // Clear on unmount so we don't leave a stale indicator visible after route changes.
       window.dispatchEvent(new CustomEvent('grid:saving', { detail: { count: 0 } }));
     };
-  }, [pendingCells, savingCells, rowCreatesInFlight, rowDeletesInFlight, sortSaving.active]);
+  }, [pendingCells, savingCells, rowCreatesInFlight, rowDeletesInFlight, sortSaving.active, filterSaving.active]);
 
   // Simple force-update hook used by the virtualizer's onChange scheduler to avoid flushSync.
   const forceUpdate = useReducer((x) => x + 1, 0)[1] as () => void;
@@ -282,6 +303,19 @@ export default function MainContent({
     return () => window.removeEventListener('grid:sortSaving', onSortSaving as EventListener);
   }, []);
 
+  // Listen for "filter applied" events from the toolbar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onFilterSaving = (e: Event) => {
+      const ce = e as CustomEvent<{ active?: boolean; signature?: string }>;
+      const active = Boolean(ce.detail?.active);
+      const signature = ce.detail?.signature ?? '[]';
+      setFilterSaving({ active, signature });
+    };
+    window.addEventListener('grid:filterSaving', onFilterSaving as EventListener);
+    return () => window.removeEventListener('grid:filterSaving', onFilterSaving as EventListener);
+  }, []);
+
   // When committed sort rules change, reset pagination and refetch deterministically.
   // We watch `rowsQueryInput` (which uses `sortSignature`) so this only runs when
   // the effective sort content actually changes.
@@ -301,6 +335,15 @@ export default function MainContent({
     if (isFetchingRows) return;
     setSortSaving((prev) => (prev.active ? { ...prev, active: false } : prev));
   }, [sortSaving.active, sortSaving.signature, sortSignature, isFetchingRows]);
+
+  // Turn off filter "saving" once the rows query finishes fetching for the same filter signature.
+  useEffect(() => {
+    if (!filterSaving.active) return;
+    // Only clear if we're on the same filter config that triggered the saving state.
+    if (filterSaving.signature !== filterSignature) return;
+    if (isFetchingRows) return;
+    setFilterSaving((prev) => (prev.active ? { ...prev, active: false } : prev));
+  }, [filterSaving.active, filterSaving.signature, filterSignature, isFetchingRows]);
 
   // Get total count from first page (for virtualizer)
   const totalCount = useMemo(() => {
@@ -1847,7 +1890,11 @@ export default function MainContent({
                   <th
                     className="w-[180px] h-8 bg-white border-b border-gray-200 p-0 text-left align-middle"
                     style={{
-                      backgroundColor: sortedColumnIds.has(displayColumns[0]?.id ?? '') ? SORTED_HEADER_BG : undefined,
+                      backgroundColor: filteredColumnIds.has(displayColumns[0]?.id ?? '') 
+                        ? FILTERED_HEADER_BG 
+                        : sortedColumnIds.has(displayColumns[0]?.id ?? '') 
+                          ? SORTED_HEADER_BG 
+                          : undefined,
                     }}
                   >
                     <div className="h-8 px-2 flex items-center gap-2">
@@ -1894,7 +1941,11 @@ export default function MainContent({
                       key={col.id}
                       className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
                       style={{
-                        backgroundColor: sortedColumnIds.has(col.id) ? SORTED_HEADER_BG : undefined,
+                        backgroundColor: filteredColumnIds.has(col.id) 
+                          ? FILTERED_HEADER_BG 
+                          : sortedColumnIds.has(col.id) 
+                            ? SORTED_HEADER_BG 
+                            : undefined,
                       }}
                     >
                       <div className="h-8 px-2 flex items-center gap-2">
@@ -1983,7 +2034,11 @@ export default function MainContent({
                               <td
                                 className="w-[180px] h-8 border-b border-gray-200 p-0 align-middle bg-white"
                                 style={{
-                                  backgroundColor: sortedColumnIds.has(firstColumn.id) ? SORTED_COLUMN_BG : undefined,
+                                  backgroundColor: filteredColumnIds.has(firstColumn.id)
+                                    ? FILTERED_COLUMN_BG
+                                    : sortedColumnIds.has(firstColumn.id)
+                                      ? SORTED_COLUMN_BG
+                                      : undefined,
                                 }}
                               >
                                 <div className="h-8 px-2 flex items-center text-gray-300">
@@ -2041,11 +2096,15 @@ export default function MainContent({
                           isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                         }`}
                         style={{
-                          backgroundColor: cellMatches 
-                            ? (sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : SEARCH_CELL_BG)
-                            : sortedColumnIds.has(columnId) 
-                              ? SORTED_COLUMN_BG 
-                              : undefined,
+                          backgroundColor: cellMatches && filteredColumnIds.has(columnId)
+                            ? SEARCH_FILTER_OVERLAP_BG
+                            : cellMatches
+                              ? SEARCH_CELL_BG
+                              : filteredColumnIds.has(columnId)
+                                ? FILTERED_COLUMN_BG
+                                : sortedColumnIds.has(columnId)
+                                  ? SORTED_COLUMN_BG
+                                  : undefined,
                         }}
                       >
                         <input
@@ -2157,7 +2216,11 @@ export default function MainContent({
                                   key={col.id}
                                   className="w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle bg-white"
                                   style={{
-                                    backgroundColor: sortedColumnIds.has(col.id) ? SORTED_COLUMN_BG : undefined,
+                                    backgroundColor: filteredColumnIds.has(col.id)
+                                      ? FILTERED_COLUMN_BG
+                                      : sortedColumnIds.has(col.id)
+                                        ? SORTED_COLUMN_BG
+                                        : undefined,
                                   }}
                                 >
                                   <div className="h-8 pl-3 pr-2 flex items-center text-gray-300">
@@ -2217,11 +2280,15 @@ export default function MainContent({
                               isRowHighlighted ? 'bg-gray-50' : 'bg-white'
                             }`}
                             style={{
-                              backgroundColor: cellMatches 
-                                ? (sortedColumnIds.has(columnId) ? SORTED_COLUMN_BG : SEARCH_CELL_BG)
-                                : sortedColumnIds.has(columnId) 
-                                  ? SORTED_COLUMN_BG 
-                                  : undefined,
+                              backgroundColor: cellMatches && filteredColumnIds.has(columnId)
+                                ? SEARCH_FILTER_OVERLAP_BG
+                                : cellMatches
+                                  ? SEARCH_CELL_BG
+                                  : filteredColumnIds.has(columnId)
+                                    ? FILTERED_COLUMN_BG
+                                    : sortedColumnIds.has(columnId)
+                                      ? SORTED_COLUMN_BG
+                                      : undefined,
                             }}
                           >
                             <input
