@@ -50,8 +50,9 @@ const FieldTypePicker = forwardRef<
     position: { x: number; y: number } | null;
     onClose: () => void;
     onSelect?: (fieldType: string) => void;
+    onCreate?: (args: { fieldTypeId: string; name: string; defaultValue: string }) => void;
   }
->(function FieldTypePicker({ isOpen, position, onClose, onSelect }, ref) {
+>(function FieldTypePicker({ isOpen, position, onClose, onSelect, onCreate }, ref) {
   const PICKER_W = 400;
   const PANEL_GAP = 8;
 
@@ -286,12 +287,16 @@ const FieldTypePicker = forwardRef<
                     ) : null}
                     <div className="p-half" style={{ padding: '4px' }}>
                       {filteredFieldTypes.map((fieldType) => (
+                        (() => {
+                          const isInert = fieldType.id === 'foreignKey';
+                          return (
                         <div
                           key={fieldType.id}
                           className="flex items-center p1 px1-and-quarter rounded-big width-full colors-background-subtler-hover colors-background-subtle-active pointer"
                           data-tutorial-selector-id={`displayTypePicker-${fieldType.id}`}
-                          aria-disabled="false"
+                          aria-disabled={isInert ? 'true' : 'false'}
                           onClick={() => {
+                            if (isInert) return;
                             if (selectedFieldType && isTypePickerOpenFromConfig) {
                               // Switch field type, then return to the config UI (second UI)
                               // in its original anchored position.
@@ -317,7 +322,7 @@ const FieldTypePicker = forwardRef<
                             alignItems: 'center',
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            cursor: 'pointer',
+                            cursor: isInert ? 'default' : 'pointer',
                             width: '100%',
                           }}
                         >
@@ -370,6 +375,8 @@ const FieldTypePicker = forwardRef<
                             </svg>
                           )}
                         </div>
+                          );
+                        })()
                       ))}
                     </div>
                   </div>
@@ -387,6 +394,14 @@ const FieldTypePicker = forwardRef<
           position={configDialogPosition}
           fieldType={selectedFieldType}
           ignoreOutsideClicks={isTypePickerOpenFromConfig}
+          onCreate={(config) => {
+            if (!selectedFieldType) return;
+            onCreate?.({
+              fieldTypeId: selectedFieldType.id,
+              name: config.name,
+              defaultValue: config.defaultValue,
+            });
+          }}
           onOpenFieldTypePicker={() => {
             // When reopening the type picker from the config dropdown:
             // - keep the original picker anchored in the same spot

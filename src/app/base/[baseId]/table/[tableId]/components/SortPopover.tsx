@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
 import { forwardRef, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api } from '~/trpc/react';
+import { useColumnsUi } from './ColumnsUiContext';
 import { getColumnIconName } from './columnIcons';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
@@ -239,6 +240,8 @@ const SortPopover = forwardRef<
     { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
   );
 
+  const { columnOrder, ensureColumnOrder } = useColumnsUi();
+
   // Draft rules: stage edits while the popover is open; commit only when clicking "Sort".
   const [draftRules, setDraftRules] = useState(sortRules);
   const [autoSort, setAutoSort] = useState(true);
@@ -330,7 +333,31 @@ const SortPopover = forwardRef<
     setAddSortMenuPos(null);
   }, [isOpen, sortRules.length]);
 
-  const columns = useMemo(() => tableMeta?.columns ?? [], [tableMeta]);
+  const defaultIds = useMemo(() => tableMeta?.columns.map((c) => c.id) ?? [], [tableMeta]);
+
+  useEffect(() => {
+    if (!tableMeta) return;
+    ensureColumnOrder(defaultIds);
+  }, [tableMeta, defaultIds, ensureColumnOrder]);
+
+  const orderedIds = useMemo(() => {
+    const base = columnOrder ?? defaultIds;
+    // Keep any new columns appended; drop ids that no longer exist
+    const existing = new Set(defaultIds);
+    const normalized = base.filter((id) => existing.has(id));
+    for (const id of defaultIds) {
+      if (!normalized.includes(id)) normalized.push(id);
+    }
+    return normalized;
+  }, [columnOrder, defaultIds]);
+
+  const columns = useMemo(() => {
+    if (!tableMeta) return [];
+    const byId = new Map(tableMeta.columns.map((c) => [c.id, c] as const));
+    return orderedIds
+      .map((id) => byId.get(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  }, [tableMeta, orderedIds]);
 
   const filteredColumns = useMemo(() => {
     const q = query.trim().toLowerCase();

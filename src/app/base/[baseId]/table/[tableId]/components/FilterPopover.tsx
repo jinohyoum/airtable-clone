@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '~/trpc/react';
+import { useColumnsUi } from './ColumnsUiContext';
 import { getColumnIconName } from './columnIcons';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
@@ -852,7 +853,33 @@ const FilterPopover = forwardRef<
     { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
   );
 
-  const columns = useMemo(() => tableMeta?.columns ?? [], [tableMeta]);
+  const { columnOrder, ensureColumnOrder } = useColumnsUi();
+
+  const defaultIds = useMemo(() => tableMeta?.columns.map((c) => c.id) ?? [], [tableMeta]);
+
+  useEffect(() => {
+    if (!tableMeta) return;
+    ensureColumnOrder(defaultIds);
+  }, [tableMeta, defaultIds, ensureColumnOrder]);
+
+  const orderedIds = useMemo(() => {
+    const base = columnOrder ?? defaultIds;
+    // Keep any new columns appended; drop ids that no longer exist
+    const existing = new Set(defaultIds);
+    const normalized = base.filter((id) => existing.has(id));
+    for (const id of defaultIds) {
+      if (!normalized.includes(id)) normalized.push(id);
+    }
+    return normalized;
+  }, [columnOrder, defaultIds]);
+
+  const columns = useMemo(() => {
+    if (!tableMeta) return [];
+    const byId = new Map(tableMeta.columns.map((c) => [c.id, c] as const));
+    return orderedIds
+      .map((id) => byId.get(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  }, [tableMeta, orderedIds]);
 
   const setRootNode = useCallback(
     (node: HTMLDivElement | null) => {

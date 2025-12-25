@@ -282,6 +282,13 @@ const FieldConfigDialog = forwardRef<HTMLDivElement, FieldConfigDialogProps>(
                     aria-disabled="false"
                     data-tutorial-selector-id="columnDialogCreateButton"
                     data-testid="column-dialog-create-button"
+                    onClick={() => {
+                      onCreate?.({
+                        name: fieldName,
+                        defaultValue,
+                      });
+                      onClose();
+                    }}
                   >
                     <span className="truncate noevents button-text-label no-user-select">
                       Create field

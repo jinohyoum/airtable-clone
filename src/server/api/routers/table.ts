@@ -192,6 +192,65 @@ export const tableRouter = createTRPCRouter({
       return table;
     }),
 
+  createColumn: protectedProcedure
+    .input(
+      z.object({
+        tableId: z.string(),
+        type: z.string(),
+        name: z.string().optional(),
+        defaultValue: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const trimmedName = input.name?.trim();
+
+      return ctx.db.$transaction(async (tx) => {
+        const table = await tx.table.findUnique({
+          where: { id: input.tableId },
+          include: {
+            columns: {
+              orderBy: { order: "asc" },
+              select: { id: true, name: true, order: true },
+            },
+          },
+        });
+
+        if (!table) throw new Error("Table not found");
+
+        // Prevent concurrent order collisions.
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${input.tableId}))
+        `;
+
+        const maxOrderAgg = await tx.column.aggregate({
+          where: { tableId: input.tableId },
+          _max: { order: true },
+        });
+        const nextOrder = (maxOrderAgg._max.order ?? -1) + 1;
+
+        const existingNames = new Set(table.columns.map((c) => c.name));
+        const baseName = trimmedName && trimmedName.length > 0 ? trimmedName : undefined;
+        let finalName = baseName;
+        if (!finalName) {
+          // Airtable-ish: Field N. Ensure uniqueness.
+          let i = table.columns.length + 1;
+          while (existingNames.has(`Field ${i}`)) i++;
+          finalName = `Field ${i}`;
+        }
+
+        return tx.column.create({
+          data: {
+            tableId: input.tableId,
+            name: finalName,
+            type: input.type,
+            order: nextOrder,
+            // Default value is currently UI-only; ignore it on create.
+            options: null,
+          },
+        });
+      });
+    }),
+
   createRow: protectedProcedure
     .input(z.object({ 
       tableId: z.string(),
@@ -340,6 +399,17 @@ export const tableRouter = createTRPCRouter({
       });
 
       if (!row) throw new Error("Row not found");
+
+      // Validate the column exists and belongs to the same table.
+      // This prevents persisting values under unknown/optimistic column IDs.
+      const column = await ctx.db.column.findUnique({
+        where: { id: input.columnId },
+        select: { id: true, tableId: true },
+      });
+
+      if (!column || column.tableId !== row.tableId) {
+        throw new Error("Column not found");
+      }
 
       // Access values - use type assertion since Prisma client may not have regenerated
       const currentValues = ((row as { values?: unknown }).values as Record<string, string>) ?? {};
@@ -855,12 +925,23 @@ export const tableRouter = createTRPCRouter({
       const q = input.search?.trim();
       const search = q && q.length > 0 ? q : undefined;
 
+      // Fetch columns so we can validate filter columnIds.
+      const table = await ctx.db.table.findUnique({
+        where: { id: input.tableId },
+        include: { columns: { select: { id: true } } },
+      });
+
+      if (!table) throw new Error("Table not found");
+
       // Build filter SQL (same logic as getRows)
       const filterConditions: Prisma.Sql[] = [];
       
       if (input.filters && input.filters.length > 0) {
         for (const filter of input.filters) {
           const { columnId, operator, value } = filter;
+
+          const columnExists = table.columns.some((c) => c.id === columnId);
+          if (!columnExists) continue;
           
           const valueExpr = Prisma.sql`(r."values"->>${columnId})`;
           const trimmedExpr = Prisma.sql`btrim(COALESCE(${valueExpr}, ''))`;

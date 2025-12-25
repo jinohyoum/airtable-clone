@@ -233,7 +233,208 @@ export default function MainContent({
     },
   );
 
-  const { columnOrder, hiddenColumnIds, ensureColumnOrder } = useColumnsUi();
+  const { columnOrder, hiddenColumnIds, ensureColumnOrder, setColumnOrder, setHiddenColumnIds } = useColumnsUi();
+
+  const mapUiFieldTypeToDbType = useCallback((fieldTypeId: string): string => {
+    switch (fieldTypeId) {
+      case 'text':
+        return 'singleLineText';
+      case 'multilineText':
+        return 'longText';
+      case 'number':
+        return 'number';
+      default:
+        // Keep safe default. (Project scope is mainly Text + Number.)
+        return 'singleLineText';
+    }
+  }, []);
+
+  const isOptimisticColumnId = useCallback((columnId: string) => {
+    return columnId.startsWith('__creating_col__');
+  }, []);
+
+  const upsertRowCell = useCallback(
+    (
+      row: {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        cells: Array<{ columnId: string; value?: string; [key: string]: unknown }>;
+      },
+      columnId: string,
+      value: string,
+    ) => {
+      const idx = row.cells.findIndex((c) => c.columnId === columnId);
+      if (idx >= 0) {
+        const nextCells = row.cells.map((c) => (c.columnId === columnId ? { ...c, value } : c));
+        return { ...row, cells: nextCells };
+      }
+
+      const col = tableMeta?.columns?.find((c) => c.id === columnId);
+      if (!col) return row;
+
+      return {
+        ...row,
+        cells: [
+          ...row.cells,
+          {
+            id: `${row.id}-${columnId}`,
+            value,
+            rowId: row.id,
+            columnId,
+            column: col,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+          },
+        ],
+      };
+    },
+    [tableMeta],
+  );
+
+  const createColumnMutation = api.table.createColumn.useMutation({
+    onMutate: async (variables) => {
+      await utils.table.getTableMeta.cancel({ tableId: variables.tableId });
+      const previous = utils.table.getTableMeta.getData({ tableId: variables.tableId });
+
+      const tempId = `__creating_col__${Date.now()}`;
+      const now = new Date();
+      const trimmedName = variables.name?.trim();
+      const trimmedDefault = variables.defaultValue?.trim();
+
+      const existingNames = new Set(previous?.columns?.map((c) => c.name) ?? []);
+      let optimisticName = trimmedName && trimmedName.length > 0 ? trimmedName : undefined;
+      if (!optimisticName) {
+        let i = (previous?.columns?.length ?? 0) + 1;
+        while (existingNames.has(`Field ${i}`)) i++;
+        optimisticName = `Field ${i}`;
+      }
+
+      const nextOrder =
+        previous?.columns?.reduce((m, c) => Math.max(m, c.order), -1) != null
+          ? (previous?.columns?.reduce((m, c) => Math.max(m, c.order), -1) ?? -1) + 1
+          : 0;
+
+      const options = trimmedDefault && trimmedDefault.length > 0
+        ? JSON.stringify({ defaultValue: trimmedDefault })
+        : null;
+
+      if (previous) {
+        utils.table.getTableMeta.setData({ tableId: variables.tableId }, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            columns: [
+              ...old.columns,
+              {
+                id: tempId,
+                tableId: variables.tableId,
+                name: optimisticName!,
+                type: variables.type,
+                order: nextOrder,
+                options,
+                createdAt: now,
+                updatedAt: now,
+              } as (typeof old.columns)[number],
+            ],
+          };
+        });
+
+        // Keep any user-defined column order stable; append the new column.
+        if (columnOrder && !columnOrder.includes(tempId)) {
+          setColumnOrder([...columnOrder, tempId]);
+        }
+      }
+
+      return { previous, tempId };
+    },
+    onError: (err, variables, ctx) => {
+      console.error('Failed to create column:', err);
+      if (ctx?.previous) {
+        utils.table.getTableMeta.setData({ tableId: variables.tableId }, ctx.previous);
+      }
+      if (ctx?.tempId) {
+        // Clean up any UI-only references
+        if (columnOrder?.includes(ctx.tempId)) {
+          setColumnOrder(columnOrder.filter((id) => id !== ctx.tempId));
+        }
+        if (hiddenColumnIds.has(ctx.tempId)) {
+          const next = new Set(hiddenColumnIds);
+          next.delete(ctx.tempId);
+          setHiddenColumnIds(next);
+        }
+      }
+    },
+    onSuccess: (created, variables, ctx) => {
+      // Replace optimistic temp column with the real one.
+      if (ctx?.tempId) {
+        utils.table.getTableMeta.setData({ tableId: variables.tableId }, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            columns: old.columns.map((c) => (c.id === ctx.tempId ? created : c)),
+          };
+        });
+
+        if (columnOrder?.includes(ctx.tempId)) {
+          setColumnOrder(columnOrder.map((id) => (id === ctx.tempId ? created.id : id)));
+        }
+        if (hiddenColumnIds.has(ctx.tempId)) {
+          const next = new Set(hiddenColumnIds);
+          next.delete(ctx.tempId);
+          next.add(created.id);
+          setHiddenColumnIds(next);
+        }
+      }
+
+      // Make the new column behave like existing ones immediately:
+      // - add a corresponding cell object to all currently loaded rows in the cache
+      //   (avoids refetch + ensures updates work against row.cells).
+      let defaultValue = '';
+      if (typeof created.options === 'string' && created.options) {
+        try {
+          const parsed = JSON.parse(created.options) as unknown;
+          const dv = (parsed as { defaultValue?: unknown } | null)?.defaultValue;
+          if (typeof dv === 'string') defaultValue = dv;
+        } catch {
+          // ignore invalid JSON
+        }
+      }
+
+      utils.table.getRows.setInfiniteData(rowsQueryInput, (old) => {
+        if (!old) return old;
+        return {
+          pages: old.pages.map((page) => ({
+            ...page,
+            rows: page.rows.map((r) => {
+              // Only patch loaded rows; avoid duplicates.
+              if (r.cells.some((c) => c.columnId === created.id)) return r;
+              return {
+                ...r,
+                cells: [
+                  ...r.cells,
+                  {
+                    id: `${r.id}-${created.id}`,
+                    value: defaultValue,
+                    rowId: r.id,
+                    columnId: created.id,
+                    column: created,
+                    createdAt: r.createdAt,
+                    updatedAt: r.updatedAt,
+                  },
+                ],
+              };
+            }),
+          })),
+          pageParams: old.pageParams,
+        };
+      });
+    },
+    onSettled: async (_data, _err, variables) => {
+      // Keep meta in sync with server (also updates timestamps/order precisely).
+      await utils.table.getTableMeta.invalidate({ tableId: variables.tableId });
+    },
+  });
 
   useEffect(() => {
     if (!tableMeta) return;
@@ -766,20 +967,7 @@ export default function MainContent({
             ...page,
             rows: page.rows.map(row => {
               if (row.id !== variables.rowId) return row;
-              // Update the specific cell value
-              const updatedCells = row.cells.map(cell => {
-                if (cell.columnId === variables.columnId) {
-                  return {
-                    ...cell,
-                    value: variables.value,
-                  };
-                }
-                return cell;
-              });
-              return {
-                ...row,
-                cells: updatedCells,
-              };
+              return upsertRowCell(row, variables.columnId, variables.value);
             }),
           })),
           pageParams: oldData.pageParams,
@@ -1024,15 +1212,20 @@ export default function MainContent({
     currentValue: string
   ) => {
     e.preventDefault(); // Stop native dblclick selection behavior
+
+    // Don't allow editing optimistic placeholder columns.
+    if (isOptimisticColumnId(columnId)) return;
+
     const cellKey = `${rowId}-${columnId}`;
     doubleClickEditRef.current = cellKey; // Mark this cell for caret positioning on focus
     setEditingCell({ rowId, columnId });
     setEditValue(currentValue);
-  }, []);
+  }, [isOptimisticColumnId]);
 
   const scheduleAutosave = useCallback((rowId: string, columnId: string, value: string) => {
     const cellKey = `${rowId}-${columnId}`;
     if (rowId.startsWith('__temp__')) return;
+    if (isOptimisticColumnId(columnId)) return;
 
     setPendingCells((prev) => (prev.has(cellKey) ? prev : new Set(prev).add(cellKey)));
 
@@ -1076,10 +1269,22 @@ export default function MainContent({
     }, 500);
 
     autosaveTimersRef.current.set(cellKey, t);
-  }, [updateCellMutation, utils, rowsQueryInput]);
+  }, [updateCellMutation, utils, rowsQueryInput, isOptimisticColumnId]);
   
   const handleCellChange = useCallback((rowId: string, columnId: string, newValue: string) => {
     const cellKey = `${rowId}-${columnId}`;
+
+    // Don't autosave optimistic placeholder columns.
+    if (isOptimisticColumnId(columnId)) {
+      // Still keep local draft so the user doesn't lose typing while the column is being created.
+      setLocalDrafts(prev => {
+        const next = new Map(prev);
+        next.set(cellKey, newValue);
+        return next;
+      });
+      setEditValue(newValue);
+      return;
+    }
     
     // Update local draft immediately
     setLocalDrafts(prev => {
@@ -1100,13 +1305,7 @@ export default function MainContent({
           rows: page.rows.map(row => {
           if (row.id !== rowId) return row;
           
-          return {
-            ...row,
-            cells: row.cells.map(cell => {
-              if (cell.columnId !== columnId) return cell;
-              return { ...cell, value: newValue };
-            }),
-          };
+          return upsertRowCell(row, columnId, newValue);
         }),
         })),
         pageParams: oldData.pageParams,
@@ -1114,10 +1313,16 @@ export default function MainContent({
     });
 
     scheduleAutosave(rowId, columnId, newValue);
-  }, [utils, rowsQueryInput, scheduleAutosave]);
+  }, [utils, rowsQueryInput, scheduleAutosave, isOptimisticColumnId, upsertRowCell]);
   
   const handleCellSave = useCallback(async (rowId: string, columnId: string, maintainFocus = true) => {
     if (editingCell?.rowId !== rowId || editingCell?.columnId !== columnId) return;
+    if (isOptimisticColumnId(columnId)) {
+      // Column isn't real yet; keep draft and exit edit mode.
+      setEditingCell(null);
+      setEditValue('');
+      return;
+    }
 
     const cellKey = `${rowId}-${columnId}`;
     const newValue = editValue;
@@ -1157,13 +1362,7 @@ export default function MainContent({
           ...page,
           rows: page.rows.map(row => {
             if (row.id !== rowId) return row;
-            return {
-              ...row,
-              cells: row.cells.map(cell => {
-                if (cell.columnId !== columnId) return cell;
-                return { ...cell, value: newValue };
-              }),
-            };
+            return upsertRowCell(row, columnId, newValue);
           }),
         })),
         pageParams: oldData.pageParams,
@@ -1419,7 +1618,7 @@ export default function MainContent({
       // Schedule autosave
       scheduleAutosave(rowId, columnId, emptyValue);
     }
-  }, [allRows, tableMeta, editingCell, committingCells, utils, rowsQueryInput, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow, displayColumns]);
+  }, [allRows, tableMeta, editingCell, committingCells, utils, rowsQueryInput, scheduleAutosave, handleCellSave, handleCellCancel, handleCreateRow, displayColumns, isOptimisticColumnId, upsertRowCell]);
   
   const focusRafRef = useRef<number | null>(null);
   const invalidateTimerRef = useRef<number | null>(null);
@@ -1539,14 +1738,40 @@ export default function MainContent({
   }, [tableMeta, displayColumns]);
   
   const data = useMemo<CellData[]>(() => {
+    const defaultByColumnId = new Map<string, string>();
+    if (tableMeta?.columns) {
+      for (const c of tableMeta.columns) {
+        if (!c.options) continue;
+        try {
+          const parsed = JSON.parse(c.options) as unknown;
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+          const dv = (parsed as { defaultValue?: unknown }).defaultValue;
+          if (typeof dv !== 'string') continue;
+          const trimmed = dv.trim();
+          if (trimmed.length > 0) defaultByColumnId.set(c.id, trimmed);
+        } catch {
+          // ignore invalid JSON
+        }
+      }
+    }
+
     return allRows.map((row) => {
       const rowData: CellData = { _id: row.id };
-      row.cells.forEach((cell) => {
+
+      // Prefer the server-provided cells for speed, but fall back to column defaults
+      // if a new column was added (optimistic meta update) without refetching rows.
+      for (const cell of row.cells) {
         rowData[cell.columnId] = cell.value ?? '';
-      });
+      }
+      for (const col of displayColumns) {
+        if (rowData[col.id] === undefined) {
+          rowData[col.id] = defaultByColumnId.get(col.id) ?? '';
+        }
+      }
+
       return rowData;
     });
-  }, [allRows]);
+  }, [allRows, tableMeta, displayColumns]);
   
   const reactTable = useReactTable({
     data,
@@ -2500,9 +2725,17 @@ export default function MainContent({
           setFieldTypePickerOpen(false);
           setFieldTypePickerPosition(null);
         }}
-        onSelect={(fieldTypeId) => {
-          console.log('Selected field type:', fieldTypeId);
-          // TODO: Implement column creation logic
+        onCreate={({ fieldTypeId, name, defaultValue }) => {
+          if (!tableId || isCreatingTable) return;
+          const dbType = mapUiFieldTypeToDbType(fieldTypeId);
+          createColumnMutation.mutate({
+            tableId,
+            type: dbType,
+            name: name?.trim() ? name.trim() : undefined,
+            defaultValue: defaultValue?.trim() ? defaultValue.trim() : undefined,
+          });
+          setFieldTypePickerOpen(false);
+          setFieldTypePickerPosition(null);
         }}
       />
     </div>
