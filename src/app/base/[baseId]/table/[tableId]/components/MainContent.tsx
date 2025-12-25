@@ -1725,6 +1725,21 @@ export default function MainContent({
     return () => root.removeEventListener('keydown', onKeyDownCapture, { capture: true } as never);
   }, [activeCell, allRows, tableMeta, displayColumns, navigateToCell, handleCreateRow, editingCell, handleCellSave]);
 
+  // Clicking outside the grid should clear the active cell selection.
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      const root = rootRef.current;
+      const target = e.target as Node | null;
+      if (!root || !target) return;
+      if (root.contains(target)) return;
+      setActiveCell(null);
+      setIsKeyboardNav(false);
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () => window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
+  }, []);
+
   const syncFromMiddle = () => {
     const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 import BulkInsertButton from './[tableId]/components/BulkInsertButton';
 import { useParams } from 'next/navigation';
-import { forwardRef, useDeferredValue, useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { forwardRef, useDeferredValue, useMemo, useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { api } from '~/trpc/react';
 import LeftSidebarNarrow from './[tableId]/components/LeftSidebarNarrow';
 import MainContent from './[tableId]/components/MainContent';
@@ -151,6 +151,16 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<FilterCondition[]>([]);
   const [draftFilters, setDraftFilters] = useState<FilterCondition[]>([]);
 
+  // Match Ctrl+F search behavior: keep typing responsive by deferring the value that drives grid fetching.
+  const deferredFilters = useDeferredValue(filters);
+
+  // Keep filter UI typing responsive by scheduling filter application as a transition.
+  const [, startFilterTransition] = useTransition();
+  const filtersRef = useRef<FilterCondition[]>([]);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
   const filterCountForButton = isFilterOpen ? draftFilters.length : filters.length;
   const isFilterActiveForButton = filterCountForButton > 0;
   
@@ -175,28 +185,45 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     return `Filtered by ${filteredFieldNames.join(', ')}`;
   }, [isFilterActiveForButton, filteredFieldNames]);
 
-  const applyFilters = useCallback((next: FilterCondition[]) => {
-    // Always create new references to ensure React detects the change
-    const normalized = (next ?? [])
-      .filter(Boolean)
-      .map((f) => ({ id: f.id, columnId: f.columnId, operator: f.operator, value: f.value })); // new objects
+  const applyFilters = useCallback(
+    (next: FilterCondition[]) => {
+      // Normalize and stable-serialize to detect no-op updates.
+      const normalized = (next ?? [])
+        .filter(Boolean)
+        .map((f) => ({ id: f.id, columnId: f.columnId, operator: f.operator, value: f.value }));
 
-    // Check if filters actually changed
-    const prevSignature = JSON.stringify(filters);
-    const nextSignature = JSON.stringify(normalized);
-    const hasChanged = prevSignature !== nextSignature;
+      const prevSignature = JSON.stringify(filtersRef.current);
+      const nextSignature = JSON.stringify(normalized);
+      if (prevSignature === nextSignature) return;
 
-    setFilters(normalized); // new array reference guaranteed
+      // Schedule the expensive grid refetch/render work as non-urgent.
+      startFilterTransition(() => {
+        setFilters(normalized);
+      });
 
-    // Only trigger global "Saving…" UI if filters actually changed
-    if (hasChanged && typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('grid:filterSaving', {
-          detail: { active: true, signature: nextSignature },
-        }),
-      );
-    }
-  }, [filters]);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('grid:filterSaving', {
+            detail: { active: true, signature: nextSignature },
+          }),
+        );
+      }
+    },
+    [startFilterTransition],
+  );
+
+  const applyDraftFilters = useCallback(
+    (next: FilterCondition[]) => {
+      // Draft updates happen during typing; keep them low priority as well.
+      const normalized = (next ?? [])
+        .filter(Boolean)
+        .map((f) => ({ id: f.id, columnId: f.columnId, operator: f.operator, value: f.value }));
+      startFilterTransition(() => {
+        setDraftFilters(normalized);
+      });
+    },
+    [startFilterTransition],
+  );
 
   const applySortRules = (next: Array<{ columnId: string; direction: 'asc' | 'desc' }>) => {
     // Always create new references to ensure React detects the change
@@ -723,7 +750,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         position={filterPos}
                         filters={filters}
                         onChangeFilters={applyFilters}
-                        onDraftFiltersChange={setDraftFilters}
+                        onDraftFiltersChange={applyDraftFilters}
                         onRequestClose={() => {
                           setIsFilterOpen(false);
                           setFilterPos(null);
@@ -1254,7 +1281,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <Sidebar />
-              <MainContent isSearchOpen={isSearchOpen} search={search} sortRules={sortRules} filters={filters} />
+              <MainContent isSearchOpen={isSearchOpen} search={search} sortRules={sortRules} filters={deferredFilters} />
               {/* Keep children mounted for route completeness */}
               {children}
             </div>

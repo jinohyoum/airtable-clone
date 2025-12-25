@@ -803,18 +803,27 @@ const FilterPopover = forwardRef<
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [conditions, setConditions] = useState<FilterCondition[]>([]);
   const [isAddConditionActive, setIsAddConditionActive] = useState(false);
+  const didInitConditionsRef = useRef(false);
   
-  // Sync conditions with filters prop when popover opens
+  // Initialize local conditions from parent filters only when opening (or when table changes).
+  // IMPORTANT: do not rehydrate on every parent `filters` change while open, or it will overwrite typing.
   useEffect(() => {
-    if (isOpen) {
-      setConditions(filters.map(f => ({
+    if (!isOpen) {
+      didInitConditionsRef.current = false;
+      return;
+    }
+    if (didInitConditionsRef.current) return;
+
+    setConditions(
+      filters.map((f) => ({
         id: f.id,
         columnId: f.columnId,
-        operator: mapDbTypeToOperator(f.operator), // Convert DB type to UI label
+        operator: mapDbTypeToOperator(f.operator),
         value: f.value ?? '',
-      })));
-    }
-  }, [isOpen, filters]);
+      })),
+    );
+    didInitConditionsRef.current = true;
+  }, [isOpen, tableId]);
 
   // Notify parent of draft changes and auto-apply filters
   useEffect(() => {
