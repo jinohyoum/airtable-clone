@@ -1,6 +1,7 @@
 'use client';
 
-import { forwardRef, useEffect, useId, useState } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState } from 'react';
+import FieldConfigDialog from './FieldConfigDialog';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
 
@@ -52,11 +53,14 @@ const FieldTypePicker = forwardRef<
   }
 >(function FieldTypePicker({ isOpen, position, onClose, onSelect }, ref) {
   const searchInputId = useId();
-  const [query, setQuery] = useState('');
-
+  const [query, setQuery] = useState('');  const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>(null);
+  const [configDialogPosition, setConfigDialogPosition] = useState<{ x: number; y: number } | null>(null);
+  const configDialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!isOpen) {
       setQuery('');
+      setSelectedFieldType(null);
+      setConfigDialogPosition(null);
       return;
     }
 
@@ -90,6 +94,23 @@ const FieldTypePicker = forwardRef<
         ft.name.toLowerCase().includes(query.toLowerCase())
       )
     : FIELD_TYPES;
+
+  // If a field type is selected, show only the config dialog
+  if (selectedFieldType && configDialogPosition) {
+    return (
+      <FieldConfigDialog
+        ref={configDialogRef}
+        isOpen={true}
+        position={configDialogPosition}
+        fieldType={selectedFieldType}
+        onClose={() => {
+          setSelectedFieldType(null);
+          setConfigDialogPosition(null);
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -150,12 +171,10 @@ const FieldTypePicker = forwardRef<
                   }}
                 >
                   <div
-                    className="flex rounded-big width-full colors-background-subtler border"
+                    className="flex rounded-big width-full colors-background-subtler border field-type-picker-search"
                     style={{
-                      borderColor: 'rgb(246, 248, 252)',
                       backgroundColor: 'rgb(246, 248, 252)',
                       borderRadius: '6px',
-                      border: '1px solid rgb(246, 248, 252)',
                       display: 'flex',
                       width: '100%',
                     }}
@@ -254,9 +273,17 @@ const FieldTypePicker = forwardRef<
                       className="flex items-center p1 px1-and-quarter rounded-big width-full colors-background-subtler-hover colors-background-subtle-active pointer"
                       data-tutorial-selector-id={`displayTypePicker-${fieldType.id}`}
                       aria-disabled="false"
-                      onClick={() => {
-                        onSelect?.(fieldType.id);
-                        onClose();
+                      onClick={(e) => {
+                        // Get the picker's position to align right edges
+                        const pickerRect = (ref as React.RefObject<HTMLDivElement>)?.current?.getBoundingClientRect();
+                        if (pickerRect) {
+                          setSelectedFieldType(fieldType);
+                          // Position dialog so its right edge aligns with picker's right edge
+                          setConfigDialogPosition({
+                            x: pickerRect.left,
+                            y: pickerRect.top,
+                          });
+                        }
                       }}
                       style={{
                         display: 'flex',

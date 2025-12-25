@@ -944,8 +944,9 @@ li:hover .visually-hidden {
 }
 
 .stroked-blue-inset-outset-focus:focus {
-  border-color: rgb(22, 110, 225);
-  box-shadow: 0 0 0 2px rgba(22, 110, 225, 0.2);
+  border-color: rgb(10, 110, 220);
+  box-shadow: none;
+  outline: none;
 }
 
 /* Sidebar specific styles */
@@ -1423,6 +1424,14 @@ li:hover .visually-hidden {
 /* Field Type Picker (Create field dialog)                                    */
 /* -------------------------------------------------------------------------- */
 
+.field-type-picker-search {
+  border: 1px solid rgb(246, 248, 252);
+}
+
+.field-type-picker-search:focus-within {
+  border-color: rgba(10, 110, 220);
+}
+
 :root {
   --palette-blue-blue: rgb(45, 127, 249);
   --palette-purple-purple: rgb(128, 90, 213);
@@ -1546,4 +1555,270 @@ li:hover .visually-hidden {
 .focus-visible-opaque:focus-visible {
   outline: 2px solid rgb(45, 127, 249);
   outline-offset: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Field Config Dialog                                                        */
+/* -------------------------------------------------------------------------- */
+
+.px2 {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.py1 {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.pb-half {
+  padding-bottom: 4px;
+}
+
+.pt1 {
+  padding-top: 8px;
+}
+
+.pb2 {
+  padding-bottom: 16px;
+}
+
+.mt-half {
+  margin-top: 4px;
+}
+
+.mt1 {
+  margin-top: 8px;
+}
+
+.gap1 {
+  gap: 8px;
+}
+
+.width-full {
+  width: 100%;
+}
+
+.css-fitwu4 {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background-color: rgb(255, 255, 255);
+}
+
+.css-bao0pl {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background-color: rgb(255, 255, 255);
+  box-shadow: rgba(0, 0, 0, 0.32) 0px 0px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 2px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
+  font-size: 13px;
+  line-height: 18px;
+  height: 32px;
+  outline: none;
+}
+
+.stroked-blue-inset-outset-focus:focus {
+  border: 2px solid rgb(10, 110, 220);
+  box-shadow: none;
+  outline: none;
+}
+
+.ignore-baymax-defaults {
+  /* Override any baymax default styles */
+}
+
+.flex-row {
+  flex-direction: row;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.shadow-elevation-low {
+  box-shadow: rgba(0, 0, 0, 0.32) 0px 0px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 2px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
+}
+
+.shadow-elevation-low-hover:hover {
+  box-shadow: rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.16) 0px 0px 2px 0px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.colors-background-raised-control {
+  background-color: rgb(255, 255, 255);
+}
+
+.focus-visible-stroked-inset-blue-focus:focus-visible {
+  outline: 2px solid rgb(10, 110, 220);
+  outline-offset: -2px;
+}
+
+.outline-offset-0 {
+  outline-offset: 0;
+}
+
+.text-dark {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quiet {
+  opacity: 0.75;
+}
+
+.quieter {
+  opacity: 0.65;
+}
+
+.sm-vh-show {
+  /* Show on small viewport heights */
+}
+
+.sm-vh-hide {
+  /* Hide on small viewport heights - for now, always visible */
+}
+
+.max-width-2 {
+  max-width: 512px;
+}
+
+.mb2 {
+  margin-bottom: 16px;
+}
+
+.animate-opacity-fade-in {
+  animation: opacityFadeIn 0.2s ease-in;
+}
+
+.animate-slow {
+  animation-duration: 0.4s;
+}
+
+@keyframes opacityFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.typeOptionsContainer {
+  /* Container for field type specific options */
+}
+
+.border-thick {
+  border-width: 2px;
+}
+
+.border-transparent {
+  border-color: transparent;
+}
+
+.border-blue-focus:focus {
+  border-color: rgb(10, 110, 220);
+}
+
+.small {
+  font-size: 11px;
+}
+
+.items-baseline {
+  align-items: baseline;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.ml-auto {
+  margin-left: auto;
+}
+
+.border-box {
+  box-sizing: border-box;
+}
+
+.text-decoration-none {
+  text-decoration: none;
+}
+
+.print-color-exact {
+  print-color-adjust: exact;
+}
+
+.border-none {
+  border: none;
+}
+
+.background-transparent {
+  background-color: transparent;
+}
+
+.colors-background-selected-hover:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.px1-and-half {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.button-size-default {
+  height: 32px;
+  line-height: 22px;
+}
+
+.flex-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.noevents {
+  pointer-events: none;
+}
+
+.mr1 {
+  margin-right: 8px;
+}
+
+.button-text-label {
+  max-width: 100%;
+  text-align: center;
+  transform: translateY(-0.5px);
+}
+
+.no-user-select {
+  user-select: none;
+}
+
+.ml1 {
+  margin-left: 8px;
+}
+
+.text-white {
+  color: rgb(255, 255, 255);
+}
+
+.font-weight-strong {
+  font-weight: 500;
+}
+
+.colors-background-primary-control {
+  background-color: rgb(22, 110, 225);
+}
+
+.px-half {
+  padding-left: 4px;
+  padding-right: 4px;
 }
