@@ -1418,3 +1418,132 @@ li:hover .visually-hidden {
   visibility: hidden !important;
   opacity: 0 !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Field Type Picker (Create field dialog)                                    */
+/* -------------------------------------------------------------------------- */
+
+:root {
+  --palette-blue-blue: rgb(45, 127, 249);
+  --palette-purple-purple: rgb(128, 90, 213);
+  --palette-orange-orange: rgb(255, 115, 37);
+  --palette-neutral-quieter: rgb(151, 154, 160);
+  --palette-green-greenLight3: rgba(4, 138, 14, 0.1);
+  --palette-blue-blueLight3: rgba(45, 127, 249, 0.1);
+  --palette-purple-purpleLight3: rgb(243, 240, 252);
+  --palette-orange-orangeLight3: rgba(255, 115, 37, 0.1);
+}
+
+/* Field agent buttons - different background colors on hover */
+.css-1jahlvp {
+  background-color: var(--palette-green-greenLight3);
+}
+
+.css-1jahlvp:hover {
+  background-color: rgba(4, 138, 14, 0.1);
+}
+
+.css-jn6dnq {
+  background-color: var(--palette-blue-blueLight3);
+}
+
+.css-jn6dnq:hover {
+  background-color: rgba(45, 127, 249, 0.1);
+}
+
+.css-1c21ntr {
+  background-color: var(--palette-purple-purpleLight3);
+}
+
+.css-1c21ntr:hover {
+  background-color: rgba(128, 90, 213, 0.1);
+}
+
+.css-g1sgjn {
+  background-color: var(--palette-orange-orangeLight3);
+}
+
+.css-g1sgjn:hover {
+  background-color: rgba(255, 115, 37, 0.1);
+}
+
+.css-10izfj {
+  background-color: var(--palette-green-greenLight3);
+}
+
+.css-10izfj:hover {
+  background-color: rgba(4, 138, 14, 0.1);
+}
+
+.css-1gm6i6d:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* General hover states */
+.colors-background-subtler-hover:hover {
+  background-color: rgb(246, 248, 252);
+}
+
+.colors-background-subtle-active:active {
+  background-color: rgb(240, 244, 250);
+}
+
+.colors-background-raised-popover {
+  background-color: rgb(255, 255, 255);
+}
+
+.colors-background-subtler {
+  background-color: rgb(246, 248, 252);
+}
+
+.colors-background-selected-hover:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.colors-background-selected-focus:focus {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.colors-foreground-subtle {
+  color: rgb(97, 102, 112);
+}
+
+.colors-foreground-default {
+  color: rgb(29, 31, 37);
+}
+
+.colors-border-subtle {
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Shadow elevation */
+.shadow-elevation-high {
+  box-shadow: rgba(0, 0, 0, 0.24) 0px 0px 1px 0px, rgba(0, 0, 0, 0.16) 0px 0px 2px 0px, 
+              rgba(0, 0, 0, 0.06) 0px 3px 4px 0px, rgba(0, 0, 0, 0.06) 0px 6px 8px 0px, 
+              rgba(0, 0, 0, 0.08) 0px 12px 16px 0px, rgba(0, 0, 0, 0.06) 0px 18px 32px 0px;
+}
+
+/* z-index */
+.z3 {
+  z-index: 3;
+}
+
+/* Border radius */
+.rounded-big {
+  border-radius: 6px;
+}
+
+.rounded-huge {
+  border-radius: 9999px;
+}
+
+/* Focus visible */
+.focus-visible:focus-visible {
+  outline: 2px solid rgb(45, 127, 249);
+  outline-offset: 2px;
+}
+
+.focus-visible-opaque:focus-visible {
+  outline: 2px solid rgb(45, 127, 249);
+  outline-offset: 0;
+}

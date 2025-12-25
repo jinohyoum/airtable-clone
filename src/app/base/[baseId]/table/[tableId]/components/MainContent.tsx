@@ -12,6 +12,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { api } from '~/trpc/react';
 import { useColumnsUi } from './ColumnsUiContext';
 import { getColumnIconName } from './columnIcons';
+import FieldTypePicker from './FieldTypePicker';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
 
@@ -184,6 +185,11 @@ export default function MainContent({
   // Transition mask: brief skeleton on every table switch (like Airtable)
   // This signals "context change" even when data is cached
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Field type picker state
+  const [fieldTypePickerOpen, setFieldTypePickerOpen] = useState(false);
+  const [fieldTypePickerPosition, setFieldTypePickerPosition] = useState<{ x: number; y: number } | null>(null);
+  const fieldTypePickerRef = useRef<HTMLDivElement>(null);
 
   // Broadcast saving state so TopNav can render the global "Saving…" indicator.
   useEffect(() => {
@@ -2013,7 +2019,17 @@ export default function MainContent({
                   ))}
                   {/* Add column button */}
                   <th className="w-[94px] h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
-                    <button className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500">
+                    <button 
+                      className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setFieldTypePickerPosition({
+                          x: rect.right - 400, // Align right edge with button's right edge (400px is dialog minWidth)
+                          y: rect.bottom + 4,
+                        });
+                        setFieldTypePickerOpen(true);
+                      }}
+                    >
                       <svg
                         width="16"
                         height="16"
@@ -2474,6 +2490,21 @@ export default function MainContent({
       >
         <div style={{ width: bottomSpacerWidth, height: 1 }} />
       </div>
+
+      {/* Field Type Picker Dialog */}
+      <FieldTypePicker
+        ref={fieldTypePickerRef}
+        isOpen={fieldTypePickerOpen}
+        position={fieldTypePickerPosition}
+        onClose={() => {
+          setFieldTypePickerOpen(false);
+          setFieldTypePickerPosition(null);
+        }}
+        onSelect={(fieldTypeId) => {
+          console.log('Selected field type:', fieldTypeId);
+          // TODO: Implement column creation logic
+        }}
+      />
     </div>
   );
 }
