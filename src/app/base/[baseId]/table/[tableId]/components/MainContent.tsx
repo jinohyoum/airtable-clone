@@ -240,11 +240,60 @@ export default function MainContent({
         return 'singleLineText';
       case 'multilineText':
         return 'longText';
+      case 'select':
+        return 'singleSelect';
+      case 'multiSelect':
+        return 'multiSelect';
+      case 'collaborator':
+        return 'user';
+      case 'multipleAttachment':
+        return 'attachment';
       case 'number':
         return 'number';
+      case 'currency':
+        return 'currency';
+      case 'percentV2':
+        return 'percentV2';
+      case 'duration':
+        return 'duration';
+      case 'rating':
+        return 'rating';
+      case 'checkbox':
+        return 'checkbox';
+      case 'date':
+        return 'date';
+      case 'phone':
+        return 'phone';
+      case 'email':
+        return 'email';
+      case 'url':
+        return 'url';
+      case 'formula':
+        return 'formula';
+      case 'rollup':
+        return 'rollup';
+      case 'count':
+        return 'count';
+      case 'lookup':
+        return 'lookup';
+      case 'createdTime':
+        return 'createdTime';
+      case 'lastModifiedTime':
+        return 'lastModifiedTime';
+      case 'createdBy':
+        return 'createdBy';
+      case 'lastModifiedBy':
+        return 'lastModifiedBy';
+      case 'autoNumber':
+        return 'autoNumber';
+      case 'barcode':
+        return 'barcode';
+      case 'button':
+        return 'button';
       default:
-        // Keep safe default. (Project scope is mainly Text + Number.)
-        return 'singleLineText';
+        // If the UI introduces new field types, preserve the identifier so icon mapping can still work.
+        // This keeps behavior forward-compatible (it's a string column type in the DB).
+        return fieldTypeId;
     }
   }, []);
 
