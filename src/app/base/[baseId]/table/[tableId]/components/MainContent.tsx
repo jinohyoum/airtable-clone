@@ -2673,7 +2673,7 @@ export default function MainContent({
                         {displayColumns.slice(1).map((col) => (
                           <td
                             key={col.id}
-                            className={`w-[180px] h-8 border-r border-b border-gray-200 p-0 align-middle ${
+                            className={`w-[180px] h-8 p-0 align-middle ${
                               hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
                             }`}
                           >
