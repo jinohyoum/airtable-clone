@@ -10,10 +10,23 @@ interface FieldConfigDialogProps {
   fieldType: { id: string; name: string; icon: string } | null;
   onClose: () => void;
   onCreate?: (config: { name: string; defaultValue: string }) => void;
+  onOpenFieldTypePicker?: () => void;
+  ignoreOutsideClicks?: boolean;
 }
 
 const FieldConfigDialog = forwardRef<HTMLDivElement, FieldConfigDialogProps>(
-  function FieldConfigDialog({ isOpen, position, fieldType, onClose, onCreate }, ref) {
+  function FieldConfigDialog(
+    {
+      isOpen,
+      position,
+      fieldType,
+      onClose,
+      onCreate,
+      onOpenFieldTypePicker,
+      ignoreOutsideClicks,
+    },
+    ref
+  ) {
     const [fieldName, setFieldName] = useState('');
     const [defaultValue, setDefaultValue] = useState('');
 
@@ -31,6 +44,7 @@ const FieldConfigDialog = forwardRef<HTMLDivElement, FieldConfigDialogProps>(
       };
 
       const handleClickOutside = (e: MouseEvent) => {
+        if (ignoreOutsideClicks) return;
         const target = e.target as HTMLElement;
         const dialog = (ref as React.RefObject<HTMLDivElement>)?.current;
         if (dialog && !dialog.contains(target)) {
@@ -128,6 +142,18 @@ const FieldConfigDialog = forwardRef<HTMLDivElement, FieldConfigDialogProps>(
                     className="flex-auto flex items-center flex items-center px1 pointer animate rounded-big overflow-hidden colors-background-raised-control border-none focus-visible-stroked-inset-blue-focus outline-offset-0 shadow-elevation-low shadow-elevation-low-hover"
                     tabIndex={0}
                     role="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onOpenFieldTypePicker?.();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onOpenFieldTypePicker?.();
+                      }
+                    }}
                   >
                     <svg
                       width="16"
