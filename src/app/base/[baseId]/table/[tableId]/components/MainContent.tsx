@@ -1829,6 +1829,14 @@ export default function MainContent({
     );
   }
 
+  // Keep column widths stable when hiding fields.
+  // We size the middle (scrollable) tables to the sum of their fixed column widths
+  // so the browser doesn't redistribute extra space across the remaining columns.
+  const DATA_COLUMN_WIDTH_PX = 180;
+  const ADD_COLUMN_WIDTH_PX = 94;
+  const middleColumnCount = Math.max(0, displayColumns.length - 1);
+  const middleTableWidthPx = `${middleColumnCount * DATA_COLUMN_WIDTH_PX + ADD_COLUMN_WIDTH_PX}px`;
+
   const loadError = rowsError ?? rowCountError;
   const loadErrorMessage =
     loadError instanceof Error ? loadError.message : "Unknown error";
@@ -1942,7 +1950,14 @@ export default function MainContent({
             onScroll={syncFromHeader}
             className={`flex-1 min-w-0 ${isSearchOpen ? 'overflow-x-hidden' : 'overflow-x-auto'} hide-scrollbar`}
           >
-            <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+            <table
+              style={{
+                borderCollapse: 'separate',
+                borderSpacing: 0,
+                width: middleTableWidthPx,
+                tableLayout: 'fixed',
+              }}
+            >
               <thead>
                 <tr className="bg-white h-8">
                   {displayColumns.slice(1).map((col) => (
@@ -2236,7 +2251,14 @@ export default function MainContent({
             onScroll={syncFromMiddle}
             className={`flex-1 min-w-0 ${isSearchOpen ? 'overflow-x-hidden' : 'overflow-x-auto'} overflow-y-hidden hide-scrollbar`}
           >
-            <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+            <table
+              style={{
+                borderCollapse: 'separate',
+                borderSpacing: 0,
+                width: middleTableWidthPx,
+                tableLayout: 'fixed',
+              }}
+            >
               <tbody>
                       {virtualItems.map((virtualRow) => {
                         const idx = virtualRow.index;
@@ -2384,7 +2406,14 @@ export default function MainContent({
                     </tbody>
                   </table>
                   {/* Add row button at the end - always visible */}
-                  <table className="min-w-[1200px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                  <table
+                    style={{
+                      borderCollapse: 'separate',
+                      borderSpacing: 0,
+                      width: middleTableWidthPx,
+                      tableLayout: 'fixed',
+                    }}
+                  >
                     <tbody>
                       <tr
                         className="cursor-pointer"
