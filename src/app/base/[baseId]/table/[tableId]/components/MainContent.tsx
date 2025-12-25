@@ -127,10 +127,9 @@ export default function MainContent({
   }, [cellMatchesSearch]);
   
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const middleHeaderScrollRef = useRef<HTMLDivElement | null>(null);
   const middleScrollRef = useRef<HTMLDivElement | null>(null);
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
-  const syncingRef = useRef<'middle' | 'bottom' | 'header' | null>(null);
+  const syncingRef = useRef<'middle' | 'bottom' | null>(null);
   const prevTableIdRef = useRef<string>(tableId);
   const [bottomSpacerWidth, setBottomSpacerWidth] = useState<number>(0);
   const [hoveredRow, setHoveredRow] = useState<number | 'add' | null>(null);
@@ -1971,64 +1970,42 @@ export default function MainContent({
     return () => window.removeEventListener('pointerdown', onPointerDown, { capture: true } as never);
   }, []);
 
+  const setGridScrollLeft = (scrollLeft: number) => {
+    // Store as a negative length so the header can translate by this value.
+    rootRef.current?.style.setProperty('--grid-scroll-left-neg', `${-scrollLeft}px`);
+  };
+
   const syncFromMiddle = () => {
-    const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;
     const bottom = bottomScrollRef.current;
     if (!middle || !bottom) return;
-    if (syncingRef.current === 'bottom' || syncingRef.current === 'header') return;
+    if (syncingRef.current === 'bottom') return;
     syncingRef.current = 'middle';
     
     const scrollPos = middle.scrollLeft;
     const bottomMax = Math.max(0, bottom.scrollWidth - bottom.clientWidth);
     bottom.scrollLeft = Math.min(scrollPos, bottomMax);
-    
-    if (middleHeader) {
-      const headerMax = Math.max(0, middleHeader.scrollWidth - middleHeader.clientWidth);
-      middleHeader.scrollLeft = Math.min(scrollPos, headerMax);
-    }
+
+    setGridScrollLeft(scrollPos);
     syncingRef.current = null;
   };
 
   const syncFromBottom = () => {
-    const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;
     const bottom = bottomScrollRef.current;
     if (!middle || !bottom) return;
-    if (syncingRef.current === 'middle' || syncingRef.current === 'header') return;
+    if (syncingRef.current === 'middle') return;
     syncingRef.current = 'bottom';
     
     const scrollPos = bottom.scrollLeft;
     const middleMax = Math.max(0, middle.scrollWidth - middle.clientWidth);
     middle.scrollLeft = Math.min(scrollPos, middleMax);
-    
-    if (middleHeader) {
-      const headerMax = Math.max(0, middleHeader.scrollWidth - middleHeader.clientWidth);
-      middleHeader.scrollLeft = Math.min(scrollPos, headerMax);
-    }
-    syncingRef.current = null;
-  };
 
-  const syncFromHeader = () => {
-    const middleHeader = middleHeaderScrollRef.current;
-    const middle = middleScrollRef.current;
-    const bottom = bottomScrollRef.current;
-    if (!middleHeader || !middle || !bottom) return;
-    if (syncingRef.current === 'middle' || syncingRef.current === 'bottom') return;
-    syncingRef.current = 'header';
-    
-    const scrollPos = middleHeader.scrollLeft;
-    const middleMax = Math.max(0, middle.scrollWidth - middle.clientWidth);
-    middle.scrollLeft = Math.min(scrollPos, middleMax);
-    
-    const bottomMax = Math.max(0, bottom.scrollWidth - bottom.clientWidth);
-    bottom.scrollLeft = Math.min(scrollPos, bottomMax);
-    
+    setGridScrollLeft(scrollPos);
     syncingRef.current = null;
   };
 
   useLayoutEffect(() => {
-    const middleHeader = middleHeaderScrollRef.current;
     const middle = middleScrollRef.current;
     const bottom = bottomScrollRef.current;
     if (!middle || !bottom) return;
@@ -2044,11 +2021,8 @@ export default function MainContent({
     const ro = new ResizeObserver(update);
     ro.observe(middle);
     ro.observe(bottom);
-    if (middleHeader) ro.observe(middleHeader);
     const table = middle.querySelector('table');
     if (table) ro.observe(table);
-    const headerTable = middleHeader?.querySelector('table');
-    if (headerTable) ro.observe(headerTable);
 
     return () => ro.disconnect();
   }, []);
@@ -2118,7 +2092,7 @@ export default function MainContent({
         }
       }}
       className="flex-1 min-h-0 flex flex-col overflow-hidden outline-none"
-      style={{ backgroundColor: '#f6f8fc' }}
+      style={{ backgroundColor: '#f6f8fc', ['--grid-scroll-left-neg' as never]: '0px' }}
     >
       {loadError ? (
         <div className="px-3 py-2 text-sm border-b border-red-200 bg-red-50 text-red-700">
@@ -2152,7 +2126,7 @@ export default function MainContent({
                     </div>
                   </th>
                   <th
-                    className="w-[180px] h-8 bg-white border-b border-b-[rgb(209,209,209)] p-0 text-left align-middle"
+                    className="w-[180px] h-8 bg-white border-b border-gray-200 p-0 text-left align-middle"
                     style={{
                       backgroundColor: filteredColumnIds.has(displayColumns[0]?.id ?? '') 
                         ? FILTERED_HEADER_BG 
@@ -2192,83 +2166,101 @@ export default function MainContent({
           </div>
           {/* Middle header (other columns) */}
           <div
-            ref={middleHeaderScrollRef}
-            onScroll={syncFromHeader}
-            className={`flex-1 min-w-0 ${isSearchOpen ? 'overflow-x-hidden' : 'overflow-x-auto'} hide-scrollbar`}
+            className="flex-1 min-w-0 overflow-x-hidden"
+            onWheel={(e) => {
+              const middle = middleScrollRef.current;
+              if (!middle) return;
+
+              // Support trackpads (deltaX) and Shift+wheel (deltaY) for horizontal scrolling.
+              const delta = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+              if (delta === 0) return;
+
+              middle.scrollLeft += delta;
+              // Ensure the translated header stays in lock-step even before the scroll event fires.
+              setGridScrollLeft(middle.scrollLeft);
+              e.preventDefault();
+            }}
           >
-            <table
+            <div
               style={{
-                borderCollapse: 'separate',
-                borderSpacing: 0,
-                width: middleTableWidthPx,
-                tableLayout: 'fixed',
+                transform: 'translateX(var(--grid-scroll-left-neg, 0px))',
+                willChange: 'transform',
               }}
             >
-              <thead>
-                <tr className="bg-white h-8">
-                  {displayColumns.slice(1).map((col) => (
-                    <th
-                      key={col.id}
-                      className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
-                      style={{
-                        backgroundColor: filteredColumnIds.has(col.id) 
-                          ? FILTERED_HEADER_BG 
-                          : sortedColumnIds.has(col.id) 
-                            ? SORTED_HEADER_BG 
-                            : undefined,
-                      }}
-                    >
-                      <div className="h-8 px-2 flex items-center gap-2">
+              <table
+                style={{
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                  width: middleTableWidthPx,
+                  tableLayout: 'fixed',
+                }}
+              >
+                <thead>
+                  <tr className="bg-white h-8">
+                    {displayColumns.slice(1).map((col) => (
+                      <th
+                        key={col.id}
+                        className="w-[180px] h-8 border-r border-b border-gray-200 p-0 text-left bg-white align-middle"
+                        style={{
+                          backgroundColor: filteredColumnIds.has(col.id) 
+                            ? FILTERED_HEADER_BG 
+                            : sortedColumnIds.has(col.id) 
+                              ? SORTED_HEADER_BG 
+                              : undefined,
+                        }}
+                      >
+                        <div className="h-8 px-2 flex items-center gap-2">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            style={{ shapeRendering: 'geometricPrecision' }}
+                            className="flex-none primaryDisplayTypeIcon"
+                          >
+                            <use fill="currentColor" href={`${ICON_SPRITE}#${getColumnIconName(col.type)}`} />
+                          </svg>
+                          <span 
+                            className="text-xs font-semibold leading-4"
+                            style={{ 
+                              color: 'lab(27.1134 -0.956401 -12.3224)',
+                              height: '16px',
+                              lineHeight: '16px',
+                              fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
+                            }}
+                          >
+                            {col.name}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
+                    {/* Add column button */}
+                    <th className="w-[94px] h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
+                      <button 
+                        className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500"
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setFieldTypePickerPosition({
+                            x: rect.right - 400, // Align right edge with button's right edge (400px is dialog minWidth)
+                            y: rect.bottom + 4,
+                          });
+                          setFieldTypePickerOpen(true);
+                        }}
+                      >
                         <svg
                           width="16"
                           height="16"
                           viewBox="0 0 16 16"
                           style={{ shapeRendering: 'geometricPrecision' }}
-                          className="flex-none primaryDisplayTypeIcon"
+                          className="flex-none icon"
                         >
-                          <use fill="currentColor" href={`${ICON_SPRITE}#${getColumnIconName(col.type)}`} />
+                          <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
                         </svg>
-                        <span 
-                          className="text-xs font-semibold leading-4"
-                          style={{ 
-                            color: 'lab(27.1134 -0.956401 -12.3224)',
-                            height: '16px',
-                            lineHeight: '16px',
-                            fontFamily: 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
-                          }}
-                        >
-                          {col.name}
-                        </span>
-                      </div>
+                      </button>
                     </th>
-                  ))}
-                  {/* Add column button */}
-                  <th className="w-[94px] h-8 border-r border-b border-gray-200 bg-white p-0 align-middle">
-                    <button 
-                      className="w-full h-8 flex items-center justify-center hover:bg-gray-100 text-gray-500"
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setFieldTypePickerPosition({
-                          x: rect.right - 400, // Align right edge with button's right edge (400px is dialog minWidth)
-                          y: rect.bottom + 4,
-                        });
-                        setFieldTypePickerOpen(true);
-                      }}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        style={{ shapeRendering: 'geometricPrecision' }}
-                        className="flex-none icon"
-                      >
-                        <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
-                      </svg>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-            </table>
+                  </tr>
+                </thead>
+              </table>
+            </div>
           </div>
         </div>
 
