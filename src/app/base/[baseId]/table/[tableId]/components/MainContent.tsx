@@ -31,7 +31,17 @@ export default function MainContent({
   filters?: Array<{
     id: string;
     columnId: string;
-    operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+    operator:
+      | 'isEmpty'
+      | 'isNotEmpty'
+      | 'contains'
+      | 'notContains'
+      | 'equals'
+      | 'notEquals'
+      | 'greaterThan'
+      | 'lessThan'
+      | 'greaterThanOrEqual'
+      | 'lessThanOrEqual';
     value?: string;
   }>;
 }) {

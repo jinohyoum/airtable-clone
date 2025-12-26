@@ -848,7 +848,9 @@ export default function TableTabsBar() {
                     onMouseEnter={() => {
                       // Prefetch table data on hover for instant switching
                       if (!table.isActive && !table.isOptimistic) {
-                        void utils.table.getData.prefetch({ tableId: table.id });
+                        // IMPORTANT: do not prefetch getData here (it includes ALL rows/cells).
+                        // Prefetch only lightweight metadata so large tables (100k/1m rows) don't melt.
+                        void utils.table.getTableMeta.prefetch({ tableId: table.id });
                       }
                     }}
                     style={{
