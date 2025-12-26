@@ -621,11 +621,18 @@ export default function TableLayout({ children }: { children: ReactNode }) {
       if (!t) return;
       if (hideFieldsPopoverRef.current?.contains(t)) return;
       if (hideFieldsButtonRef.current?.contains(t)) return;
+
+      // Ensure hidden fields (and other view config) is persisted even if the user
+      // closes the popover quickly.
+      window.dispatchEvent(new CustomEvent('views:flushActive'));
       setIsHideFieldsOpen(false);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+
+      // Same rationale as outside click: flush before closing.
+      window.dispatchEvent(new CustomEvent('views:flushActive'));
       setIsHideFieldsOpen(false);
       hideFieldsButtonRef.current?.focus();
     };
@@ -1683,7 +1690,21 @@ function ViewHiddenColumnsApplier({
     hiddenColumnIdsRef.current = hiddenColumnIds;
   }, [hiddenColumnIds]);
 
+  // Important: `hiddenColumns` is often a freshly-created array on each render.
+  // Use a stable signature to avoid re-applying the server state and overwriting
+  // local/optimistic UI changes before autosave runs.
   const hiddenColumnsSignature = useMemo(() => JSON.stringify([...hiddenColumns].sort()), [hiddenColumns]);
+  const hiddenColumnsFromSignature = useMemo<string[]>(
+    () => {
+      try {
+        const parsed = JSON.parse(hiddenColumnsSignature);
+        return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+      } catch {
+        return [];
+      }
+    },
+    [hiddenColumnsSignature],
+  );
 
   useEffect(() => {
     if (!activeViewId) return;
@@ -1692,12 +1713,12 @@ function ViewHiddenColumnsApplier({
     if (JSON.stringify(current) === hiddenColumnsSignature) return;
 
     isApplyingViewRef.current = true;
-    setHiddenColumnIds(new Set(hiddenColumns));
+    setHiddenColumnIds(new Set(hiddenColumnsFromSignature));
     const t = window.setTimeout(() => {
       isApplyingViewRef.current = false;
     }, 0);
     return () => window.clearTimeout(t);
-  }, [activeViewId, hiddenColumns, hiddenColumnsSignature, setHiddenColumnIds, isApplyingViewRef]);
+  }, [activeViewId, hiddenColumnsSignature, hiddenColumnsFromSignature, setHiddenColumnIds, isApplyingViewRef]);
 
   return null;
 }
