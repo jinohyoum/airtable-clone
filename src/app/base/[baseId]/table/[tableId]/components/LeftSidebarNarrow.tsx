@@ -24,7 +24,7 @@ export default function LeftSidebarNarrow() {
             id="appTopBarHomeButton" 
             aria-label="Back to home" 
             className="flex flex-none relative pointer rounded-full border-transparent group" 
-            href="/" 
+            href="/base" 
             style={{ width: '24px', height: '24px' }}
             aria-description="Tooltip: Back to home"
           >
