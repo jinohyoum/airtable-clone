@@ -1,7 +1,22 @@
 'use client';
 
-import { Plus, MoreHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 
 function SpriteIcon({
   name,
@@ -29,9 +44,125 @@ function SpriteIcon({
   );
 }
 
+type ViewListItem = {
+  id: string;
+  name: string;
+};
+
+function SortableViewRow({
+  view,
+  selected,
+  showDragHandle,
+  onSelect,
+}: {
+  view: ViewListItem;
+  selected: boolean;
+  showDragHandle: boolean;
+  onSelect: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: view.id, disabled: !showDragHandle });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    backgroundColor: selected ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+    borderRadius: '3px',
+    boxSizing: 'border-box',
+    height: '32.25px',
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      role="option"
+      aria-selected={selected}
+      className={`rounded pointer flex relative justify-center flex-column pt1 pb1 px1-and-half width-full ${
+        selected ? 'sidebar-view-item-selected' : ''
+      }`}
+      style={style}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSelect();
+      }}
+    >
+      <div className="flex items-center">
+        <div className="flex-auto flex items-center">
+          <span className="flex-inline flex-none items-center mr1">
+            <span className="flex-none icon" style={{ color: 'rgb(22, 110, 225)', display: 'flex' }}>
+              <SpriteIcon name="GridFeature" width={16} height={16} className="flex-none icon" />
+            </span>
+          </span>
+          <span
+            className="font-family-default text-size-default text-color-default line-height-3 font-weight-strong truncate sidebar-text"
+            style={{ color: 'rgb(29, 31, 37)' }}
+          >
+            {view.name}
+          </span>
+        </div>
+
+        <div
+          tabIndex={0}
+          role="button"
+          className="flex items-center justify-center mr-half focus-visible visually-hidden solid"
+          aria-label="Menu"
+          aria-expanded="false"
+          aria-haspopup="true"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <SpriteIcon name="Overflow" width={16} height={16} className="flex-none colors-foreground-subtle" />
+        </div>
+
+        <div
+          ref={setActivatorNodeRef}
+          tabIndex={0}
+          role="button"
+          draggable="false"
+          className="visually-hidden solid dragHandle flex items-center flex-none focus-visible quieter link-unquiet"
+          style={{ marginRight: '4px' }}
+          {...attributes}
+          {...listeners}
+          onClick={(e) => {
+            // Prevent the handle click from selecting the view.
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <SpriteIcon name="DotsSixVertical" width={16} height={16} className="flex-none icon" />
+        </div>
+      </div>
+
+      <span
+        className="font-family-default text-size-small text-color-quieter line-height-4 font-weight-default truncate"
+        style={{ marginLeft: '24px' }}
+      ></span>
+    </li>
+  );
+}
+
 export default function Sidebar() {
   const [width, setWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Views aren't persisted yet (server router not implemented).
+  // Keep the sidebar UI data-driven so it can be wired to DB-backed views later.
+  const [views, setViews] = useState<ViewListItem[]>(() => [{ id: 'grid', name: 'Grid view' }]);
+  const [selectedViewId, setSelectedViewId] = useState<string>('grid');
+
+  const showDragHandle = views.length > 1;
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  const viewIds = useMemo(() => views.map((v) => v.id), [views]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -88,7 +219,7 @@ export default function Sidebar() {
             aria-expanded="false"
             style={{ justifyContent: 'flex-start', backgroundColor: 'white' }}
           >
-            <Plus className="w-4 h-4 flex-none mr1" />
+            <SpriteIcon name="Plus" width={16} height={16} className="flex-none noevents mr1" />
             <span className="truncate noevents button-text-label no-user-select sidebar-text">
               Create new...
             </span>
@@ -173,59 +304,35 @@ export default function Sidebar() {
             <div className="colors-background-default events relative flex flex-col height-full width-full">
               <div className="flex flex-col flex-auto width-full" style={{ minHeight: '144px' }}>
                 <div className="relative flex-auto">
-                  <ul role="listbox" className="css-bi2s67">
-                    {/* Grid view item - selected */}
-                    <li
-                      role="option"
-                      aria-selected="true"
-                      className="pointer flex relative justify-center flex-col pt1 pb1 px1-and-half width-full sidebar-view-item-selected"
-                      style={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                        borderRadius: '3px',
-                        boxSizing: 'border-box',
-                        height: '32.25px',
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <div className="flex-auto flex items-center">
-                          <span className="flex-inline flex-none items-center mr1">
-                            <span
-                              className="flex-none icon"
-                              style={{ color: 'rgb(22, 110, 225)', display: 'flex' }}
-                            >
-                              <SpriteIcon name="GridFeature" width={16} height={16} className="flex-none icon" />
-                            </span>
-                          </span>
-                          <span className="font-family-default text-size-default line-height-3 font-weight-strong truncate sidebar-text" style={{ color: 'rgb(29, 31, 37)' }}>
-                            Grid view
-                          </span>
-                        </div>
-                        <div
-                          tabIndex={0}
-                          role="button"
-                          className="flex items-center justify-center mr-half focus-visible visually-hidden solid"
-                          aria-label="Menu"
-                          aria-expanded="false"
-                          aria-haspopup="true"
-                        >
-                          <MoreHorizontal className="w-4 h-4 colors-foreground-subtle" />
-                        </div>
-                        <div
-                          tabIndex={0}
-                          role="button"
-                          draggable="false"
-                          className="visually-hidden solid dragHandle flex items-center flex-none focus-visible quieter link-unquiet"
-                          style={{ marginRight: '4px' }}
-                        >
-                          <SpriteIcon name="DotsSixVertical" width={16} height={16} className="flex-none icon" />
-                        </div>
-                      </div>
-                      <span
-                        className="font-family-default text-size-small text-color-quieter line-height-4 font-weight-default truncate"
-                        style={{ marginLeft: '24px' }}
-                      ></span>
-                    </li>
-                  </ul>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                    onDragEnd={({ active, over }) => {
+                      if (!over || active.id === over.id) return;
+
+                      setViews((prev) => {
+                        const oldIndex = prev.findIndex((v) => v.id === active.id);
+                        const newIndex = prev.findIndex((v) => v.id === over.id);
+                        if (oldIndex < 0 || newIndex < 0) return prev;
+                        return arrayMove(prev, oldIndex, newIndex);
+                      });
+                    }}
+                  >
+                    <SortableContext items={viewIds} strategy={verticalListSortingStrategy}>
+                      <ul role="listbox" className="css-bi2s67">
+                        {views.map((view) => (
+                          <SortableViewRow
+                            key={view.id}
+                            view={view}
+                            selected={view.id === selectedViewId}
+                            showDragHandle={showDragHandle}
+                            onSelect={() => setSelectedViewId(view.id)}
+                          />
+                        ))}
+                      </ul>
+                    </SortableContext>
+                  </DndContext>
                 </div>
               </div>
             </div>
