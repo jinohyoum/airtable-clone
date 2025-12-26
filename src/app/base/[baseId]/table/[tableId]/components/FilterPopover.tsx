@@ -62,14 +62,40 @@ type FilterCondition = {
 };
 
 // Map UI operator labels to DB operator types
-function mapOperatorToDbType(uiOperator: string): 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan' {
-  const mapping: Record<string, 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan'> = {
+type DbOperator =
+  | 'isEmpty'
+  | 'isNotEmpty'
+  | 'contains'
+  | 'notContains'
+  | 'equals'
+  | 'notEquals'
+  | 'greaterThan'
+  | 'lessThan'
+  | 'greaterThanOrEqual'
+  | 'lessThanOrEqual';
+
+function mapOperatorToDbType(uiOperator: string, columnType?: string): DbOperator {
+  if (columnType === 'number') {
+    const mapping: Record<string, DbOperator> = {
+      '=': 'equals',
+      '≠': 'notEquals',
+      '<': 'lessThan',
+      '>': 'greaterThan',
+      '≤': 'lessThanOrEqual',
+      '≥': 'greaterThanOrEqual',
+      'is empty': 'isEmpty',
+      'is not empty': 'isNotEmpty',
+    };
+    return mapping[uiOperator] ?? 'equals';
+  }
+
+  const mapping: Record<string, DbOperator> = {
     'contains...': 'contains',
     'contains': 'contains',
     'does not contain': 'notContains',
     'is...': 'equals',
     'is': 'equals',
-    'is not...': 'notContains', // Map "is not" to notContains for text
+    'is not...': 'notContains',
     'is empty': 'isEmpty',
     'is not empty': 'isNotEmpty',
     '>': 'greaterThan',
@@ -80,15 +106,29 @@ function mapOperatorToDbType(uiOperator: string): 'isEmpty' | 'isNotEmpty' | 'co
 }
 
 // Map DB operator types back to UI labels
-function mapDbTypeToOperator(dbType: string): string {
+function mapDbTypeToOperator(dbType: string, columnType?: string): string {
+  if (columnType === 'number') {
+    const mapping: Record<string, string> = {
+      equals: '=',
+      notEquals: '≠',
+      lessThan: '<',
+      greaterThan: '>',
+      lessThanOrEqual: '≤',
+      greaterThanOrEqual: '≥',
+      isEmpty: 'is empty',
+      isNotEmpty: 'is not empty',
+    };
+    return mapping[dbType] ?? '=';
+  }
+
   const mapping: Record<string, string> = {
-    'contains': 'contains...',
-    'notContains': 'does not contain',
-    'equals': 'is...',
-    'isEmpty': 'is empty',
-    'isNotEmpty': 'is not empty',
-    'greaterThan': '>',
-    'lessThan': '<',
+    contains: 'contains...',
+    notContains: 'does not contain',
+    equals: 'is...',
+    isEmpty: 'is empty',
+    isNotEmpty: 'is not empty',
+    greaterThan: '>',
+    lessThan: '<',
   };
   return mapping[dbType] ?? 'contains...';
 }
@@ -134,21 +174,26 @@ function SortableFilterRow({
 
   const column = columns.find((c) => c.id === condition.columnId);
   const columnName = column?.name ?? 'Select field';
+  const isNumberColumn = column?.type === 'number';
 
   // Filter columns based on search
   const filteredColumns = columns.filter((col) =>
     col.name.toLowerCase().includes(columnSearchValue.toLowerCase())
   );
 
-  // Define operator options
-  const operatorOptions = [
-    'contains...',
-    'does not contain',
-    'is...',
-    'is not...',
-    'is empty',
-    'is not empty',
-  ];
+  const operatorOptions = useMemo(() => {
+    return isNumberColumn
+      ? ['=', '≠', '<', '>', '≤', '≥', 'is empty', 'is not empty']
+      : ['contains...', 'does not contain', 'is...', 'is not...', 'is empty', 'is not empty'];
+  }, [isNumberColumn]);
+
+  // Ensure current operator is valid for the selected column type
+  useEffect(() => {
+    const defaultOp = isNumberColumn ? '=' : 'contains...';
+    if (operatorOptions.includes(condition.operator)) return;
+    setConditions((prev) => prev.map((c) => (c.id === condition.id ? { ...c, operator: defaultOp } : c)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [condition.columnId, isNumberColumn]);
 
   // Filter operators based on search
   const filteredOperators = operatorOptions.filter((op) =>
@@ -512,7 +557,11 @@ function SortableFilterRow({
                                       }`}
                                       onClick={() => {
                                         setConditions((prev) =>
-                                          prev.map((c) => (c.id === condition.id ? { ...c, columnId: col.id } : c))
+                                          prev.map((c) => {
+                                            if (c.id !== condition.id) return c;
+                                            const defaultOp = col.type === 'number' ? '=' : 'contains...';
+                                            return { ...c, columnId: col.id, operator: defaultOp };
+                                          })
                                         );
                                         setShowColumnDropdown(false);
                                         setColumnSearchValue('');
@@ -789,13 +838,33 @@ const FilterPopover = forwardRef<
     onChangeFilters: (filters: Array<{
       id: string;
       columnId: string;
-      operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+        operator:
+          | 'isEmpty'
+          | 'isNotEmpty'
+          | 'contains'
+          | 'notContains'
+          | 'equals'
+          | 'notEquals'
+          | 'greaterThan'
+          | 'lessThan'
+          | 'greaterThanOrEqual'
+          | 'lessThanOrEqual';
       value?: string;
     }>) => void;
     onDraftFiltersChange: (filters: Array<{
       id: string;
       columnId: string;
-      operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+        operator:
+          | 'isEmpty'
+          | 'isNotEmpty'
+          | 'contains'
+          | 'notContains'
+          | 'equals'
+          | 'notEquals'
+          | 'greaterThan'
+          | 'lessThan'
+          | 'greaterThanOrEqual'
+          | 'lessThanOrEqual';
       value?: string;
     }>) => void;
     onRequestClose?: () => void;
@@ -805,6 +874,11 @@ const FilterPopover = forwardRef<
   const [conditions, setConditions] = useState<FilterCondition[]>([]);
   const [isAddConditionActive, setIsAddConditionActive] = useState(false);
   const didInitConditionsRef = useRef(false);
+
+  const { data: tableMeta } = api.table.getTableMeta.useQuery(
+    { tableId },
+    { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
+  );
   
   // Initialize local conditions from parent filters only when opening (or when table changes).
   // IMPORTANT: do not rehydrate on every parent `filters` change while open, or it will overwrite typing.
@@ -815,24 +889,30 @@ const FilterPopover = forwardRef<
     }
     if (didInitConditionsRef.current) return;
 
+    // Wait for table meta so we can map operators correctly for Number vs Text.
+    if (!tableMeta) return;
+
+    const typeById = new Map(tableMeta.columns.map((c) => [c.id, c.type] as const));
+
     setConditions(
       filters.map((f) => ({
         id: f.id,
         columnId: f.columnId,
-        operator: mapDbTypeToOperator(f.operator),
+        operator: mapDbTypeToOperator(f.operator, typeById.get(f.columnId)),
         value: f.value ?? '',
       })),
     );
     didInitConditionsRef.current = true;
-  }, [isOpen, tableId]);
+  }, [isOpen, tableId, tableMeta]);
 
   // Notify parent of draft changes and auto-apply filters
   useEffect(() => {
     if (isOpen && conditions.length >= 0) {
-      const mappedFilters = conditions.map(c => ({
+      const typeById = tableMeta ? new Map(tableMeta.columns.map((c) => [c.id, c.type] as const)) : null;
+      const mappedFilters = conditions.map((c) => ({
         id: c.id,
         columnId: c.columnId,
-        operator: mapOperatorToDbType(c.operator),
+        operator: mapOperatorToDbType(c.operator, typeById?.get(c.columnId)),
         value: c.value || undefined,
       }));
       
@@ -847,11 +927,6 @@ const FilterPopover = forwardRef<
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conditions, isOpen]);
-  
-  const { data: tableMeta } = api.table.getTableMeta.useQuery(
-    { tableId },
-    { enabled: Boolean(isOpen && tableId && !tableId.startsWith('__creating__')) },
-  );
 
   const { columnOrder, ensureColumnOrder } = useColumnsUi();
 

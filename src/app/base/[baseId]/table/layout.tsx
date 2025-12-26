@@ -18,7 +18,17 @@ import TopNav from './[tableId]/components/TopNav';
 type ViewFilterCondition = {
   id: string;
   columnId: string;
-  operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+  operator:
+    | 'isEmpty'
+    | 'isNotEmpty'
+    | 'contains'
+    | 'notContains'
+    | 'equals'
+    | 'notEquals'
+    | 'greaterThan'
+    | 'lessThan'
+    | 'greaterThanOrEqual'
+    | 'lessThanOrEqual';
   value?: string;
 };
 
@@ -41,8 +51,11 @@ function normalizeViewFilters(raw: unknown): ViewFilterCondition[] {
       operator === 'contains' ||
       operator === 'notContains' ||
       operator === 'equals' ||
+      operator === 'notEquals' ||
       operator === 'greaterThan' ||
-      operator === 'lessThan'
+      operator === 'lessThan' ||
+      operator === 'greaterThanOrEqual' ||
+      operator === 'lessThanOrEqual'
     )) {
       continue;
     }

@@ -116,8 +116,11 @@ export const tableRouter = createTRPCRouter({
                 "contains",
                 "notContains",
                 "equals",
+                "notEquals",
                 "greaterThan",
                 "lessThan",
+                "greaterThanOrEqual",
+                "lessThanOrEqual",
               ]),
               value: z.string().optional(),
             }),
@@ -602,7 +605,7 @@ export const tableRouter = createTRPCRouter({
               keys: z.array(
                 z.object({
                   isBlank: z.boolean(),
-                  sortKey: z.string(),
+                  sortKey: z.union([z.string(), z.number()]),
                 }),
               ),
               id: z.string(),
@@ -630,8 +633,11 @@ export const tableRouter = createTRPCRouter({
                 "contains",
                 "notContains",
                 "equals",
+                "notEquals",
                 "greaterThan",
                 "lessThan",
+                "greaterThanOrEqual",
+                "lessThanOrEqual",
               ]),
               value: z.string().optional(),
             }),
@@ -673,6 +679,7 @@ export const tableRouter = createTRPCRouter({
       // Build filter SQL conditions
       // Each filter is AND-ed together (flat conditions)
       const filterConditions: Prisma.Sql[] = [];
+      const numericRegex = "^-?[0-9]+(\\.[0-9]+)?$";
       
       if (input.filters && input.filters.length > 0) {
         for (const filter of input.filters) {
@@ -726,6 +733,28 @@ export const tableRouter = createTRPCRouter({
               }
               break;
             }
+            case "notEquals": {
+              // Not equal. For numeric values, compare numerically; empty cells count as "not equal".
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      NULLIF(${trimmedExpr}, '') IS NULL
+                      OR (
+                        ${trimmedExpr} ~ ${numericRegex}
+                        AND (${trimmedExpr})::numeric <> ${numValue}
+                      )
+                    )`,
+                  );
+                } else {
+                  filterConditions.push(
+                    Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL OR lower(${trimmedExpr}) <> lower(${value}))`,
+                  );
+                }
+              }
+              break;
+            }
             case "greaterThan": {
               // Number comparison: treat non-numeric as NULL/invalid
               if (value !== undefined && value !== null) {
@@ -734,7 +763,7 @@ export const tableRouter = createTRPCRouter({
                   // Check if the cell value is numeric and greater than the filter value
                   filterConditions.push(
                     Prisma.sql`(
-                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      ${trimmedExpr} ~ ${numericRegex}
                       AND (${trimmedExpr})::numeric > ${numValue}
                     )`,
                   );
@@ -750,8 +779,38 @@ export const tableRouter = createTRPCRouter({
                   // Check if the cell value is numeric and less than the filter value
                   filterConditions.push(
                     Prisma.sql`(
-                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      ${trimmedExpr} ~ ${numericRegex}
                       AND (${trimmedExpr})::numeric < ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            }
+            case "greaterThanOrEqual": {
+              // Number comparison: treat non-numeric as NULL/invalid
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ ${numericRegex}
+                      AND (${trimmedExpr})::numeric >= ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            }
+            case "lessThanOrEqual": {
+              // Number comparison: treat non-numeric as NULL/invalid
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ ${numericRegex}
+                      AND (${trimmedExpr})::numeric <= ${numValue}
                     )`,
                   );
                 }
@@ -807,6 +866,8 @@ export const tableRouter = createTRPCRouter({
             __sortKeys: unknown;
           }>;
 
+      let sortKeyTypes: Array<"text" | "number"> = [];
+
       if (!useSort) {
         const cursorSql =
           cursor?.mode === "order"
@@ -839,12 +900,25 @@ export const tableRouter = createTRPCRouter({
       } else {
         // Build per-rule sort expressions (JSONB text, trimmed, blank grouping, lowercase key)
         const sortExprs = validRules.map((r) => {
+          const colType = table.columns.find((c) => c.id === r.columnId)?.type;
           const valueExpr = Prisma.sql`(r."values"->>${r.columnId})`;
           const trimmedExpr = Prisma.sql`btrim(COALESCE(${valueExpr}, ''))`;
+
+          if (colType === "number") {
+            const isNumericExpr = Prisma.sql`(${trimmedExpr} ~ ${numericRegex})`;
+            // Treat empty or non-numeric as blank so they group at the end.
+            const isBlankExpr = Prisma.sql`(NOT ${isNumericExpr})`;
+            // Numeric sort key; blanks get a stable 0 (and are disambiguated by isBlank).
+            const sortKeyExpr = Prisma.sql`COALESCE(CASE WHEN ${isNumericExpr} THEN (${trimmedExpr})::numeric END, 0)`;
+            return { isBlankExpr, sortKeyExpr, direction: r.direction, sortKeyType: "number" as const };
+          }
+
           const isBlankExpr = Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL)`;
           const sortKeyExpr = Prisma.sql`lower(COALESCE(NULLIF(${trimmedExpr}, ''), ''))`;
-          return { isBlankExpr, sortKeyExpr, direction: r.direction };
+          return { isBlankExpr, sortKeyExpr, direction: r.direction, sortKeyType: "text" as const };
         });
+
+        sortKeyTypes = sortExprs.map((e) => e.sortKeyType);
 
         // Build lexicographic keyset predicate for (isBlank1, sortKey1, isBlank2, sortKey2, ..., id)
         const cursorSql = (() => {
@@ -877,7 +951,14 @@ export const tableRouter = createTRPCRouter({
             // isBlank is always ASC (false first, true last)
             pushCmp(expr.isBlankExpr, "asc", k.isBlank);
             // sortKey follows the rule direction
-            pushCmp(expr.sortKeyExpr, expr.direction, k.sortKey);
+            if (expr.sortKeyType === "number") {
+              const n =
+                typeof k.sortKey === "number" ? k.sortKey : typeof k.sortKey === "string" ? Number(k.sortKey) : 0;
+              pushCmp(expr.sortKeyExpr, expr.direction, Number.isFinite(n) ? n : 0);
+            } else {
+              const s = typeof k.sortKey === "string" ? k.sortKey : String(k.sortKey ?? "");
+              pushCmp(expr.sortKeyExpr, expr.direction, s);
+            }
           }
 
           // Stable tie-breaker: id ASC
@@ -937,7 +1018,7 @@ export const tableRouter = createTRPCRouter({
 
       let nextCursor:
         | { mode: "order"; order: number; id: string }
-        | { mode: "sort"; keys: Array<{ isBlank: boolean; sortKey: string }>; id: string }
+        | { mode: "sort"; keys: Array<{ isBlank: boolean; sortKey: string | number }>; id: string }
         | undefined = undefined;
 
       if (hasMore && rows.length > 0) {
@@ -958,10 +1039,18 @@ export const tableRouter = createTRPCRouter({
             ? ((last as { __sortKeys?: unknown }).__sortKeys as Array<{
                 isBlank?: unknown;
                 sortKey?: unknown;
-              }>).map((k) => ({
-                isBlank: Boolean(k?.isBlank),
-                sortKey: typeof k?.sortKey === "string" ? k.sortKey : "",
-              }))
+              }>).map((k, i) => {
+                const type = sortKeyTypes[i] ?? "text";
+                const raw = k?.sortKey;
+
+                if (type === "number") {
+                  const n =
+                    typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : 0;
+                  return { isBlank: Boolean(k?.isBlank), sortKey: Number.isFinite(n) ? n : 0 };
+                }
+
+                return { isBlank: Boolean(k?.isBlank), sortKey: typeof raw === "string" ? raw : String(raw ?? "") };
+              })
             : [];
 
           nextCursor = {
@@ -1058,8 +1147,11 @@ export const tableRouter = createTRPCRouter({
                 "contains",
                 "notContains",
                 "equals",
+                "notEquals",
                 "greaterThan",
                 "lessThan",
+                "greaterThanOrEqual",
+                "lessThanOrEqual",
               ]),
               value: z.string().optional(),
             }),
@@ -1081,6 +1173,7 @@ export const tableRouter = createTRPCRouter({
 
       // Build filter SQL (same logic as getRows)
       const filterConditions: Prisma.Sql[] = [];
+      const numericRegex = "^-?[0-9]+(\\.[0-9]+)?$";
       
       if (input.filters && input.filters.length > 0) {
         for (const filter of input.filters) {
@@ -1124,13 +1217,33 @@ export const tableRouter = createTRPCRouter({
                 );
               }
               break;
+            case "notEquals":
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      NULLIF(${trimmedExpr}, '') IS NULL
+                      OR (
+                        ${trimmedExpr} ~ ${numericRegex}
+                        AND (${trimmedExpr})::numeric <> ${numValue}
+                      )
+                    )`,
+                  );
+                } else {
+                  filterConditions.push(
+                    Prisma.sql`(NULLIF(${trimmedExpr}, '') IS NULL OR lower(${trimmedExpr}) <> lower(${value}))`,
+                  );
+                }
+              }
+              break;
             case "greaterThan":
               if (value !== undefined && value !== null) {
                 const numValue = parseFloat(value);
                 if (!isNaN(numValue)) {
                   filterConditions.push(
                     Prisma.sql`(
-                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      ${trimmedExpr} ~ ${numericRegex}
                       AND (${trimmedExpr})::numeric > ${numValue}
                     )`,
                   );
@@ -1143,8 +1256,34 @@ export const tableRouter = createTRPCRouter({
                 if (!isNaN(numValue)) {
                   filterConditions.push(
                     Prisma.sql`(
-                      ${trimmedExpr} ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                      ${trimmedExpr} ~ ${numericRegex}
                       AND (${trimmedExpr})::numeric < ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            case "greaterThanOrEqual":
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ ${numericRegex}
+                      AND (${trimmedExpr})::numeric >= ${numValue}
+                    )`,
+                  );
+                }
+              }
+              break;
+            case "lessThanOrEqual":
+              if (value !== undefined && value !== null) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                  filterConditions.push(
+                    Prisma.sql`(
+                      ${trimmedExpr} ~ ${numericRegex}
+                      AND (${trimmedExpr})::numeric <= ${numValue}
                     )`,
                   );
                 }

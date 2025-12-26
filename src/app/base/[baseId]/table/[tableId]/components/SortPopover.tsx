@@ -32,6 +32,11 @@ const BODY_COLOR = 'rgb(29, 31, 37)';
 
 type SortDirection = 'asc' | 'desc';
 
+function getSortDirectionLabel(columnType: string | undefined, direction: SortDirection) {
+  if (columnType === 'number') return direction === 'asc' ? '1 → 9' : '9 → 1';
+  return direction === 'asc' ? 'A → Z' : 'Z → A';
+}
+
 function SpriteIcon({
   name,
   className,
@@ -720,7 +725,7 @@ const SortPopover = forwardRef<
                                   >
                                     {draftRules.map((rule, idx) => {
                                       const col = columnsById.get(rule.columnId);
-                                      const directionLabel = rule.direction === 'asc' ? 'A → Z' : 'Z → A';
+                                      const directionLabel = getSortDirectionLabel(col?.type, rule.direction);
                                       return (
                                         <SortableSortRuleRow
                                           key={`${rule.columnId}-${idx}`}
@@ -884,6 +889,13 @@ const SortPopover = forwardRef<
             <div>
               <div className="colors-background-raised-popover baymax preventGridDeselect stroked1" style={{ borderRadius: 4 }}>
                 <div className="flex flex-column" style={{ boxSizing: 'border-box' }}>
+                  {(() => {
+                    const rule = draftRules[directionMenuIndex];
+                    const col = rule ? columnsById.get(rule.columnId) : undefined;
+                    const ascLabel = getSortDirectionLabel(col?.type, 'asc');
+                    const descLabel = getSortDirectionLabel(col?.type, 'desc');
+                    return (
+                      <>
                   <div
                     role="button"
                     className="px1 py-half pointer"
@@ -901,7 +913,7 @@ const SortPopover = forwardRef<
                       setDirectionMenuIndex(null);
                     }}
                   >
-                    A → Z
+                    {ascLabel}
                   </div>
                   <div
                     role="button"
@@ -920,8 +932,11 @@ const SortPopover = forwardRef<
                       setDirectionMenuIndex(null);
                     }}
                   >
-                    Z → A
+                    {descLabel}
                   </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

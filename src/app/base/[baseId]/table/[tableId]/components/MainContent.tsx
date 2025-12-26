@@ -1328,30 +1328,58 @@ export default function MainContent({
 
     autosaveTimersRef.current.set(cellKey, t);
   }, [updateCellMutation, utils, rowsQueryInput, isOptimisticColumnId]);
+
+  const sanitizeNumberInput = useCallback((raw: string) => {
+    // Keep only: optional leading '-', digits, and a single '.'
+    if (!raw) return '';
+    let out = '';
+    let hasDot = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (!ch) continue;
+      if (ch >= '0' && ch <= '9') {
+        out += ch;
+        continue;
+      }
+      if (ch === '-' && out.length === 0 && i === 0) {
+        out = '-';
+        continue;
+      }
+      if (ch === '.' && !hasDot) {
+        out += '.';
+        hasDot = true;
+        continue;
+      }
+    }
+    return out;
+  }, []);
   
   const handleCellChange = useCallback((rowId: string, columnId: string, newValue: string) => {
     const cellKey = `${rowId}-${columnId}`;
+
+    const columnType = tableMeta?.columns?.find((c) => c.id === columnId)?.type;
+    const nextValue = columnType === 'number' ? sanitizeNumberInput(newValue) : newValue;
 
     // Don't autosave optimistic placeholder columns.
     if (isOptimisticColumnId(columnId)) {
       // Still keep local draft so the user doesn't lose typing while the column is being created.
       setLocalDrafts(prev => {
         const next = new Map(prev);
-        next.set(cellKey, newValue);
+        next.set(cellKey, nextValue);
         return next;
       });
-      setEditValue(newValue);
+      setEditValue(nextValue);
       return;
     }
     
     // Update local draft immediately
     setLocalDrafts(prev => {
       const next = new Map(prev);
-      next.set(cellKey, newValue);
+      next.set(cellKey, nextValue);
       return next;
     });
     
-    setEditValue(newValue);
+    setEditValue(nextValue);
     
     // Update cache immediately - ensure we always return the full structure
     utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
@@ -1363,15 +1391,15 @@ export default function MainContent({
           rows: page.rows.map(row => {
           if (row.id !== rowId) return row;
           
-          return upsertRowCell(row, columnId, newValue);
+          return upsertRowCell(row, columnId, nextValue);
         }),
         })),
         pageParams: oldData.pageParams,
       };
     });
 
-    scheduleAutosave(rowId, columnId, newValue);
-  }, [utils, rowsQueryInput, scheduleAutosave, isOptimisticColumnId, upsertRowCell]);
+    scheduleAutosave(rowId, columnId, nextValue);
+  }, [utils, rowsQueryInput, scheduleAutosave, isOptimisticColumnId, upsertRowCell, tableMeta, sanitizeNumberInput]);
   
   const handleCellSave = useCallback(async (rowId: string, columnId: string, maintainFocus = true) => {
     if (editingCell?.rowId !== rowId || editingCell?.columnId !== columnId) return;
@@ -1383,7 +1411,8 @@ export default function MainContent({
     }
 
     const cellKey = `${rowId}-${columnId}`;
-    const newValue = editValue;
+    const columnType = tableMeta?.columns?.find((c) => c.id === columnId)?.type;
+    const newValue = columnType === 'number' ? sanitizeNumberInput(editValue) : editValue;
 
     committingCellKeyRef.current = cellKey;
 
@@ -1497,6 +1526,7 @@ export default function MainContent({
     editValue,
     allRows,
     tableMeta,
+    sanitizeNumberInput,
     updateCellMutation,
     utils,
     tableId,
