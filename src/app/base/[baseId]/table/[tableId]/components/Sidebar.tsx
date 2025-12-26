@@ -16,18 +16,22 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
 
 function SpriteIcon({
   name,
   width,
   height,
   className,
+  fill,
 }: {
   name: string;
   width: number;
   height: number;
   className?: string;
+  fill?: string;
 }) {
   return (
     <svg
@@ -39,7 +43,7 @@ function SpriteIcon({
       aria-hidden="true"
       focusable="false"
     >
-      <use fill="currentColor" href={`/icons/icon_definitions.svg#${name}`} />
+      <use fill={fill ?? 'currentColor'} href={`${ICON_SPRITE}#${name}`} />
     </svg>
   );
 }
@@ -154,6 +158,13 @@ export default function Sidebar() {
   const [width, setWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
 
+  const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const createMenuPopoverRef = useRef<HTMLDivElement | null>(null);
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [createMenuPos, setCreateMenuPos] = useState<
+    { x: number; y: number; maxH: number; maxW: number } | null
+  >(null);
+
   // Views aren't persisted yet (server router not implemented).
   // Keep the sidebar UI data-driven so it can be wired to DB-backed views later.
   const [views, setViews] = useState<ViewListItem[]>(() => [{ id: 'grid', name: 'Grid view' }]);
@@ -163,6 +174,63 @@ export default function Sidebar() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const viewIds = useMemo(() => views.map((v) => v.id), [views]);
+
+  // Keep popover position in sync when open.
+  useEffect(() => {
+    if (!isCreateMenuOpen) return;
+
+    const compute = () => {
+      const btn = createButtonRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const menuW = 240;
+      const x = Math.min(window.innerWidth - menuW - 8, rect.right + 8);
+      const y = Math.min(window.innerHeight - 80, rect.top);
+      setCreateMenuPos({
+        x,
+        y,
+        maxH: Math.max(120, window.innerHeight - y - 16),
+        maxW: Math.max(240, window.innerWidth - x - 16),
+      });
+    };
+
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', compute, true);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+    };
+  }, [isCreateMenuOpen]);
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!isCreateMenuOpen) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      const pop = createMenuPopoverRef.current;
+      const btn = createButtonRef.current;
+      if (pop?.contains(target)) return;
+      if (btn?.contains(target)) return;
+      setIsCreateMenuOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setIsCreateMenuOpen(false);
+      createButtonRef.current?.focus();
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isCreateMenuOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -212,12 +280,20 @@ export default function Sidebar() {
         <div className="flex-none flex flex-col justify-start pb1">
           {/* Create new button */}
           <button
+            ref={createButtonRef}
+            id="viewSidebarCreateViewButton"
+            data-tutorial-selector-id="viewSidebarCreateViewButton"
             className="pointer items-center justify-center border-box text-decoration-none focus-visible rounded-big border-none colors-foreground-default colors-background-selected-hover px1-and-half button-size-default flex width-full pl1-and-half sidebar-button"
             type="button"
             aria-disabled="false"
             aria-haspopup="true"
-            aria-expanded="false"
+            aria-expanded={isCreateMenuOpen ? 'true' : 'false'}
             style={{ justifyContent: 'flex-start', backgroundColor: 'white' }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsCreateMenuOpen((v) => !v);
+            }}
           >
             <SpriteIcon name="Plus" width={16} height={16} className="flex-none noevents mr1" />
             <span className="truncate noevents button-text-label no-user-select sidebar-text">
@@ -339,6 +415,285 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {isCreateMenuOpen && createMenuPos && (
+        <div
+          ref={createMenuPopoverRef}
+          role="dialog"
+          tabIndex={-1}
+          className="baymax rounded-big focus-visible shadow-elevation-high colors-background-raised-popover light-scrollbar"
+          data-element-owned-by="viewSidebarCreateViewButton"
+          style={{
+            position: 'fixed',
+            inset: '0px auto auto 0px',
+            width: 240,
+            zIndex: 5,
+            transform: `translate3d(${createMenuPos.x}px, ${createMenuPos.y}px, 0px)`,
+            maxHeight: createMenuPos.maxH,
+            maxWidth: createMenuPos.maxW,
+            overflowY: 'auto',
+            fontFamily:
+              '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+            fontSize: 13,
+            fontWeight: 400,
+            lineHeight: '18px',
+            color: 'rgb(29, 31, 37)',
+          }}
+        >
+          <ul role="menu" tabIndex={-1} aria-label="Create new..." className="p1-and-half">
+            <li
+              id="viewSidebarCreateView-grid"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="GridFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(22, 110, 225)"
+              />
+              <span className="truncate flex-auto no-user-select">Grid</span>
+            </li>
+
+            <li
+              id="viewSidebarCreateView-calendar"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="CalendarFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(213, 68, 1)"
+              />
+              <span className="truncate flex-auto no-user-select">Calendar</span>
+            </li>
+
+            <li
+              id="viewSidebarCreateView-gallery"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="GalleryFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(124, 55, 239)"
+              />
+              <span className="truncate flex-auto no-user-select">Gallery</span>
+            </li>
+
+            <li
+              id="viewSidebarCreateView-kanban"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="KanbanFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(4, 138, 14)"
+              />
+              <span className="truncate flex-auto no-user-select">Kanban</span>
+            </li>
+
+            <li
+              id="viewSidebarCreateView-timeline"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="TimelineFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(220, 4, 59)"
+              />
+              <span className="truncate flex-auto no-user-select">
+                Timeline
+                <div className="css-1l4uiyf css-1pi0isa pill px1 flex-inline items-center flex-none text-size-small mx1">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 16 16"
+                    className="flex-none mr-half"
+                    style={{ shapeRendering: 'geometricPrecision' }}
+                  >
+                    <use fill="currentColor" href={`${ICON_SPRITE}#AirtablePlusFill`} />
+                  </svg>
+                  Team
+                </div>
+              </span>
+            </li>
+
+            <li
+              id="viewSidebarCreateView-levels"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="ListFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(13, 82, 172)"
+              />
+              <span className="truncate flex-auto no-user-select">List</span>
+            </li>
+
+            <li
+              id="viewSidebarCreateView-block"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="Gantt"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(13, 127, 120)"
+              />
+              <span className="truncate flex-auto no-user-select">
+                Gantt
+                <div className="css-1l4uiyf css-1pi0isa pill px1 flex-inline items-center flex-none text-size-small mx1">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 16 16"
+                    className="flex-none mr-half"
+                    style={{ shapeRendering: 'geometricPrecision' }}
+                  >
+                    <use fill="currentColor" href={`${ICON_SPRITE}#AirtablePlusFill`} />
+                  </svg>
+                  Team
+                </div>
+              </span>
+            </li>
+
+            <li role="presentation" className="m1 colors-background-selected" style={{ height: 1 }} />
+
+            <li
+              id="viewSidebarCreateView-form"
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="Form"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+                fill="rgb(221, 4, 168)"
+              />
+              <span className="truncate flex-auto no-user-select">Form</span>
+            </li>
+
+            <li role="presentation" className="m1 colors-background-selected" style={{ height: 1 }} />
+
+            <li
+              role="menuitem"
+              tabIndex={-1}
+              className="rounded py1 px1 text-size-default items-center pointer width-full flex"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+              onClick={() => setIsCreateMenuOpen(false)}
+            >
+              <SpriteIcon
+                name="SwimlanesFeature"
+                width={16}
+                height={16}
+                className="flex-none flex-none mr1 colors-foreground-default"
+              />
+              <span className="truncate flex-auto no-user-select">
+                Section
+                <div className="css-1l4uiyf css-1pi0isa pill px1 flex-inline items-center flex-none text-size-small mx1">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 16 16"
+                    className="flex-none mr-half"
+                    style={{ shapeRendering: 'geometricPrecision' }}
+                  >
+                    <use fill="currentColor" href={`${ICON_SPRITE}#AirtablePlusFill`} />
+                  </svg>
+                  Team
+                </div>
+              </span>
+            </li>
+          </ul>
+        </div>
+      )}
 
       {/* Resize handle */}
       <div

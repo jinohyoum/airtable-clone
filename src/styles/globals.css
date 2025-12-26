@@ -218,8 +218,30 @@
 
 /* Business badge colors */
 .css-1pi0isa {
-  background: rgba(2, 132, 199, 0.12); /* sky-600-ish */
-  color: rgb(3, 105, 161); /* sky-700-ish */
+  background: rgba(2, 132, 199, 0.12); /* fallback */
+  color: rgb(3, 105, 161); /* fallback */
+}
+
+/* Airtable "Team" pill (computed style parity) */
+.css-1l4uiyf.css-1pi0isa.pill {
+  background-color: rgb(196, 236, 255);
+  color: rgb(15, 104, 162);
+  box-sizing: border-box;
+  border-radius: 9999px;
+  height: 18px;
+  line-height: 18px;
+  font-size: 11px;
+  font-weight: 400;
+  padding-top: 0;
+  padding-bottom: 0;
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.css-1l4uiyf.css-1pi0isa.pill.px1 {
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 /* -------------------------------------------------------------------------- */
