@@ -1879,7 +1879,8 @@ export default function MainContent({
     count: rowCountData?.count ?? allRows.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 32, // 32px = h-8 (fixed height for smoother scrolling)
-    overscan: 30, // Render 30 extra rows above/below viewport for smoother scrolling
+    overscan: 60, // Slightly larger overscan for smoother fast wheel/trackpad scrolling
+    getItemKey: (index) => rowByIndex(index)?.id ?? index, // Keep keys stable to reduce remounts while editing
     onChange: (_instance, sync) => {
       // Avoid React 18 "flushSync during render" by scheduling updates.
       if (sync) {
@@ -2362,6 +2363,8 @@ export default function MainContent({
                 left: 0,
                 width: '100%',
                 transform: `translateY(${paddingTop}px)`,
+                willChange: 'transform',
+                contain: 'layout paint',
               }}
             >
           <div className="flex min-w-0">
