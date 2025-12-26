@@ -28,7 +28,7 @@ export default function LeftSidebarNarrow() {
             style={{ width: '24px', height: '24px' }}
           >
             <div className="animate flex flex-auto items-center justify-center" style={{ transform: 'scale(1)' }}>
-              <div style={{ position: 'relative', top: '2px' }}>
+              <div style={{ position: 'relative', top: '3.5px' }}>
                 <svg 
                   width="24" 
                   height="20.4" 
@@ -78,7 +78,7 @@ export default function LeftSidebarNarrow() {
               display: 'block',
               width: '36px',
               height: '36px',
-              transform: 'translate(0px, 2px)',
+              transform: 'translate(0px, 3.5px)',
             }}
           />
         </button>
