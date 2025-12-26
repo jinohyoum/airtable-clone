@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { api } from "~/trpc/server";
 import Link from "next/link";
 import BasePageHeader from "./_components/BasePageHeader";
+import BaseSidebar from "./_components/BaseSidebar";
 
 export default async function BasesPage() {
   const session = await auth();
@@ -12,12 +13,15 @@ export default async function BasesPage() {
   const bases = await api.base.list();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col" style={{ height: '100vh', backgroundColor: 'rgb(249, 250, 251)' }}>
       <BasePageHeader />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-gray-900">Home</h1>
-        </div>
+      <div className="flex flex-1" style={{ overflow: 'hidden' }}>
+        <BaseSidebar />
+        <div className="flex-1" style={{ overflowY: 'auto' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-gray-900">Home</h1>
+            </div>
 
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-medium text-gray-900">All Bases</h2>
@@ -40,6 +44,8 @@ export default async function BasesPage() {
             ))}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );
