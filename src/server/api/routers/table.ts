@@ -649,6 +649,7 @@ export const tableRouter = createTRPCRouter({
       const { tableId, limit } = input;
       const q = input.search?.trim();
       const search = q && q.length > 0 ? q : undefined;
+      const normalizedSearch = search ? search.toLowerCase() : undefined;
 
       // Get columns to transform JSONB values to cells
       const table = await ctx.db.table.findUnique({
@@ -827,14 +828,9 @@ export const tableRouter = createTRPCRouter({
           : Prisma.empty;
 
       // Search behavior (take-home spec): case-insensitive "contains" across ALL cell values.
-      // We do this directly against the JSONB `values` column so search works even if `searchText`
-      // is stale/empty for older data.
-      const searchSql = search
-        ? Prisma.sql`AND EXISTS (
-            SELECT 1
-            FROM jsonb_each_text(r."values") AS kv(key, value)
-            WHERE kv.value ILIKE '%' || ${search} || '%'
-          )`
+      // Use the denormalized `searchText` so Postgres can use the trigram GIN index at scale.
+      const searchSql = normalizedSearch
+        ? Prisma.sql`AND r."searchText" ILIKE '%' || ${normalizedSearch} || '%'`
         : Prisma.empty;
 
       const baseSelect = Prisma.sql`
@@ -1162,6 +1158,7 @@ export const tableRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const q = input.search?.trim();
       const search = q && q.length > 0 ? q : undefined;
+      const normalizedSearch = search ? search.toLowerCase() : undefined;
 
       // Fetch columns so we can validate filter columnIds.
       const table = await ctx.db.table.findUnique({
@@ -1298,12 +1295,8 @@ export const tableRouter = createTRPCRouter({
           ? Prisma.sql`AND (${Prisma.join(filterConditions, " AND ")})`
           : Prisma.empty;
 
-      const searchSql = search
-        ? Prisma.sql`AND EXISTS (
-            SELECT 1
-            FROM jsonb_each_text(r."values") AS kv(key, value)
-            WHERE kv.value ILIKE '%' || ${search} || '%'
-          )`
+      const searchSql = normalizedSearch
+        ? Prisma.sql`AND r."searchText" ILIKE '%' || ${normalizedSearch} || '%'`
         : Prisma.empty;
 
       const countQuery = Prisma.sql`
