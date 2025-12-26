@@ -23,11 +23,13 @@ export default function MainContent({
   isSearchOpen = false,
   search,
   sortRules,
+  autoSortEnabled = true,
   filters,
 }: {
   isSearchOpen?: boolean;
   search?: string;
   sortRules?: Array<{ columnId: string; direction: 'asc' | 'desc' }>;
+  autoSortEnabled?: boolean;
   filters?: Array<{
     id: string;
     columnId: string;
@@ -53,7 +55,9 @@ export default function MainContent({
   const PAGE_SIZE = 1000 as const;
 
   // sortRules is already normalized in applySortRules, so use it directly
-  const normalizedSortRules = sortRules?.length ? sortRules : undefined;
+  // Keep fetching with sortRules even when auto-sort is off; we only suppress UI highlighting.
+  const normalizedSortRulesForQuery = sortRules?.length ? sortRules : undefined;
+  const normalizedSortRulesForUi = autoSortEnabled ? normalizedSortRulesForQuery : undefined;
 
   // Normalize filters for API (map to the shape expected by the router)
   const normalizedFilters = useMemo(() => {
@@ -65,7 +69,7 @@ export default function MainContent({
     }));
   }, [filters]);
 
-  const sortSignature = useMemo(() => JSON.stringify(normalizedSortRules ?? []), [normalizedSortRules]);
+  const sortSignature = useMemo(() => JSON.stringify(normalizedSortRulesForQuery ?? []), [normalizedSortRulesForQuery]);
   const filterSignature = useMemo(() => JSON.stringify(normalizedFilters ?? []), [normalizedFilters]);
 
   // tRPC utils + rows query key are used throughout (including in early effects), so define them up-front.
@@ -75,7 +79,7 @@ export default function MainContent({
       tableId, 
       limit: PAGE_SIZE,
       search, 
-      sortRules: normalizedSortRules,
+      sortRules: normalizedSortRulesForQuery,
       filters: normalizedFilters,
     }),
     // Use the stringified signatures so identical-content new references don't retrigger.
@@ -97,9 +101,9 @@ export default function MainContent({
 
   const sortedColumnIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const r of normalizedSortRules ?? []) ids.add(r.columnId);
+    for (const r of normalizedSortRulesForUi ?? []) ids.add(r.columnId);
     return ids;
-  }, [normalizedSortRules]);
+  }, [normalizedSortRulesForUi]);
 
   // Track filtered columns (only those with non-empty values)
   const filteredColumnIds = useMemo(() => {
@@ -548,7 +552,7 @@ export default function MainContent({
       tableId: tableId ?? "",
       limit: PAGE_SIZE, // Fetch 1000 rows per page to reduce paging boundaries during scroll
       search,
-      sortRules: normalizedSortRules,
+      sortRules: normalizedSortRulesForQuery,
       filters: normalizedFilters,
     },
     {
@@ -716,7 +720,7 @@ export default function MainContent({
       console.log('onMutate called:', { clientRowId, afterRowId });
       
       const hasSearchFilter = Boolean(search && search.trim().length > 0);
-      const hasSort = Boolean(normalizedSortRules && normalizedSortRules.length > 0);
+      const hasSort = Boolean(normalizedSortRulesForQuery && normalizedSortRulesForQuery.length > 0);
 
       // Cancel outgoing refetches - must match the query key exactly
       await utils.table.getRows.cancel(rowsQueryInput);
@@ -975,7 +979,7 @@ export default function MainContent({
       
       // When sort is active, defer re-sorting until focus leaves the created row
       // (prevents the row from jumping away while the user is still interacting with it).
-      if (normalizedSortRules && normalizedSortRules.length > 0) {
+      if (autoSortEnabled && normalizedSortRulesForQuery && normalizedSortRulesForQuery.length > 0) {
         pendingResortAfterCreateRef.current = { rowId: newRow.id, sortSignature };
       }
     },
@@ -1492,8 +1496,9 @@ export default function MainContent({
         }
       }
 
-      // If this column is part of the active sort, refetch so the row repositions after blur/commit.
-      if (sortedColumnIds.has(columnId)) {
+      // Only auto-resort when auto-sort UX is enabled.
+      // (When auto-sort is off, keep the grid stable and avoid sort/highlight behavior.)
+      if (autoSortEnabled && sortedColumnIds.has(columnId)) {
         void utils.table.getRows.invalidate(rowsQueryInput);
       }
     } else {

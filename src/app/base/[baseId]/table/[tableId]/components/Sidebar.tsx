@@ -192,12 +192,52 @@ export default function Sidebar({
 
   const isCreatingViewRef = useRef(false);
 
-  // Local-only ordering (does not persist).
+  // Local ordering (persisted per table).
   const [orderedViewIds, setOrderedViewIds] = useState<string[]>([]);
+
+  const viewOrderStorageKey = useMemo(() => {
+    if (!tableId) return null;
+    if (tableId.startsWith('__creating__')) return null;
+    return `airtable-clone:viewOrder:${tableId}`;
+  }, [tableId]);
+
+  const hasRestoredFromStorageRef = useRef(false);
+
+  const readStoredViewOrder = (): string[] | null => {
+    if (typeof window === 'undefined') return null;
+    if (!viewOrderStorageKey) return null;
+    try {
+      const raw = window.localStorage.getItem(viewOrderStorageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return null;
+      const ids = parsed.filter((v): v is string => typeof v === 'string' && v.length > 0);
+      return ids.length > 0 ? ids : null;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const next = views.map((v) => v.id);
+    if (next.length === 0) return;
+
     setOrderedViewIds((prev) => {
+      // On first load for this table, try restoring from storage.
+      if (!hasRestoredFromStorageRef.current && prev.length === 0) {
+        hasRestoredFromStorageRef.current = true;
+        const stored = readStoredViewOrder();
+        if (stored && stored.length > 0) {
+          const existing = new Set(next);
+          const normalized = stored.filter((id) => existing.has(id));
+          for (const id of next) {
+            if (!normalized.includes(id)) normalized.push(id);
+          }
+          return normalized;
+        }
+      }
+
+      // Default behavior: keep current order but reconcile with server list.
       if (prev.length === 0) return next;
       const existing = new Set(next);
       const normalized = prev.filter((id) => existing.has(id));
@@ -206,7 +246,26 @@ export default function Sidebar({
       }
       return normalized;
     });
-  }, [views]);
+  }, [views, viewOrderStorageKey]);
+
+  // Reset restore flag when switching tables.
+  useEffect(() => {
+    hasRestoredFromStorageRef.current = false;
+    // Allow `views` effect to repopulate based on the new table.
+    setOrderedViewIds([]);
+  }, [viewOrderStorageKey]);
+
+  // Persist ordering whenever the user changes it (or views change).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!viewOrderStorageKey) return;
+    if (orderedViewIds.length === 0) return;
+    try {
+      window.localStorage.setItem(viewOrderStorageKey, JSON.stringify(orderedViewIds));
+    } catch {
+      // Best-effort only.
+    }
+  }, [orderedViewIds, viewOrderStorageKey]);
 
   const normalizeLegacyGridName = (name: string) => {
     // Canonical naming:

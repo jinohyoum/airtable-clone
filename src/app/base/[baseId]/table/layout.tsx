@@ -351,11 +351,21 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [sortPos, setSortPos] = useState<{ x: number; y: number; maxH: number } | null>(null);
   const sortButtonRef = useRef<HTMLDivElement | null>(null);
   const sortPopoverRef = useRef<HTMLDivElement | null>(null);
+  const [autoSortEnabled, setAutoSortEnabled] = useState(true);
+
+  const autoSortStorageKey = useMemo(() => {
+    if (!tableId) return null;
+    // Persist per view so each view can remember its own UX preference.
+    // If view isn't known yet, avoid writing/reading to prevent leaks across tables.
+    return activeViewId && activeViewId.length > 0
+      ? `airtable-clone:autoSortEnabled:${tableId}:${activeViewId}`
+      : null;
+  }, [tableId, activeViewId]);
   const [sortRules, setSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
   const [draftSortRules, setDraftSortRules] = useState<Array<{ columnId: string; direction: 'asc' | 'desc' }>>([]);
 
   const sortCountForButton = isSortOpen ? draftSortRules.length : sortRules.length;
-  const isSortActiveForButton = sortCountForButton > 0;
+  const isSortActiveForButton = autoSortEnabled && sortCountForButton > 0;
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filterPos, setFilterPos] = useState<{ x: number; y: number; maxH: number } | null>(null);
@@ -523,6 +533,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setHideFieldsPos(null);
     setIsSortOpen(false);
     setSortPos(null);
+    setAutoSortEnabled(true);
     setSortRules([]);
     setIsFilterOpen(false);
     setFilterPos(null);
@@ -587,6 +598,34 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     if (!views || !activeViewId) return null;
     return views.find((v) => v.id === activeViewId) ?? null;
   }, [views, activeViewId]);
+
+  // Restore remembered auto-sort preference when entering a view.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!autoSortStorageKey) return;
+    try {
+      const raw = window.localStorage.getItem(autoSortStorageKey);
+      if (raw === null) return;
+      if (raw === 'true') setAutoSortEnabled(true);
+      if (raw === 'false') setAutoSortEnabled(false);
+    } catch {
+      // Best-effort only.
+    }
+  }, [autoSortStorageKey]);
+
+  const setAutoSortEnabledAndPersist = useCallback(
+    (next: boolean) => {
+      setAutoSortEnabled(next);
+      if (typeof window === 'undefined') return;
+      if (!autoSortStorageKey) return;
+      try {
+        window.localStorage.setItem(autoSortStorageKey, String(next));
+      } catch {
+        // Best-effort only.
+      }
+    },
+    [autoSortStorageKey],
+  );
 
   // Apply the selected view's saved config to UI state.
   useEffect(() => {
@@ -1242,6 +1281,8 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         isOpen={isSortOpen}
                         position={sortPos}
                         sortRules={sortRules}
+                        autoSortEnabled={autoSortEnabled}
+                        onAutoSortEnabledChange={setAutoSortEnabledAndPersist}
                         onChangeSortRules={applySortRules}
                         onDraftRulesChange={setDraftSortRules}
                         onRequestClose={() => {
@@ -1664,6 +1705,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                 isSearchOpen={isSearchOpen}
                 search={search}
                 sortRules={sortRules}
+                autoSortEnabled={autoSortEnabled}
                 filters={effectiveFiltersForQuery}
               />
               {/* Keep children mounted for route completeness */}

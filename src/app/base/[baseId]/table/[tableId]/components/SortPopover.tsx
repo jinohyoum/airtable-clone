@@ -216,12 +216,24 @@ const SortPopover = forwardRef<
     isOpen: boolean;
     position: { x: number; y: number; maxH: number } | null;
     sortRules: Array<{ columnId: string; direction: SortDirection }>;
+    autoSortEnabled: boolean;
+    onAutoSortEnabledChange: (next: boolean) => void;
     onChangeSortRules: (next: Array<{ columnId: string; direction: SortDirection }>) => void;
     onDraftRulesChange?: (draft: Array<{ columnId: string; direction: SortDirection }>) => void;
     onRequestClose?: () => void;
   }
 >(function SortPopover(
-  { tableId, isOpen, position, sortRules, onChangeSortRules, onDraftRulesChange, onRequestClose },
+  {
+    tableId,
+    isOpen,
+    position,
+    sortRules,
+    autoSortEnabled,
+    onAutoSortEnabledChange,
+    onChangeSortRules,
+    onDraftRulesChange,
+    onRequestClose,
+  },
   ref,
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -249,7 +261,7 @@ const SortPopover = forwardRef<
 
   // Draft rules: stage edits while the popover is open; commit only when clicking "Sort".
   const [draftRules, setDraftRules] = useState(sortRules);
-  const [autoSort, setAutoSort] = useState(true);
+  const autoSort = autoSortEnabled;
 
   // Let the toolbar reflect how many sorts are configured *while editing*,
   // even before the user clicks "Sort" to commit.
@@ -332,7 +344,6 @@ const SortPopover = forwardRef<
     setQuery('');
     setPanel(sortRules.length > 0 ? 'config' : 'chooseField');
     setEditingRuleIndex(null);
-    setAutoSort(true);
     setIsAddSortMenuOpen(false);
     setAddSortQuery('');
     setAddSortMenuPos(null);
@@ -822,7 +833,7 @@ const SortPopover = forwardRef<
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setAutoSort((v) => !v);
+                              onAutoSortEnabledChange(!autoSortEnabled);
                             }}
                           >
                             <SwitchPill on={autoSort} />
