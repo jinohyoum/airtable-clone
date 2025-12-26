@@ -8,6 +8,7 @@
 :root {
   /* Airtable palette tokens used by the DOM we're matching */
   --palette-green-green: rgb(4, 138, 14);
+  --colors-foreground-default: rgb(29, 31, 37);
 }
 
 /* Hide scrollbars (keep scroll functionality) */
@@ -136,6 +137,10 @@
 
 .pl2 {
   padding-left: 16px;
+}
+
+.pl1 {
+  padding-left: 8px;
 }
 
 .gap1 {
@@ -603,6 +608,36 @@
 
 .nowrap {
   white-space: nowrap;
+}
+
+.pr1-and-half {
+  padding-right: 12px;
+}
+
+.border-right {
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.border-top {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.border-bottom {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.colors-background-raised-surface {
+  background-color: rgb(255, 255, 255);
+}
+
+.animate-background-color {
+  transition-property: background-color;
+  transition-duration: 0.085s;
+  transition-timing-function: ease-in;
+}
+
+.colors-background-raised-control-hover-hover:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .darken1 {

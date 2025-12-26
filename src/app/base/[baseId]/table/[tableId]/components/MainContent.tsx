@@ -13,6 +13,7 @@ import { api } from '~/trpc/react';
 import { useColumnsUi } from './ColumnsUiContext';
 import { getColumnIconName } from './columnIcons';
 import FieldTypePicker from './FieldTypePicker';
+import AddRecordButton from './AddRecordButton';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
 
@@ -2743,11 +2744,12 @@ export default function MainContent({
       </div>
 
       {/* Bottom status bar */}
-      <div className="h-9 border-t border-gray-200 flex items-center px-4 bg-gray-50 flex-shrink-0">
+      <div className="h-9 border-t border-gray-200 flex items-center px-4 bg-gray-50 flex-shrink-0 relative">
         <span className="text-xs text-gray-600">
           {rowCountData?.count ?? allRows.length} {(rowCountData?.count ?? allRows.length) === 1 ? 'record' : 'records'}
           {isFetchingNextPage && ' • Loading more...'}
         </span>
+        <AddRecordButton />
       </div>
 
       {/* Horizontal scrollbar */}
