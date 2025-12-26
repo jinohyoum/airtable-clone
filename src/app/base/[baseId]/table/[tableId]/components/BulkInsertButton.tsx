@@ -38,11 +38,11 @@ export default function BulkInsertButton() {
 
       // Reset the infinite query cache completely so it starts fresh with new data
       // This clears all cached pages so the query will rebuild from scratch
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search: undefined }, undefined);
+      utils.table.getRows.setInfiniteData({ tableId, limit: 1000, search: undefined }, undefined);
       
       // Invalidate to trigger refetch - this will fetch the first page with updated data
       // The query will automatically refetch since it's active (being used by MainContent)
-      await utils.table.getRows.invalidate({ tableId, limit: 500, search: undefined });
+      await utils.table.getRows.invalidate({ tableId, limit: 1000, search: undefined });
       
       // Also invalidate the count query if it exists
       void utils.table.getRowCount.invalidate({ tableId, search: undefined });

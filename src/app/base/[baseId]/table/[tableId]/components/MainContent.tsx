@@ -40,6 +40,8 @@ export default function MainContent({
   const hasTableId = tableId.length > 0;
   const isCreatingTable = hasTableId ? tableId.startsWith('__creating__') : false;
 
+  const PAGE_SIZE = 1000 as const;
+
   // sortRules is already normalized in applySortRules, so use it directly
   const normalizedSortRules = sortRules?.length ? sortRules : undefined;
 
@@ -61,13 +63,13 @@ export default function MainContent({
   const rowsQueryInput = useMemo(
     () => ({ 
       tableId, 
-      limit: 500 as const, 
+      limit: PAGE_SIZE,
       search, 
       sortRules: normalizedSortRules,
       filters: normalizedFilters,
     }),
     // Use the stringified signatures so identical-content new references don't retrigger.
-    [tableId, search, sortSignature, filterSignature],
+    [tableId, PAGE_SIZE, search, sortSignature, filterSignature],
   );
 
   // When the user applies Sort in the toolbar, we want to trigger the global "Saving…" UI
@@ -534,7 +536,7 @@ export default function MainContent({
   } = api.table.getRows.useInfiniteQuery(
     { 
       tableId: tableId ?? "",
-      limit: 500, // Fetch 500 rows per page for smoother scrolling
+      limit: PAGE_SIZE, // Fetch 1000 rows per page to reduce paging boundaries during scroll
       search,
       sortRules: normalizedSortRules,
       filters: normalizedFilters,
@@ -547,6 +549,11 @@ export default function MainContent({
       refetchOnWindowFocus: false,
     },
   );
+
+  // Only show the inline “add row” row when we've reached the true end of the dataset.
+  // During normal infinite scrolling, this prevents the + row UI from flashing into view
+  // near the loaded edge (which makes paging feel non-seamless).
+  const showInlineAddRow = hasNextPage === false && !isFetchingNextPage;
 
   // Listen for "sort applied" events from the toolbar.
   useEffect(() => {
@@ -1867,9 +1874,10 @@ export default function MainContent({
     },
   });
 
-  // Prefetch next page when user scrolls close to the loaded edge
-  // This ensures seamless scrolling - fetch before user hits the bottom
-  const PREFETCH_THRESHOLD = 60; // Fetch when within 60 rows of loaded edge
+  // Prefetch next page when user scrolls close to the loaded edge.
+  // For a “seamless” Airtable feel, we intentionally prefetch *earlier* than you might expect,
+  // so fast trackpad/scroll-wheel usage doesn't hit a visible loading boundary.
+  const PREFETCH_THRESHOLD = 250; // Fetch when within 250 rows of loaded edge
   useEffect(() => {
     const virtualItems = rowVirtualizer.getVirtualItems();
     if (virtualItems.length === 0) return;
@@ -2499,39 +2507,40 @@ export default function MainContent({
                 })}
                     </tbody>
                   </table>
-                  {/* Add row button at the end - always visible */}
-                  <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-                    <tbody>
-                      <tr
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredRow('add')}
-                        onMouseLeave={() => setHoveredRow(null)}
-                        onClick={() => handleCreateRow()}
-                        title="Insert new record in grid"
-                      >
-                        <td
-                          className={`w-[84px] h-[31px] p-0 align-middle ${
-                            hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
-                          }`}
+                  {/* Add row button at the end (only when fully loaded) */}
+                  {showInlineAddRow && (
+                    <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                      <tbody>
+                        <tr
+                          className="cursor-pointer"
+                          onMouseEnter={() => setHoveredRow('add')}
+                          onMouseLeave={() => setHoveredRow(null)}
+                          onClick={() => handleCreateRow()}
+                          title="Insert new record in grid"
                         >
-                          <div
-                            className="dataRow ghost leftPane rowInsertionEnabled"
-                            data-tutorial-selector-id="ghostRowLeftPane"
-                            aria-label="Insert new record in grid"
-                            title="You can also insert a new record anywhere by pressing Shift-Enter"
+                          <td
+                            className={`w-[84px] h-[31px] p-0 align-middle ${
+                              hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                            }`}
                           >
-                            <div className="rowNumber">
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 16 16"
-                                className="flex-none icon"
-                                style={{ shapeRendering: 'geometricPrecision' }}
-                              >
-                                <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
-                              </svg>
+                            <div
+                              className="dataRow ghost leftPane rowInsertionEnabled"
+                              data-tutorial-selector-id="ghostRowLeftPane"
+                              aria-label="Insert new record in grid"
+                              title="You can also insert a new record anywhere by pressing Shift-Enter"
+                            >
+                              <div className="rowNumber">
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 16 16"
+                                  className="flex-none icon"
+                                  style={{ shapeRendering: 'geometricPrecision' }}
+                                >
+                                  <use fill="currentColor" href={`${ICON_SPRITE}#Plus`} />
+                                </svg>
+                              </div>
                             </div>
-                          </div>
                         </td>
                         <td
                           className={`w-[180px] h-[31px] p-0 align-middle ${
@@ -2540,9 +2549,10 @@ export default function MainContent({
                         >
                           <div className="h-[31px]" />
                         </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
           </div>
 
                 {/* Middle body (other cells) */}
@@ -2705,37 +2715,39 @@ export default function MainContent({
                 })}
                     </tbody>
                   </table>
-                  {/* Add row button at the end - always visible */}
-                  <table
-                    style={{
-                      borderCollapse: 'separate',
-                      borderSpacing: 0,
-                      width: middleTableWidthPx,
-                      tableLayout: 'fixed',
-                    }}
-                  >
-                    <tbody>
-                      <tr
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredRow('add')}
-                        onMouseLeave={() => setHoveredRow(null)}
-                        onClick={() => handleCreateRow()}
-                        title="Insert new record in grid"
-                      >
-                        {displayColumns.slice(1).map((col) => (
-                          <td
-                            key={col.id}
-                            className={`w-[180px] h-8 p-0 align-middle ${
-                              hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
-                            }`}
-                          >
-                            <div className="h-8 pl-3 pr-2" />
-                          </td>
-                        ))}
-                        <td className="w-[94px] h-8 border-0 bg-transparent" />
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Add row button at the end (only when fully loaded) */}
+                  {showInlineAddRow && (
+                    <table
+                      style={{
+                        borderCollapse: 'separate',
+                        borderSpacing: 0,
+                        width: middleTableWidthPx,
+                        tableLayout: 'fixed',
+                      }}
+                    >
+                      <tbody>
+                        <tr
+                          className="cursor-pointer"
+                          onMouseEnter={() => setHoveredRow('add')}
+                          onMouseLeave={() => setHoveredRow(null)}
+                          onClick={() => handleCreateRow()}
+                          title="Insert new record in grid"
+                        >
+                          {displayColumns.slice(1).map((col) => (
+                            <td
+                              key={col.id}
+                              className={`w-[180px] h-8 p-0 align-middle ${
+                                hoveredRow === 'add' ? 'bg-gray-50' : 'bg-white'
+                              }`}
+                            >
+                              <div className="h-8 pl-3 pr-2" />
+                            </td>
+                          ))}
+                          <td className="w-[94px] h-8 border-0 bg-transparent" />
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
           </div>

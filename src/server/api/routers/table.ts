@@ -589,7 +589,7 @@ export const tableRouter = createTRPCRouter({
     .input(
       z.object({
         tableId: z.string(),
-        limit: z.number().min(1).max(500).default(200),
+        limit: z.number().min(1).max(2000).default(200),
         cursor: z
           .discriminatedUnion("mode", [
             z.object({

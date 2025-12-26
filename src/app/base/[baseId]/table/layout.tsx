@@ -2,8 +2,6 @@
 
 import type { ReactNode } from 'react';
 
-
-import BulkInsertButton from './[tableId]/components/BulkInsertButton';
 import { useParams } from 'next/navigation';
 import { forwardRef, useDeferredValue, useMemo, useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { api } from '~/trpc/react';
@@ -744,15 +742,34 @@ export default function TableLayout({ children }: { children: ReactNode }) {
         count: totalRows,
       });
 
-      // Invalidate queries with current filters
-      const normalizedFilters = filters.map(f => ({
-        columnId: f.columnId,
-        operator: f.operator,
-        value: f.value,
-      }));
+      // Invalidate the *active* infinite rows query key so totalCount/paging updates immediately.
+      const normalizedFilters =
+        effectiveFiltersForQuery.length > 0
+          ? effectiveFiltersForQuery.map((f) => ({
+              columnId: f.columnId,
+              operator: f.operator,
+              value: f.value,
+            }))
+          : undefined;
+
+      const normalizedSortRules =
+        sortRules.length > 0
+          ? sortRules.map((r) => ({
+              columnId: r.columnId,
+              direction: r.direction,
+            }))
+          : undefined;
+
+      const rowsQueryInput = {
+        tableId,
+        limit: 1000,
+        search,
+        sortRules: normalizedSortRules,
+        filters: normalizedFilters,
+      };
       
-      utils.table.getRows.setInfiniteData({ tableId, limit: 500, search, filters: normalizedFilters }, undefined);
-      await utils.table.getRows.invalidate({ tableId, limit: 500, search, filters: normalizedFilters });
+      utils.table.getRows.setInfiniteData(rowsQueryInput, undefined);
+      await utils.table.getRows.invalidate(rowsQueryInput);
       void utils.table.getRowCount.invalidate({ tableId, search, filters: normalizedFilters });
     } catch (error) {
       console.error('Bulk insert error:', error);
