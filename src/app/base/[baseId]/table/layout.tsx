@@ -395,7 +395,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     if (searchCaughtUp && filtersCaughtUp) setViewSwitchSeq(0);
   }, [viewSwitchSeq, deferredSearchInput, searchInput, deferredFilters, filters]);
 
-  const search = isViewSwitching ? immediateSearch : deferredSearch;
+  const search = isSearchOpen ? (isViewSwitching ? immediateSearch : deferredSearch) : undefined;
   const effectiveFiltersForQuery = isViewSwitching ? filters : deferredFilters;
 
   // Keep filter UI typing responsive by scheduling filter application as a transition.
@@ -554,6 +554,11 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     if (!views || !views.some((v) => v.id === activeViewId)) return;
     lastSelectedViewIdByTableIdRef.current[tableId] = activeViewId;
   }, [tableId, activeViewId, views]);
+
+  // Close search UI when switching views so it "goes away" and stops searching
+  useEffect(() => {
+    setIsSearchOpen(false);
+  }, [activeViewId]);
 
   // Choose an initial view for the table.
   useEffect(() => {
@@ -1438,7 +1443,13 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                     marginLeft: '6px', // bring magnifier slightly left
                   }}
                   onClick={() => {
-                    setIsSearchOpen(!isSearchOpen);
+                    if (isSearchOpen) {
+                      // Closing search should also stop searching immediately
+                      setSearchInput('');
+                      setIsSearchOpen(false);
+                    } else {
+                      setIsSearchOpen(true);
+                    }
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';

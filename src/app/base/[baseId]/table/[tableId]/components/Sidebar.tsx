@@ -353,13 +353,14 @@ export default function Sidebar({
     setIsViewConfigDialogOpen(false);
     setIsCreateMenuOpen(false);
     onRequestResetViewConfig?.();
-    onCreatedView(optimistic);
-
     utils.table.getViews.setData({ tableId }, (old) => {
       if (!old) return [optimistic];
       if (old.some((v) => v.id === tempId)) return old;
       return [...old, optimistic] as typeof old;
     });
+
+    // Select after the optimistic view is present in the `views` list.
+    onCreatedView(optimistic);
 
     try {
       const created = await createViewMutation.mutateAsync({ tableId, name: trimmed });
@@ -367,8 +368,11 @@ export default function Sidebar({
         if (!old) return old;
         return old.map((v) => (v.id === tempId ? (created as unknown as typeof v) : v));
       });
-      await utils.table.getViews.invalidate({ tableId });
+      // Select immediately after swapping temp id -> real id.
+      // (If we wait for `invalidate()`, the table layout can temporarily see
+      // `activeViewId` missing and snap back to the first view.)
       onCreatedView(created as ViewListItem);
+      void utils.table.getViews.invalidate({ tableId });
     } catch (e) {
       console.warn('Failed to create view', e);
       // Roll back optimistic entry.

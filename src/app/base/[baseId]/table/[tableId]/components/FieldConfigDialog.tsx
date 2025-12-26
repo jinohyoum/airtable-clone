@@ -63,6 +63,11 @@ const FieldConfigDialog = forwardRef<HTMLDivElement, FieldConfigDialogProps>(
 
     if (!isOpen || !position || !fieldType) return null;
 
+    const helperText =
+      fieldType.id === 'number'
+        ? 'Enter a number, or prefill each new cell with a default value.'
+        : 'Enter text, or prefill each new cell with a default value.';
+
     return (
       <div
         className="baymax"
@@ -206,7 +211,7 @@ const FieldConfigDialog = forwardRef<HTMLDivElement, FieldConfigDialogProps>(
             <div className="animate-opacity-fade-in animate-slow pb-half">
               <div className="relative">
                 <div className="quiet mt-half px2 sm-vh-hide max-width-2 mb2">
-                  <span>Enter text, or prefill each new cell with a default value.</span>
+                  <span>{helperText}</span>
                 </div>
                 <div className="typeOptionsContainer relative">
                   <div className="px2 pb-half">
