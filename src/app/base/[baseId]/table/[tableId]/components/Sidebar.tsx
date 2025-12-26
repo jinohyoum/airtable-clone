@@ -17,6 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, type RouterOutputs } from '~/trpc/react';
 import ViewConfigDialog from './ViewConfigDialog';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
@@ -49,16 +50,7 @@ function SpriteIcon({
   );
 }
 
-type ViewListItem = {
-  id: string;
-  name: string;
-  type: 'grid';
-  // Placeholder for future DB-backed view configs.
-  // These are not yet wired into the grid query layer.
-  filters: unknown[];
-  sortRules: unknown[];
-  hiddenColumnIds: string[];
-};
+type ViewListItem = RouterOutputs['table']['getViews'][number];
 
 function SortableViewRow({
   view,
@@ -164,12 +156,27 @@ function SortableViewRow({
 }
 
 export default function Sidebar({
+  tableId,
+  views,
+  activeViewId,
+  onSelectView,
+  onCreatedView,
+  isLoadingViews,
   onRequestResetViewConfig,
 }: {
+  tableId: string;
+  views: ViewListItem[];
+  activeViewId: string | null;
+  onSelectView: (viewId: string) => void;
+  onCreatedView: (view: ViewListItem) => void;
+  isLoadingViews: boolean;
   onRequestResetViewConfig?: () => void;
 }) {
   const [width, setWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
+
+  const utils = api.useUtils();
+  const createViewMutation = api.table.createView.useMutation();
 
   const createButtonRef = useRef<HTMLButtonElement | null>(null);
   const createMenuPopoverRef = useRef<HTMLDivElement | null>(null);
@@ -183,26 +190,43 @@ export default function Sidebar({
   const [viewConfigDialogPos, setViewConfigDialogPos] = useState({ x: 0, y: 0 });
   const [defaultViewName, setDefaultViewName] = useState('Grid');
 
-  // Views aren't persisted yet (server router not implemented).
-  // Keep the sidebar UI data-driven so it can be wired to DB-backed views later.
-  const [views, setViews] = useState<ViewListItem[]>(() => [
-    {
-      id: 'grid',
-      name: 'Grid view',
-      type: 'grid',
-      filters: [],
-      sortRules: [],
-      hiddenColumnIds: [],
-    },
-  ]);
-  const [selectedViewId, setSelectedViewId] = useState<string>('grid');
+  const isCreatingViewRef = useRef(false);
+
+  // Local-only ordering (does not persist).
+  const [orderedViewIds, setOrderedViewIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const next = views.map((v) => v.id);
+    setOrderedViewIds((prev) => {
+      if (prev.length === 0) return next;
+      const existing = new Set(next);
+      const normalized = prev.filter((id) => existing.has(id));
+      for (const id of next) {
+        if (!normalized.includes(id)) normalized.push(id);
+      }
+      return normalized;
+    });
+  }, [views]);
+
+  const normalizeLegacyGridName = (name: string) => {
+    if (name === 'Grid view') return 'Grid';
+    const m = /^Grid view (\d+)$/.exec(name);
+    if (m) return `Grid ${m[1]}`;
+    return name;
+  };
 
   // Function to calculate the next default view name
   const calculateNextViewName = () => {
-    const gridCount = views.filter((v) => v.type === 'grid').length;
-    if (gridCount === 0) return 'Grid';
-    if (gridCount === 1) return 'Grid 2';
-    return `Grid ${gridCount + 1}`;
+    const existing = new Set<string>();
+    for (const v of views) {
+      existing.add(v.name);
+      existing.add(normalizeLegacyGridName(v.name));
+    }
+
+    if (!existing.has('Grid')) return 'Grid';
+    let n = 2;
+    while (existing.has(`Grid ${n}`)) n++;
+    return `Grid ${n}`;
   };
 
   // Handle opening the view config dialog
@@ -219,35 +243,74 @@ export default function Sidebar({
     setIsCreateMenuOpen(false);
   };
 
-  const createNewGridView = (name: string) => {
-    const newId =
-      typeof crypto !== 'undefined' &&
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      typeof (crypto as unknown as { randomUUID?: () => string }).randomUUID === 'function'
-        ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
-        : `grid-${Date.now()}`;
+  const createNewGridView = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (!tableId || tableId.length === 0) return;
+    if (tableId.startsWith('__creating__')) return;
+    if (isCreatingViewRef.current) return;
 
-    setViews((prev) => [
-      ...prev,
-      {
-        id: newId,
-        name,
-        type: 'grid',
-        filters: [],
-        sortRules: [],
-        hiddenColumnIds: [],
-      },
-    ]);
+    isCreatingViewRef.current = true;
 
-    setSelectedViewId(newId);
+    // Optimistically insert a placeholder view so the UI stays open/consistent and
+    // default naming doesn't repeat while the network request is in-flight.
+    const tempId = `__creating_view__${Date.now()}`;
+    const optimistic: ViewListItem = {
+      id: tempId,
+      name: trimmed,
+      tableId,
+      filters: [],
+      sortRules: [],
+      search: '',
+      hiddenColumns: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Close dialog immediately to match Airtable-like behavior.
     setIsViewConfigDialogOpen(false);
+    setIsCreateMenuOpen(false);
     onRequestResetViewConfig?.();
+    onCreatedView(optimistic);
+
+    utils.table.getViews.setData({ tableId }, (old) => {
+      if (!old) return [optimistic];
+      if (old.some((v) => v.id === tempId)) return old;
+      return [...old, optimistic] as typeof old;
+    });
+
+    try {
+      const created = await createViewMutation.mutateAsync({ tableId, name: trimmed });
+      utils.table.getViews.setData({ tableId }, (old) => {
+        if (!old) return old;
+        return old.map((v) => (v.id === tempId ? (created as unknown as typeof v) : v));
+      });
+      await utils.table.getViews.invalidate({ tableId });
+      onCreatedView(created as ViewListItem);
+    } catch (e) {
+      console.warn('Failed to create view', e);
+      // Roll back optimistic entry.
+      utils.table.getViews.setData({ tableId }, (old) => {
+        if (!old) return old;
+        return old.filter((v) => v.id !== tempId);
+      });
+      // Best-effort: let the user retry by reopening the dialog.
+      setDefaultViewName(trimmed);
+      setIsViewConfigDialogOpen(true);
+    } finally {
+      isCreatingViewRef.current = false;
+    }
   };
 
   const showDragHandle = views.length > 1;
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const viewIds = useMemo(() => views.map((v) => v.id), [views]);
+  const viewIds = useMemo(() => orderedViewIds, [orderedViewIds]);
+
+  const orderedViews = useMemo(() => {
+    const byId = new Map(views.map((v) => [v.id, v] as const));
+    return orderedViewIds.map((id) => byId.get(id)).filter((v): v is ViewListItem => Boolean(v));
+  }, [views, orderedViewIds]);
 
   // Keep popover position in sync when open.
   useEffect(() => {
@@ -488,9 +551,9 @@ export default function Sidebar({
                     onDragEnd={({ active, over }) => {
                       if (!over || active.id === over.id) return;
 
-                      setViews((prev) => {
-                        const oldIndex = prev.findIndex((v) => v.id === active.id);
-                        const newIndex = prev.findIndex((v) => v.id === over.id);
+                      setOrderedViewIds((prev) => {
+                        const oldIndex = prev.findIndex((id) => id === active.id);
+                        const newIndex = prev.findIndex((id) => id === over.id);
                         if (oldIndex < 0 || newIndex < 0) return prev;
                         return arrayMove(prev, oldIndex, newIndex);
                       });
@@ -498,13 +561,13 @@ export default function Sidebar({
                   >
                     <SortableContext items={viewIds} strategy={verticalListSortingStrategy}>
                       <ul role="listbox" className="css-bi2s67">
-                        {views.map((view) => (
+                        {orderedViews.map((view) => (
                           <SortableViewRow
                             key={view.id}
                             view={view}
-                            selected={view.id === selectedViewId}
+                            selected={view.id === activeViewId}
                             showDragHandle={showDragHandle}
-                            onSelect={() => setSelectedViewId(view.id)}
+                            onSelect={() => onSelectView(view.id)}
                           />
                         ))}
                       </ul>
@@ -801,10 +864,27 @@ export default function Sidebar({
         <ViewConfigDialog
           position={viewConfigDialogPos}
           defaultName={defaultViewName}
-          existingViewNames={views.map((v) => v.name)}
+          existingViewNames={views.map((v) => normalizeLegacyGridName(v.name))}
           onCancel={() => setIsViewConfigDialogOpen(false)}
-          onCreate={(name) => createNewGridView(name)}
+          onCreate={(name, _permission) => {
+            void createNewGridView(name);
+          }}
         />
+      )}
+
+      {isLoadingViews && (
+        <div
+          className="absolute"
+          style={{
+            top: 8,
+            right: 8,
+            color: 'rgba(29, 31, 37, 0.6)',
+            fontSize: 11,
+            pointerEvents: 'none',
+          }}
+        >
+          Loading…
+        </div>
       )}
 
       {/* Resize handle */}

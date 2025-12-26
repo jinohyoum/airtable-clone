@@ -302,20 +302,22 @@ export default function MainContent({
   }, []);
 
   const upsertRowCell = useCallback(
-    (
-      row: {
+    <
+      TRow extends {
         id: string;
         createdAt: Date;
         updatedAt: Date;
         cells: Array<{ columnId: string; value?: string; [key: string]: unknown }>;
       },
+    >(
+      row: TRow,
       columnId: string,
       value: string,
-    ) => {
+    ): TRow => {
       const idx = row.cells.findIndex((c) => c.columnId === columnId);
       if (idx >= 0) {
         const nextCells = row.cells.map((c) => (c.columnId === columnId ? { ...c, value } : c));
-        return { ...row, cells: nextCells };
+        return { ...row, cells: nextCells } as TRow;
       }
 
       const col = tableMeta?.columns?.find((c) => c.id === columnId);
@@ -335,7 +337,7 @@ export default function MainContent({
             updatedAt: row.updatedAt,
           },
         ],
-      };
+      } as TRow;
     },
     [tableMeta],
   );

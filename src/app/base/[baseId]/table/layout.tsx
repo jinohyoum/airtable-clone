@@ -17,6 +17,199 @@ import FilterPopover from './[tableId]/components/FilterPopover';
 import TableTabsBar from './[tableId]/components/TableTabsBar';
 import TopNav from './[tableId]/components/TopNav';
 
+type ViewFilterCondition = {
+  id: string;
+  columnId: string;
+  operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
+  value?: string;
+};
+
+type ViewSortRule = { columnId: string; direction: 'asc' | 'desc' };
+
+function normalizeViewFilters(raw: unknown): ViewFilterCondition[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ViewFilterCondition[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const columnId = typeof r.columnId === 'string' ? r.columnId : '';
+    const operator = r.operator as ViewFilterCondition['operator'];
+    const value = typeof r.value === 'string' ? r.value : undefined;
+    const id = typeof r.id === 'string' && r.id.length > 0 ? r.id : `${Date.now()}-${Math.random()}`;
+    if (!columnId) continue;
+    if (!(
+      operator === 'isEmpty' ||
+      operator === 'isNotEmpty' ||
+      operator === 'contains' ||
+      operator === 'notContains' ||
+      operator === 'equals' ||
+      operator === 'greaterThan' ||
+      operator === 'lessThan'
+    )) {
+      continue;
+    }
+    out.push({ id, columnId, operator, value });
+  }
+  return out;
+}
+
+function normalizeViewSortRules(raw: unknown): ViewSortRule[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ViewSortRule[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const columnId = typeof r.columnId === 'string' ? r.columnId : '';
+    const direction = r.direction === 'desc' ? 'desc' : 'asc';
+    if (!columnId) continue;
+    out.push({ columnId, direction });
+  }
+  return out;
+}
+
+function normalizeHiddenColumns(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === 'string');
+}
+
+function useDebouncedEffect(effect: () => void, deps: unknown[], delayMs: number) {
+  useEffect(() => {
+    const handle = window.setTimeout(() => effect(), delayMs);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, delayMs]);
+}
+
+function ViewConfigAutosaver({
+  tableId,
+  activeViewId,
+  search,
+  sortRules,
+  filters,
+  isApplyingViewRef,
+}: {
+  tableId: string;
+  activeViewId: string | null;
+  search: string;
+  sortRules: ViewSortRule[];
+  filters: ViewFilterCondition[];
+  isApplyingViewRef: React.MutableRefObject<boolean>;
+}) {
+  const { hiddenColumnIds } = useColumnsUi();
+  const utils = api.useUtils();
+  const updateView = api.table.updateView.useMutation({
+    onMutate: async (input) => {
+      // Keep the local views list in sync so switching views reapplies the latest config.
+      await utils.table.getViews.cancel({ tableId });
+      const previous = utils.table.getViews.getData({ tableId });
+
+      utils.table.getViews.setData({ tableId }, (old) => {
+        if (!old) return old;
+        return old.map((v) => {
+          if (v.id !== input.viewId) return v;
+          return {
+            ...v,
+            search: input.search ?? v.search,
+            filters: input.filters ?? v.filters,
+            sortRules: input.sortRules ?? v.sortRules,
+            hiddenColumns: input.hiddenColumns ?? v.hiddenColumns,
+          };
+        });
+      });
+
+      return { previous };
+    },
+    onError: (_err, _input, ctx) => {
+      if (ctx?.previous) {
+        utils.table.getViews.setData({ tableId }, ctx.previous);
+      }
+    },
+  });
+
+  const hiddenColumns = useMemo(() => Array.from(hiddenColumnIds), [hiddenColumnIds]);
+
+  const latestRef = useRef({
+    tableId,
+    activeViewId,
+    search,
+    sortRules,
+    filters,
+    hiddenColumns,
+  });
+  useEffect(() => {
+    latestRef.current = { tableId, activeViewId, search, sortRules, filters, hiddenColumns };
+  }, [tableId, activeViewId, search, sortRules, filters, hiddenColumns]);
+
+  // Flush immediately when the user switches views (or any code requests it).
+  useEffect(() => {
+    const onFlush = () => {
+      const v = latestRef.current;
+      if (!v.activeViewId) return;
+      if (!v.tableId || v.tableId.startsWith('__creating__')) return;
+      if (isApplyingViewRef.current) return;
+
+      updateView.mutate({
+        viewId: v.activeViewId,
+        search: v.search.trim(),
+        sortRules: v.sortRules.map((r) => ({ columnId: r.columnId, direction: r.direction })),
+        filters: v.filters.map((f) => ({
+          id: f.id,
+          columnId: f.columnId,
+          operator: f.operator,
+          value: f.value,
+        })),
+        hiddenColumns: v.hiddenColumns,
+      });
+    };
+
+    window.addEventListener('views:flushActive', onFlush as EventListener);
+    return () => window.removeEventListener('views:flushActive', onFlush as EventListener);
+  }, [updateView, isApplyingViewRef]);
+
+  const signature = useMemo(() => {
+    const normalizedHidden = [...hiddenColumns].sort();
+    const normalizedFilters = [...filters]
+      .map((f) => ({ id: f.id, columnId: f.columnId, operator: f.operator, value: f.value ?? '' }))
+      .sort((a, b) => `${a.columnId}:${a.operator}:${a.value}`.localeCompare(`${b.columnId}:${b.operator}:${b.value}`));
+    const normalizedSort = [...sortRules]
+      .map((r) => ({ columnId: r.columnId, direction: r.direction }))
+      .sort((a, b) => `${a.columnId}:${a.direction}`.localeCompare(`${b.columnId}:${b.direction}`));
+    return JSON.stringify({
+      tableId,
+      viewId: activeViewId,
+      search: search.trim(),
+      hiddenColumns: normalizedHidden,
+      filters: normalizedFilters,
+      sortRules: normalizedSort,
+    });
+  }, [activeViewId, tableId, search, hiddenColumns, filters, sortRules]);
+
+  useDebouncedEffect(
+    () => {
+      if (!activeViewId) return;
+      if (!tableId || tableId.startsWith('__creating__')) return;
+      if (isApplyingViewRef.current) return;
+
+      updateView.mutate({
+        viewId: activeViewId,
+        search: search.trim(),
+        sortRules: sortRules.map((r) => ({ columnId: r.columnId, direction: r.direction })),
+        filters: filters.map((f) => ({
+          id: f.id,
+          columnId: f.columnId,
+          operator: f.operator,
+          value: f.value,
+        })),
+        hiddenColumns,
+      });
+    },
+    [signature],
+    500,
+  );
+
+  return null;
+}
+
 const HideFieldsButton = forwardRef<
   HTMLDivElement,
   {
@@ -98,6 +291,16 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const hasTableId = Boolean(tableId && tableId.length > 0);
   const utils = api.useUtils();
   const [isInserting, setIsInserting] = useState(false);
+
+  const { data: views, isLoading: isLoadingViews } = api.table.getViews.useQuery(
+    { tableId: tableId ?? '' },
+    { enabled: hasTableId && !Boolean(tableId?.startsWith('__creating__')) },
+  );
+  const createViewMutation = api.table.createView.useMutation();
+
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [viewSwitchSeq, setViewSwitchSeq] = useState(0);
+  const isApplyingViewRef = useRef(false);
   
   // Fetch table metadata to get column names for filter button
   const { data: tableMeta } = api.table.getTableMeta.useQuery(
@@ -112,10 +315,14 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const deferredSearchInput = useDeferredValue(searchInput);
-  const search = useMemo(() => {
+  const deferredSearch = useMemo(() => {
     const q = deferredSearchInput.trim();
     return q.length > 0 ? q : undefined;
   }, [deferredSearchInput]);
+  const immediateSearch = useMemo(() => {
+    const q = searchInput.trim();
+    return q.length > 0 ? q : undefined;
+  }, [searchInput]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
@@ -142,21 +349,34 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const filterPopoverRef = useRef<HTMLDivElement | null>(null);
   
   // Filter state
-  type FilterCondition = {
-    id: string;
-    columnId: string;
-    operator: 'isEmpty' | 'isNotEmpty' | 'contains' | 'notContains' | 'equals' | 'greaterThan' | 'lessThan';
-    value?: string;
-  };
-  const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [draftFilters, setDraftFilters] = useState<FilterCondition[]>([]);
+  const [filters, setFilters] = useState<ViewFilterCondition[]>([]);
+  const [draftFilters, setDraftFilters] = useState<ViewFilterCondition[]>([]);
 
   // Match Ctrl+F search behavior: keep typing responsive by deferring the value that drives grid fetching.
   const deferredFilters = useDeferredValue(filters);
 
+  // During a view switch, we want the rows query to react immediately (showing the same
+  // loading/transition state users see when applying filter/sort). We normally defer for typing.
+  const isViewSwitching = useMemo(() => {
+    if (viewSwitchSeq === 0) return false;
+    const searchCaughtUp = deferredSearchInput === searchInput;
+    const filtersCaughtUp = deferredFilters === filters;
+    return !(searchCaughtUp && filtersCaughtUp);
+  }, [viewSwitchSeq, deferredSearchInput, searchInput, deferredFilters, filters]);
+
+  useEffect(() => {
+    if (viewSwitchSeq === 0) return;
+    const searchCaughtUp = deferredSearchInput === searchInput;
+    const filtersCaughtUp = deferredFilters === filters;
+    if (searchCaughtUp && filtersCaughtUp) setViewSwitchSeq(0);
+  }, [viewSwitchSeq, deferredSearchInput, searchInput, deferredFilters, filters]);
+
+  const search = isViewSwitching ? immediateSearch : deferredSearch;
+  const effectiveFiltersForQuery = isViewSwitching ? filters : deferredFilters;
+
   // Keep filter UI typing responsive by scheduling filter application as a transition.
   const [, startFilterTransition] = useTransition();
-  const filtersRef = useRef<FilterCondition[]>([]);
+  const filtersRef = useRef<ViewFilterCondition[]>([]);
   useEffect(() => {
     filtersRef.current = filters;
   }, [filters]);
@@ -186,7 +406,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   }, [isFilterActiveForButton, filteredFieldNames]);
 
   const applyFilters = useCallback(
-    (next: FilterCondition[]) => {
+    (next: ViewFilterCondition[]) => {
       // Normalize and stable-serialize to detect no-op updates.
       const normalized = (next ?? [])
         .filter(Boolean)
@@ -213,7 +433,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   );
 
   const applyDraftFilters = useCallback(
-    (next: FilterCondition[]) => {
+    (next: ViewFilterCondition[]) => {
       // Draft updates happen during typing; keep them low priority as well.
       const normalized = (next ?? [])
         .filter(Boolean)
@@ -292,7 +512,66 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setFilters([]);
     setIsSearchOpen(false);
     setSearchInput('');
+    setActiveViewId(null);
   }, [tableId]);
+
+  // Choose an initial view for the table.
+  useEffect(() => {
+    if (!hasTableId || !views) return;
+    if (views.length === 0) return;
+
+    // If the current active view doesn't exist anymore, fall back to the first.
+    if (!activeViewId || !views.some((v) => v.id === activeViewId)) {
+      setActiveViewId(views[0]!.id);
+    }
+  }, [hasTableId, views, activeViewId]);
+
+  // If a table has no views (older data), create a default Grid view.
+  useEffect(() => {
+    if (!hasTableId || !tableId) return;
+    if (tableId.startsWith('__creating__')) return;
+    if (isLoadingViews) return;
+    if (!views) return;
+    if (views.length > 0) return;
+    if (createViewMutation.isPending) return;
+
+    void createViewMutation
+      .mutateAsync({ tableId, name: 'Grid' })
+      .then((created) => {
+        setActiveViewId(created.id);
+        void utils.table.getViews.invalidate({ tableId });
+      })
+      .catch(() => {
+        // Best-effort: keep UI usable even if default view creation fails.
+      });
+  }, [hasTableId, tableId, isLoadingViews, views, createViewMutation, utils]);
+
+  const activeView = useMemo(() => {
+    if (!views || !activeViewId) return null;
+    return views.find((v) => v.id === activeViewId) ?? null;
+  }, [views, activeViewId]);
+
+  // Apply the selected view's saved config to UI state.
+  useEffect(() => {
+    if (!activeView) return;
+    isApplyingViewRef.current = true;
+
+    setSearchInput(activeView.search ?? '');
+    const nextSort = normalizeViewSortRules(activeView.sortRules);
+    setSortRules(nextSort);
+    setDraftSortRules(nextSort);
+    const nextFilters = normalizeViewFilters(activeView.filters);
+    setFilters(nextFilters);
+    setDraftFilters(nextFilters);
+
+    // Hidden columns are applied via ColumnsUiContext syncer below.
+
+    // Allow autosave effects to run after the apply settles.
+    const t = window.setTimeout(() => {
+      isApplyingViewRef.current = false;
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [activeView]);
 
   // Position hide-fields popover under the button when opened
   useEffect(() => {
@@ -458,6 +737,21 @@ export default function TableLayout({ children }: { children: ReactNode }) {
         <TableTabsBar />
         {hasTableId ? (
           <ColumnsUiProvider tableId={tableId ?? ''}>
+            {/* Apply view hiddenColumns to ColumnsUi state */}
+            <ViewHiddenColumnsApplier
+              activeViewId={activeViewId}
+              hiddenColumns={normalizeHiddenColumns(activeView?.hiddenColumns)}
+              isApplyingViewRef={isApplyingViewRef}
+            />
+            {/* Debounced autosave of view config */}
+            <ViewConfigAutosaver
+              tableId={tableId ?? ''}
+              activeViewId={activeViewId}
+              search={searchInput}
+              sortRules={sortRules}
+              filters={filters}
+              isApplyingViewRef={isApplyingViewRef}
+            />
             {/* View bar (spans to the narrow sidebar) */}
             <div
               className="flex flex-shrink-0 items-center border-b border-gray-200 bg-white relative"
@@ -564,7 +858,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         className="strong truncate flex-auto text-size-default ml1 mr1"
                         style={{ maxWidth: '200px' }}
                       >
-                        Grid view
+                        {activeView?.name ?? 'Grid'}
                       </span>
                       <div data-testid="More options">
                         <svg
@@ -1280,15 +1574,43 @@ export default function TableLayout({ children }: { children: ReactNode }) {
             </div>
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <Sidebar />
-              <MainContent isSearchOpen={isSearchOpen} search={search} sortRules={sortRules} filters={deferredFilters} />
+              <Sidebar
+                tableId={tableId ?? ''}
+                views={views ?? []}
+                activeViewId={activeViewId}
+                onSelectView={(nextViewId) => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('views:flushActive'));
+                  }
+                  setViewSwitchSeq((n) => n + 1);
+                  setActiveViewId(nextViewId);
+                }}
+                onCreatedView={(created) => {
+                  setActiveViewId(created.id);
+                  // New view should start clean; applying view handles the rest.
+                }}
+                isLoadingViews={isLoadingViews}
+              />
+              <MainContent
+                isSearchOpen={isSearchOpen}
+                search={search}
+                sortRules={sortRules}
+                filters={effectiveFiltersForQuery}
+              />
               {/* Keep children mounted for route completeness */}
               {children}
             </div>
           </ColumnsUiProvider>
         ) : (
           <div className="flex min-h-0 flex-1 overflow-hidden">
-            <Sidebar />
+            <Sidebar
+              tableId={''}
+              views={[]}
+              activeViewId={null}
+              onSelectView={() => null}
+              onCreatedView={() => null}
+              isLoadingViews={false}
+            />
             <div
               className="flex min-h-0 flex-1 items-center justify-center"
               style={{ backgroundColor: '#f6f8fc' }}
@@ -1314,5 +1636,40 @@ export default function TableLayout({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function ViewHiddenColumnsApplier({
+  activeViewId,
+  hiddenColumns,
+  isApplyingViewRef,
+}: {
+  activeViewId: string | null;
+  hiddenColumns: string[];
+  isApplyingViewRef: React.MutableRefObject<boolean>;
+}) {
+  const { hiddenColumnIds, setHiddenColumnIds } = useColumnsUi();
+  const hiddenColumnIdsRef = useRef<ReadonlySet<string>>(hiddenColumnIds);
+
+  useEffect(() => {
+    hiddenColumnIdsRef.current = hiddenColumnIds;
+  }, [hiddenColumnIds]);
+
+  const hiddenColumnsSignature = useMemo(() => JSON.stringify([...hiddenColumns].sort()), [hiddenColumns]);
+
+  useEffect(() => {
+    if (!activeViewId) return;
+
+    const current = Array.from(hiddenColumnIdsRef.current).sort();
+    if (JSON.stringify(current) === hiddenColumnsSignature) return;
+
+    isApplyingViewRef.current = true;
+    setHiddenColumnIds(new Set(hiddenColumns));
+    const t = window.setTimeout(() => {
+      isApplyingViewRef.current = false;
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [activeViewId, hiddenColumns, hiddenColumnsSignature, setHiddenColumnIds, isApplyingViewRef]);
+
+  return null;
 }
 

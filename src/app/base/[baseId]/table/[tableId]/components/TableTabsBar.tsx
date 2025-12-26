@@ -350,10 +350,8 @@ export default function TableTabsBar() {
         onSelect: () => {
           // Make the tab + dropdown appear immediately (Airtable-like),
           // while the real table is created in the background.
-          const existingTables = [...(tablesData ?? [])];
-          if (optimisticTable) {
-            existingTables.push(optimisticTable);
-          }
+          const existingTables = (tablesData ?? []).map((t) => ({ name: t.name }));
+          if (optimisticTable) existingTables.push({ name: optimisticTable.name });
           const defaultName = findSmallestAvailableTableName(existingTables);
           const tempId = `__creating__${Date.now()}`;
 

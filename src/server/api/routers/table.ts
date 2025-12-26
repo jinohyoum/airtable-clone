@@ -31,6 +31,144 @@ function computeSearchText(values: Record<string, unknown>) {
 }
 
 export const tableRouter = createTRPCRouter({
+  getViews: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // Basic ownership check (consistent with protected routes).
+      const table = await ctx.db.table.findFirst({
+        where: {
+          id: input.tableId,
+          base: { userId: ctx.session.user.id },
+        },
+        select: { id: true },
+      });
+
+      if (!table) throw new Error("Table not found");
+
+      return ctx.db.view.findMany({
+        where: { tableId: input.tableId },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          tableId: true,
+          filters: true,
+          sortRules: true,
+          search: true,
+          hiddenColumns: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    }),
+
+  createView: protectedProcedure
+    .input(
+      z.object({
+        tableId: z.string(),
+        name: z.string().min(1).max(256),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const table = await ctx.db.table.findFirst({
+        where: {
+          id: input.tableId,
+          base: { userId: ctx.session.user.id },
+        },
+        select: { id: true },
+      });
+
+      if (!table) throw new Error("Table not found");
+
+      return ctx.db.view.create({
+        data: {
+          tableId: input.tableId,
+          name: input.name,
+          // Defaults handled by Prisma schema.
+        },
+        select: {
+          id: true,
+          name: true,
+          tableId: true,
+          filters: true,
+          sortRules: true,
+          search: true,
+          hiddenColumns: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    }),
+
+  updateView: protectedProcedure
+    .input(
+      z.object({
+        viewId: z.string(),
+        name: z.string().min(1).max(256).optional(),
+        filters: z
+          .array(
+            z.object({
+              id: z.string().optional(),
+              columnId: z.string(),
+              operator: z.enum([
+                "isEmpty",
+                "isNotEmpty",
+                "contains",
+                "notContains",
+                "equals",
+                "greaterThan",
+                "lessThan",
+              ]),
+              value: z.string().optional(),
+            }),
+          )
+          .optional(),
+        sortRules: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              direction: z.enum(["asc", "desc"]),
+            }),
+          )
+          .optional(),
+        search: z.string().optional(),
+        hiddenColumns: z.array(z.string()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.view.findFirst({
+        where: {
+          id: input.viewId,
+          table: { base: { userId: ctx.session.user.id } },
+        },
+        select: { id: true },
+      });
+
+      if (!existing) throw new Error("View not found");
+
+      return ctx.db.view.update({
+        where: { id: input.viewId },
+        data: {
+          name: input.name,
+          filters: input.filters as Prisma.InputJsonValue | undefined,
+          sortRules: input.sortRules as Prisma.InputJsonValue | undefined,
+          search: input.search,
+          hiddenColumns: input.hiddenColumns as Prisma.InputJsonValue | undefined,
+        },
+        select: {
+          id: true,
+          name: true,
+          tableId: true,
+          filters: true,
+          sortRules: true,
+          search: true,
+          hiddenColumns: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    }),
+
   list: protectedProcedure
     .input(z.object({ baseId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -82,6 +220,14 @@ export const tableRouter = createTRPCRouter({
           columns: {
             orderBy: { order: "asc" },
           },
+        },
+      });
+
+      // Ensure every table has an initial Grid view.
+      await ctx.db.view.create({
+        data: {
+          tableId: table.id,
+          name: "Grid",
         },
       });
 
