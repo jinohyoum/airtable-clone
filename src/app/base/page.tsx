@@ -2,6 +2,7 @@ import { auth } from "~/server/auth";
 import { redirect } from "next/navigation";
 import { api } from "~/trpc/server";
 import Link from "next/link";
+import BasePageHeader from "./_components/BasePageHeader";
 
 export default async function BasesPage() {
   const session = await auth();
@@ -12,6 +13,7 @@ export default async function BasesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <BasePageHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gray-900">Home</h1>
