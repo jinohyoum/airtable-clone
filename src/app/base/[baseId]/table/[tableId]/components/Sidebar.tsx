@@ -17,6 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import ViewConfigDialog from './ViewConfigDialog';
 
 const ICON_SPRITE = '/icons/icon_definitions.svg?v=04661fff742a9043fa037c751b1c6e66';
 
@@ -51,6 +52,12 @@ function SpriteIcon({
 type ViewListItem = {
   id: string;
   name: string;
+  type: 'grid';
+  // Placeholder for future DB-backed view configs.
+  // These are not yet wired into the grid query layer.
+  filters: unknown[];
+  sortRules: unknown[];
+  hiddenColumnIds: string[];
 };
 
 function SortableViewRow({
@@ -129,8 +136,6 @@ function SortableViewRow({
 
         <div
           ref={setActivatorNodeRef}
-          tabIndex={0}
-          role="button"
           draggable="false"
           className="visually-hidden solid dragHandle flex items-center flex-none focus-visible quieter link-unquiet"
           style={{ marginRight: '4px' }}
@@ -154,7 +159,11 @@ function SortableViewRow({
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({
+  onRequestResetViewConfig,
+}: {
+  onRequestResetViewConfig?: () => void;
+}) {
   const [width, setWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
 
@@ -165,10 +174,71 @@ export default function Sidebar() {
     { x: number; y: number; maxH: number; maxW: number } | null
   >(null);
 
+  // View config dialog state
+  const [isViewConfigDialogOpen, setIsViewConfigDialogOpen] = useState(false);
+  const [viewConfigDialogPos, setViewConfigDialogPos] = useState({ x: 0, y: 0 });
+  const [defaultViewName, setDefaultViewName] = useState('Grid');
+
   // Views aren't persisted yet (server router not implemented).
   // Keep the sidebar UI data-driven so it can be wired to DB-backed views later.
-  const [views, setViews] = useState<ViewListItem[]>(() => [{ id: 'grid', name: 'Grid view' }]);
+  const [views, setViews] = useState<ViewListItem[]>(() => [
+    {
+      id: 'grid',
+      name: 'Grid view',
+      type: 'grid',
+      filters: [],
+      sortRules: [],
+      hiddenColumnIds: [],
+    },
+  ]);
   const [selectedViewId, setSelectedViewId] = useState<string>('grid');
+
+  // Function to calculate the next default view name
+  const calculateNextViewName = () => {
+    const gridCount = views.filter((v) => v.type === 'grid').length;
+    if (gridCount === 0) return 'Grid';
+    if (gridCount === 1) return 'Grid 2';
+    return `Grid ${gridCount + 1}`;
+  };
+
+  // Handle opening the view config dialog
+  const openViewConfigDialog = () => {
+    const nextName = calculateNextViewName();
+    setDefaultViewName(nextName);
+    
+    // Use the same position as the create menu
+    if (createMenuPos) {
+      setViewConfigDialogPos({ x: createMenuPos.x, y: createMenuPos.y });
+    }
+    
+    setIsViewConfigDialogOpen(true);
+    setIsCreateMenuOpen(false);
+  };
+
+  const createNewGridView = (name: string) => {
+    const newId =
+      typeof crypto !== 'undefined' &&
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      typeof (crypto as unknown as { randomUUID?: () => string }).randomUUID === 'function'
+        ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
+        : `grid-${Date.now()}`;
+
+    setViews((prev) => [
+      ...prev,
+      {
+        id: newId,
+        name,
+        type: 'grid',
+        filters: [],
+        sortRules: [],
+        hiddenColumnIds: [],
+      },
+    ]);
+
+    setSelectedViewId(newId);
+    setIsViewConfigDialogOpen(false);
+    onRequestResetViewConfig?.();
+  };
 
   const showDragHandle = views.length > 1;
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -231,6 +301,33 @@ export default function Sidebar() {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [isCreateMenuOpen]);
+
+  // Close view config dialog on outside click / Escape.
+  useEffect(() => {
+    if (!isViewConfigDialogOpen) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      // Check if click is inside the dialog
+      const dialog = document.querySelector('[data-view-config-dialog="true"]');
+      if (dialog?.contains(target)) return;
+      setIsViewConfigDialogOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setIsViewConfigDialogOpen(false);
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isViewConfigDialogOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -452,7 +549,7 @@ export default function Sidebar() {
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
               }}
-              onClick={() => setIsCreateMenuOpen(false)}
+              onClick={() => openViewConfigDialog()}
             >
               <SpriteIcon
                 name="GridFeature"
@@ -693,6 +790,17 @@ export default function Sidebar() {
             </li>
           </ul>
         </div>
+      )}
+
+      {/* View Config Dialog */}
+      {isViewConfigDialogOpen && (
+        <ViewConfigDialog
+          position={viewConfigDialogPos}
+          defaultName={defaultViewName}
+          existingViewNames={views.map((v) => v.name)}
+          onCancel={() => setIsViewConfigDialogOpen(false)}
+          onCreate={(name) => createNewGridView(name)}
+        />
       )}
 
       {/* Resize handle */}
