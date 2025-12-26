@@ -80,10 +80,12 @@ function SortableViewRow({
     transition,
   } = useSortable({ id: view.id, disabled: !showDragHandle });
 
+  const [isHovered, setIsHovered] = useState(false);
+
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    backgroundColor: selected ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+    backgroundColor: selected ? 'rgba(0, 0, 0, 0.05)' : isHovered ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
     borderRadius: '3px',
     boxSizing: 'border-box',
     height: '32.25px',
@@ -103,6 +105,8 @@ function SortableViewRow({
         e.stopPropagation();
         onSelect();
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-center">
         <div className="flex-auto flex items-center">

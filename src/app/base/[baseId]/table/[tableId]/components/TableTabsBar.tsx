@@ -68,6 +68,16 @@ export default function TableTabsBar() {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('tables:saving', { detail: { count } }));
   };
+
+  // Find the smallest positive "Table N" that isn't already taken
+  const findSmallestAvailableTableName = (existingTables: Array<{ name: string }>) => {
+    const existingNames = new Set(existingTables.map(t => t.name));
+    let n = 1;
+    while (existingNames.has(`Table ${n}`)) {
+      n++;
+    }
+    return `Table ${n}`;
+  };
   // Fetch real tables from database
   const { data: tablesData } = api.table.list.useQuery(
     { baseId: baseId ?? "" },
@@ -340,8 +350,11 @@ export default function TableTabsBar() {
         onSelect: () => {
           // Make the tab + dropdown appear immediately (Airtable-like),
           // while the real table is created in the background.
-          const existingCount = (tablesData?.length ?? 0) + (optimisticTable ? 1 : 0);
-          const defaultName = `Table ${existingCount + 1}`;
+          const existingTables = [...(tablesData ?? [])];
+          if (optimisticTable) {
+            existingTables.push(optimisticTable);
+          }
+          const defaultName = findSmallestAvailableTableName(existingTables);
           const tempId = `__creating__${Date.now()}`;
 
           pendingCreateRef.current = { tempId, defaultName, prevTableId: currentTableId };
@@ -1466,6 +1479,12 @@ export default function TableTabsBar() {
             const activeId = activeOverrideTableId ?? currentTableId;
             const currentTable = tabs.find((t) => t.id === activeId);
             if (!activeId) return;
+
+            // Prevent saving if name is empty or already exists
+            const trimmedName = name.trim();
+            if (!trimmedName) return;
+            const nameExists = tabs.some((t) => t.id !== activeId && t.name === trimmedName);
+            if (nameExists) return;
 
             // If we're still creating (temp id), queue the rename and close.
             if (activeId.startsWith('__creating__')) {
