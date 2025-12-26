@@ -387,13 +387,16 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const filterCountForButton = isFilterOpen ? draftFilters.length : filters.length;
   const isFilterActiveForButton = filterCountForButton > 0;
   
-  // Get unique field names for active filters (only those with non-empty values)
+  // Get unique field names for active filters.
+  // Note: some operators (e.g. isEmpty/isNotEmpty) are meaningful without a typed value.
   const filteredFieldNames = useMemo(() => {
     const activeFilters = isFilterOpen ? draftFilters : filters;
     if (!tableMeta || activeFilters.length === 0) return [];
     
-    // Only include filters that have a value (non-empty)
-    const filtersWithValues = activeFilters.filter(f => f.value && f.value.trim().length > 0);
+    const filtersWithValues = activeFilters.filter((f) => {
+      if (f.operator === 'isEmpty' || f.operator === 'isNotEmpty') return true;
+      return Boolean(f.value && f.value.trim().length > 0);
+    });
     const uniqueColumnIds = new Set(filtersWithValues.map(f => f.columnId));
     const columnMap = new Map(tableMeta.columns.map(c => [c.id, c.name]));
     
