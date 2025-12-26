@@ -2346,7 +2346,7 @@ export default function MainContent({
         {/* Scrollable Body - VIRTUALIZED */}
         <div 
           ref={scrollContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden light-scrollbar"
         >
           <div className="flex min-w-0" style={{ height: `${totalHeight}px`, position: 'relative' }}>
             {/* Virtualized rows wrapper */}

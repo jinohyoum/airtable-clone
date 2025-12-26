@@ -33,7 +33,15 @@
 .light-scrollbar::-webkit-scrollbar {
   width: 10px;
 }
+.light-scrollbar::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
 .light-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.light-scrollbar::-webkit-scrollbar-corner {
   background: transparent;
 }
 .light-scrollbar::-webkit-scrollbar-thumb {
@@ -1500,6 +1508,44 @@ li:hover .visually-hidden {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Airtable-like Antiscroll Scrollbars                                        */
+/* -------------------------------------------------------------------------- */
+
+/* Base scrollbar element (the JS sets size + transform inline). */
+.antiscroll-scrollbar {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s linear;
+}
+
+/* Shown state (Airtable fades these in/out). */
+.antiscroll-scrollbar.antiscroll-scrollbar-shown {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Vertical thumb */
+.antiscroll-scrollbar.antiscroll-scrollbar-vertical {
+  right: 2px;
+  top: 0;
+  margin-top: 2px;
+  width: 10px;
+  border-radius: 7px;
+  background-color: rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 1px rgb(255, 255, 255) inset;
+  background-clip: border-box;
+  background-origin: padding-box;
+}
+
+.antiscroll-scrollbar.antiscroll-scrollbar-vertical:hover {
+  background-color: rgba(0, 0, 0, 0.34);
 }
 
 /* -------------------------------------------------------------------------- */
