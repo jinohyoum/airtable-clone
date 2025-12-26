@@ -299,6 +299,9 @@ export default function TableLayout({ children }: { children: ReactNode }) {
   const createViewMutation = api.table.createView.useMutation();
 
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  // Remember the last selected view per table while the user switches tabs.
+  // (Session-only; falls back to first view if the remembered id no longer exists.)
+  const lastSelectedViewIdByTableIdRef = useRef<Record<string, string>>({});
   const [viewSwitchSeq, setViewSwitchSeq] = useState(0);
   const isApplyingViewRef = useRef(false);
   
@@ -512,21 +515,41 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     setFilters([]);
     setIsSearchOpen(false);
     setSearchInput('');
+    // Reset the active view when switching tables; the "Choose an initial view" effect
+    // will immediately select either the remembered view for this table or the first view.
     setActiveViewId(null);
   }, [tableId]);
+
+  // Keep per-table memory in sync.
+  useEffect(() => {
+    if (!tableId) return;
+    if (!activeViewId) return;
+    // Guard against transient states during table switches where `tableId` updates
+    // before `activeViewId`/`views` have caught up.
+    if (!views || !views.some((v) => v.id === activeViewId)) return;
+    lastSelectedViewIdByTableIdRef.current[tableId] = activeViewId;
+  }, [tableId, activeViewId, views]);
 
   // Choose an initial view for the table.
   useEffect(() => {
     if (!hasTableId || !views) return;
     if (views.length === 0) return;
 
+    const rememberedViewId = tableId ? lastSelectedViewIdByTableIdRef.current[tableId] : null;
+
+    // Prefer restoring the last selected view for this table.
+    if (rememberedViewId && views.some((v) => v.id === rememberedViewId)) {
+      if (activeViewId !== rememberedViewId) setActiveViewId(rememberedViewId);
+      return;
+    }
+
     // If the current active view doesn't exist anymore, fall back to the first.
     if (!activeViewId || !views.some((v) => v.id === activeViewId)) {
       setActiveViewId(views[0]!.id);
     }
-  }, [hasTableId, views, activeViewId]);
+  }, [hasTableId, tableId, views, activeViewId]);
 
-  // If a table has no views (older data), create a default Grid view.
+  // If a table has no views (older data), create a default Grid View.
   useEffect(() => {
     if (!hasTableId || !tableId) return;
     if (tableId.startsWith('__creating__')) return;
@@ -536,7 +559,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
     if (createViewMutation.isPending) return;
 
     void createViewMutation
-      .mutateAsync({ tableId, name: 'Grid' })
+      .mutateAsync({ tableId, name: 'Grid View' })
       .then((created) => {
         setActiveViewId(created.id);
         void utils.table.getViews.invalidate({ tableId });
@@ -858,7 +881,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                         className="strong truncate flex-auto text-size-default ml1 mr1"
                         style={{ maxWidth: '200px' }}
                       >
-                        {activeView?.name ?? 'Grid'}
+                        {activeView?.name ?? 'Grid view'}
                       </span>
                       <div data-testid="More options">
                         <svg
@@ -1583,9 +1606,15 @@ export default function TableLayout({ children }: { children: ReactNode }) {
                     window.dispatchEvent(new CustomEvent('views:flushActive'));
                   }
                   setViewSwitchSeq((n) => n + 1);
+                  if (tableId) {
+                    lastSelectedViewIdByTableIdRef.current[tableId] = nextViewId;
+                  }
                   setActiveViewId(nextViewId);
                 }}
                 onCreatedView={(created) => {
+                  if (tableId) {
+                    lastSelectedViewIdByTableIdRef.current[tableId] = created.id;
+                  }
                   setActiveViewId(created.id);
                   // New view should start clean; applying view handles the rest.
                 }}

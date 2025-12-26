@@ -227,7 +227,7 @@ export const tableRouter = createTRPCRouter({
       await ctx.db.view.create({
         data: {
           tableId: table.id,
-          name: "Grid",
+          name: "Grid View",
         },
       });
 

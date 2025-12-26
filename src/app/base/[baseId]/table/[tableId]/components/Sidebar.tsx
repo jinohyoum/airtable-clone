@@ -188,7 +188,7 @@ export default function Sidebar({
   // View config dialog state
   const [isViewConfigDialogOpen, setIsViewConfigDialogOpen] = useState(false);
   const [viewConfigDialogPos, setViewConfigDialogPos] = useState({ x: 0, y: 0 });
-  const [defaultViewName, setDefaultViewName] = useState('Grid');
+  const [defaultViewName, setDefaultViewName] = useState('Grid View');
 
   const isCreatingViewRef = useRef(false);
 
@@ -209,24 +209,47 @@ export default function Sidebar({
   }, [views]);
 
   const normalizeLegacyGridName = (name: string) => {
-    if (name === 'Grid view') return 'Grid';
-    const m = /^Grid view (\d+)$/.exec(name);
-    if (m) return `Grid ${m[1]}`;
+    // Canonical naming:
+    // - Initial grid view on a new table: "Grid View"
+    // - Additional grid views: "Grid 2", "Grid 3", ...
+    // Support older/legacy names like "Grid", "Grid view", and "Grid view 2".
+    if (/^grid$/i.test(name)) return 'Grid View';
+    if (/^grid\s+view$/i.test(name)) return 'Grid View';
+
+    const legacyNumbered = /^grid\s+view\s+(\d+)$/i.exec(name);
+    if (legacyNumbered) return `Grid ${legacyNumbered[1]}`;
+
+    const numbered = /^grid\s+(\d+)$/i.exec(name);
+    if (numbered) return `Grid ${numbered[1]}`;
+
     return name;
   };
 
   // Function to calculate the next default view name
   const calculateNextViewName = () => {
     const existing = new Set<string>();
+    let hasGridView = false;
+    let maxGridNumber = 0;
+
     for (const v of views) {
-      existing.add(v.name);
-      existing.add(normalizeLegacyGridName(v.name));
+      const normalized = normalizeLegacyGridName(v.name);
+      existing.add(normalized);
+
+      if (normalized === 'Grid View') hasGridView = true;
+
+      const m = /^Grid (\d+)$/.exec(normalized);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > maxGridNumber) maxGridNumber = n;
+      }
     }
 
-    if (!existing.has('Grid')) return 'Grid';
-    let n = 2;
-    while (existing.has(`Grid ${n}`)) n++;
-    return `Grid ${n}`;
+    // If the table has no grid view at all (older data), create the initial one.
+    if (!hasGridView && maxGridNumber === 0 && !existing.has('Grid View')) return 'Grid View';
+
+    // Otherwise, new grids are "Grid 2", "Grid 3", ...
+    // (We reserve the base table's default grid name as "Grid View".)
+    return `Grid ${Math.max(2, maxGridNumber + 1)}`;
   };
 
   // Handle opening the view config dialog
@@ -870,21 +893,6 @@ export default function Sidebar({
             void createNewGridView(name);
           }}
         />
-      )}
-
-      {isLoadingViews && (
-        <div
-          className="absolute"
-          style={{
-            top: 8,
-            right: 8,
-            color: 'rgba(29, 31, 37, 0.6)',
-            fontSize: 11,
-            pointerEvents: 'none',
-          }}
-        >
-          Loading…
-        </div>
       )}
 
       {/* Resize handle */}
