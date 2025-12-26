@@ -755,7 +755,7 @@ export default function TableLayout({ children }: { children: ReactNode }) {
         count: totalRows,
       });
 
-      // Invalidate the *active* infinite rows query key so totalCount/paging updates immediately.
+      // Invalidate the *active* infinite rows query key so paging updates immediately.
       const normalizedFilters =
         effectiveFiltersForQuery.length > 0
           ? effectiveFiltersForQuery.map((f) => ({

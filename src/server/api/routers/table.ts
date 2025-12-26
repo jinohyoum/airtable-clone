@@ -1059,20 +1059,6 @@ export const tableRouter = createTRPCRouter({
         }
       }
 
-      // Total count for the virtualizer should ignore the cursor (it represents total matching rows).
-      // We return it on every page so the client always has the latest count.
-      const countQuery = Prisma.sql`
-        SELECT COUNT(*) AS count
-        FROM "Row" r
-        WHERE r."tableId" = ${tableId}
-        ${filterSql}
-        ${searchSql}
-      `;
-      const totalCountResult = await ctx.db.$queryRaw<Array<{ count: bigint }>>(
-        countQuery,
-      );
-      const totalCount = Number(totalCountResult?.[0]?.count ?? 0n);
-
       // Transform JSONB values to cells array for backward compatibility
       const rowsWithCells = rows.map((row) => {
         const values = (row.values as Record<string, string | null | undefined>) ?? {};
@@ -1105,7 +1091,6 @@ export const tableRouter = createTRPCRouter({
       return {
         rows: rowsWithCells,
         nextCursor,
-        totalCount,
       };
     }),
 

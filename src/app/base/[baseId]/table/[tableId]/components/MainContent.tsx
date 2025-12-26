@@ -620,11 +620,6 @@ export default function MainContent({
     setFilterSaving((prev) => (prev.active ? { ...prev, active: false } : prev));
   }, [filterSaving.active, filterSaving.signature, filterSignature, isFetchingRows]);
 
-  // Get total count from first page (for virtualizer)
-  const totalCount = useMemo(() => {
-    return rowPages?.pages?.[0]?.totalCount ?? 0;
-  }, [rowPages]);
-
   // Flatten all pages into a single rows array
   const allRows = useMemo(() => {
     if (!rowPages) return [];
@@ -794,9 +789,6 @@ export default function MainContent({
           return oldData;
         }
         
-        // Get current totalCount from first page
-        const currentTotalCount = oldData.pages[0]?.totalCount ?? 0;
-        
         // Create completely new arrays at every level to ensure React Query detects changes
         const newPages = oldData.pages.map((page, pIdx) => {
           if (pIdx !== insertPageIdx) {
@@ -812,8 +804,6 @@ export default function MainContent({
             ...page,
             rows: newRows,
             nextCursor: page.nextCursor,
-            // Update totalCount on first page to reflect new row
-            totalCount: pIdx === 0 ? currentTotalCount + 1 : page.totalCount,
           };
         });
         
@@ -827,7 +817,6 @@ export default function MainContent({
           newRowCount: newPages.reduce((sum, p) => sum + p.rows.length, 0),
           insertPageIdx,
           insertRowIdx,
-          totalCount: newPages[0]?.totalCount,
         });
         
         // Return new object to ensure React Query detects the change
@@ -1101,13 +1090,10 @@ export default function MainContent({
 
           const newPages = oldData.pages.map((page, pageIdx) => {
             const newRows = page.rows.filter((r) => r.id !== rowId);
-            const currentTotal = page.totalCount ?? 0;
 
             return {
               ...page,
               rows: newRows,
-              // Keep totalCount in sync on the first page so virtualizer + footer stay accurate
-              totalCount: pageIdx === 0 ? Math.max(0, currentTotal - 1) : page.totalCount,
             };
           });
 
@@ -1181,7 +1167,7 @@ export default function MainContent({
           return next;
         });
 
-        // Remove from cache (and keep totalCount + rowCount consistent).
+        // Remove from cache (and keep rowCount consistent).
         const hasSearchFilter = Boolean(search && search.trim().length > 0);
         const currentCount = utils.table.getRowCount.getData({ tableId, search });
         if (!hasSearchFilter && currentCount) {
@@ -1193,19 +1179,11 @@ export default function MainContent({
 
         utils.table.getRows.setInfiniteData(rowsQueryInput, (oldData) => {
           if (!oldData) return oldData;
-          const currentTotal = oldData.pages[0]?.totalCount ?? 0;
-
-          // Only decrement totalCount if the row actually existed in cached rows.
-          const existed = oldData.pages.some((p) => p.rows.some((r) => r.id === rowId));
 
           return {
             pages: oldData.pages.map((page, pageIdx) => ({
               ...page,
               rows: page.rows.filter((r) => r.id !== rowId),
-              totalCount:
-                pageIdx === 0
-                  ? Math.max(0, (page.totalCount ?? currentTotal) - (existed ? 1 : 0))
-                  : page.totalCount,
             })),
             pageParams: oldData.pageParams ? [...oldData.pageParams] : [],
           };
@@ -1890,9 +1868,10 @@ export default function MainContent({
     };
   }, []);
 
-  // Set up row virtualizer with totalCount (not just loaded rows)
+  // Set up row virtualizer using DB-level count (not just loaded rows)
   const rowVirtualizer = useVirtualizer({
-    count: totalCount || allRows.length, // Use totalCount if available, fallback to loaded count
+    // Use DB-level count (separate query) so we don't need COUNT(*) inside every getRows page.
+    count: rowCountData?.count ?? allRows.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 32, // 32px = h-8 (fixed height for smoother scrolling)
     overscan: 30, // Render 30 extra rows above/below viewport for smoother scrolling
