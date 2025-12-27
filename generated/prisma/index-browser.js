@@ -126,6 +126,7 @@ exports.Prisma.BaseScalarFieldEnum = {
   name: 'name',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
+  lastAccessedAt: 'lastAccessedAt',
   userId: 'userId'
 };
 

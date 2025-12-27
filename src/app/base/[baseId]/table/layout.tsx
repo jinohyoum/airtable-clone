@@ -298,9 +298,18 @@ const HideFieldsButton = forwardRef<
 
 export default function TableLayout({ children }: { children: ReactNode }) {
   const params = useParams();
+  const baseId = params?.baseId as string | undefined;
   const tableId = params?.tableId as string | undefined;
   const hasTableId = Boolean(tableId && tableId.length > 0);
   const utils = api.useUtils();
+  
+  // Update lastAccessedAt when base is opened
+  const updateLastAccessed = api.base.updateLastAccessed.useMutation();
+  useEffect(() => {
+    if (baseId && !baseId.startsWith('__creating__')) {
+      updateLastAccessed.mutate({ baseId });
+    }
+  }, [baseId]); // Only run when baseId changes
   const [isInserting, setIsInserting] = useState(false);
 
   const { data: views, isLoading: isLoadingViews } = api.table.getViews.useQuery(

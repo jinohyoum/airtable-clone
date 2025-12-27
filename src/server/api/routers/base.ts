@@ -5,7 +5,7 @@ export const baseRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.base.findMany({
       where: { userId: ctx.session.user.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: { lastAccessedAt: "desc" },
     });
   }),
 
@@ -17,6 +17,27 @@ export const baseRouter = createTRPCRouter({
           name: input.name,
           userId: ctx.session.user.id,
         },
+      });
+    }),
+
+  updateLastAccessed: protectedProcedure
+    .input(z.object({ baseId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify user owns this base
+      const base = await ctx.db.base.findFirst({
+        where: {
+          id: input.baseId,
+          userId: ctx.session.user.id,
+        },
+      });
+
+      if (!base) {
+        throw new Error("Base not found");
+      }
+
+      return ctx.db.base.update({
+        where: { id: input.baseId },
+        data: { lastAccessedAt: new Date() },
       });
     }),
 });

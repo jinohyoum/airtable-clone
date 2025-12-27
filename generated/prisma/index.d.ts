@@ -1885,6 +1885,7 @@ export namespace Prisma {
     name: string | null
     createdAt: Date | null
     updatedAt: Date | null
+    lastAccessedAt: Date | null
     userId: string | null
   }
 
@@ -1893,6 +1894,7 @@ export namespace Prisma {
     name: string | null
     createdAt: Date | null
     updatedAt: Date | null
+    lastAccessedAt: Date | null
     userId: string | null
   }
 
@@ -1901,6 +1903,7 @@ export namespace Prisma {
     name: number
     createdAt: number
     updatedAt: number
+    lastAccessedAt: number
     userId: number
     _all: number
   }
@@ -1911,6 +1914,7 @@ export namespace Prisma {
     name?: true
     createdAt?: true
     updatedAt?: true
+    lastAccessedAt?: true
     userId?: true
   }
 
@@ -1919,6 +1923,7 @@ export namespace Prisma {
     name?: true
     createdAt?: true
     updatedAt?: true
+    lastAccessedAt?: true
     userId?: true
   }
 
@@ -1927,6 +1932,7 @@ export namespace Prisma {
     name?: true
     createdAt?: true
     updatedAt?: true
+    lastAccessedAt?: true
     userId?: true
     _all?: true
   }
@@ -2008,6 +2014,7 @@ export namespace Prisma {
     name: string
     createdAt: Date
     updatedAt: Date
+    lastAccessedAt: Date
     userId: string
     _count: BaseCountAggregateOutputType | null
     _min: BaseMinAggregateOutputType | null
@@ -2033,6 +2040,7 @@ export namespace Prisma {
     name?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    lastAccessedAt?: boolean
     userId?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
     tables?: boolean | Base$tablesArgs<ExtArgs>
@@ -2044,6 +2052,7 @@ export namespace Prisma {
     name?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    lastAccessedAt?: boolean
     userId?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["base"]>
@@ -2053,6 +2062,7 @@ export namespace Prisma {
     name?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    lastAccessedAt?: boolean
     userId?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["base"]>
@@ -2062,10 +2072,11 @@ export namespace Prisma {
     name?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    lastAccessedAt?: boolean
     userId?: boolean
   }
 
-  export type BaseOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "createdAt" | "updatedAt" | "userId", ExtArgs["result"]["base"]>
+  export type BaseOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "createdAt" | "updatedAt" | "lastAccessedAt" | "userId", ExtArgs["result"]["base"]>
   export type BaseInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     tables?: boolean | Base$tablesArgs<ExtArgs>
@@ -2089,6 +2100,7 @@ export namespace Prisma {
       name: string
       createdAt: Date
       updatedAt: Date
+      lastAccessedAt: Date
       userId: string
     }, ExtArgs["result"]["base"]>
     composites: {}
@@ -2519,6 +2531,7 @@ export namespace Prisma {
     readonly name: FieldRef<"Base", 'String'>
     readonly createdAt: FieldRef<"Base", 'DateTime'>
     readonly updatedAt: FieldRef<"Base", 'DateTime'>
+    readonly lastAccessedAt: FieldRef<"Base", 'DateTime'>
     readonly userId: FieldRef<"Base", 'String'>
   }
     
@@ -12965,6 +12978,7 @@ export namespace Prisma {
     name: 'name',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
+    lastAccessedAt: 'lastAccessedAt',
     userId: 'userId'
   };
 
@@ -13221,6 +13235,7 @@ export namespace Prisma {
     name?: StringFilter<"Base"> | string
     createdAt?: DateTimeFilter<"Base"> | Date | string
     updatedAt?: DateTimeFilter<"Base"> | Date | string
+    lastAccessedAt?: DateTimeFilter<"Base"> | Date | string
     userId?: StringFilter<"Base"> | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     tables?: TableListRelationFilter
@@ -13231,6 +13246,7 @@ export namespace Prisma {
     name?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    lastAccessedAt?: SortOrder
     userId?: SortOrder
     user?: UserOrderByWithRelationInput
     tables?: TableOrderByRelationAggregateInput
@@ -13244,6 +13260,7 @@ export namespace Prisma {
     name?: StringFilter<"Base"> | string
     createdAt?: DateTimeFilter<"Base"> | Date | string
     updatedAt?: DateTimeFilter<"Base"> | Date | string
+    lastAccessedAt?: DateTimeFilter<"Base"> | Date | string
     userId?: StringFilter<"Base"> | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     tables?: TableListRelationFilter
@@ -13254,6 +13271,7 @@ export namespace Prisma {
     name?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    lastAccessedAt?: SortOrder
     userId?: SortOrder
     _count?: BaseCountOrderByAggregateInput
     _max?: BaseMaxOrderByAggregateInput
@@ -13268,6 +13286,7 @@ export namespace Prisma {
     name?: StringWithAggregatesFilter<"Base"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Base"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Base"> | Date | string
+    lastAccessedAt?: DateTimeWithAggregatesFilter<"Base"> | Date | string
     userId?: StringWithAggregatesFilter<"Base"> | string
   }
 
@@ -13887,6 +13906,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     user: UserCreateNestedOneWithoutBasesInput
     tables?: TableCreateNestedManyWithoutBaseInput
   }
@@ -13896,6 +13916,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     userId: string
     tables?: TableUncheckedCreateNestedManyWithoutBaseInput
   }
@@ -13905,6 +13926,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutBasesNestedInput
     tables?: TableUpdateManyWithoutBaseNestedInput
   }
@@ -13914,6 +13936,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: StringFieldUpdateOperationsInput | string
     tables?: TableUncheckedUpdateManyWithoutBaseNestedInput
   }
@@ -13923,6 +13946,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     userId: string
   }
 
@@ -13931,6 +13955,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type BaseUncheckedUpdateManyInput = {
@@ -13938,6 +13963,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: StringFieldUpdateOperationsInput | string
   }
 
@@ -14634,6 +14660,7 @@ export namespace Prisma {
     name?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    lastAccessedAt?: SortOrder
     userId?: SortOrder
   }
 
@@ -14642,6 +14669,7 @@ export namespace Prisma {
     name?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    lastAccessedAt?: SortOrder
     userId?: SortOrder
   }
 
@@ -14650,6 +14678,7 @@ export namespace Prisma {
     name?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    lastAccessedAt?: SortOrder
     userId?: SortOrder
   }
 
@@ -16247,6 +16276,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     user: UserCreateNestedOneWithoutBasesInput
   }
 
@@ -16255,6 +16285,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     userId: string
   }
 
@@ -16372,6 +16403,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutBasesNestedInput
   }
 
@@ -16380,6 +16412,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: StringFieldUpdateOperationsInput | string
   }
 
@@ -16959,6 +16992,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     tables?: TableCreateNestedManyWithoutBaseInput
   }
 
@@ -16967,6 +17001,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
     tables?: TableUncheckedCreateNestedManyWithoutBaseInput
   }
 
@@ -17061,6 +17096,7 @@ export namespace Prisma {
     name?: StringFilter<"Base"> | string
     createdAt?: DateTimeFilter<"Base"> | Date | string
     updatedAt?: DateTimeFilter<"Base"> | Date | string
+    lastAccessedAt?: DateTimeFilter<"Base"> | Date | string
     userId?: StringFilter<"Base"> | string
   }
 
@@ -17340,6 +17376,7 @@ export namespace Prisma {
     name: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    lastAccessedAt?: Date | string
   }
 
   export type SessionCreateManyUserInput = {
@@ -17398,6 +17435,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tables?: TableUpdateManyWithoutBaseNestedInput
   }
 
@@ -17406,6 +17444,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tables?: TableUncheckedUpdateManyWithoutBaseNestedInput
   }
 
@@ -17414,6 +17453,7 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    lastAccessedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type SessionUpdateWithoutUserInput = {
