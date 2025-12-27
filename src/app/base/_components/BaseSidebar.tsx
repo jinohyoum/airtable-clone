@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import CreateBaseModal from './CreateBaseModal';
 
 export default function BaseSidebar() {
   const [starredExpanded, setStarredExpanded] = useState(true);
   const [workspacesExpanded, setWorkspacesExpanded] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   return (
     <div 
@@ -238,7 +240,7 @@ export default function BaseSidebar() {
 
             {/* Create button */}
             <button
-              onClick={(e) => e.preventDefault()}
+              onClick={() => setIsCreateModalOpen(true)}
               className="pointer items-center justify-center border-none text-white font-medium rounded-md focus-visible:outline-2 focus-visible:outline-blue-500 inline-flex w-full"
               style={{
                 backgroundColor: 'rgb(22, 110, 225)',
@@ -261,6 +263,12 @@ export default function BaseSidebar() {
           </div>
         </div>
       </nav>
+
+      {/* Create Base Modal */}
+      <CreateBaseModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }
